@@ -1,5 +1,5 @@
 #!/bin/bash
-FILE=i-MongoStore
+FILE=Mi-RAM-HQ
 make $FILE
 if test -f "./$FILE"; then
     ./$FILE

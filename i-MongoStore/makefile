@@ -4,6 +4,7 @@ SHARED_IDIR = ../shared/include
 CC=gcc
 CFLAGS=-I$(IDIR) -I$(SHARED_IDIR) -g -Wall
 
+CFG=./cfg
 ODIR=./obj
 SRCDIR =./src
 LIBS=-lcommons -lpthread -lreadline -lcunit -lrt
@@ -15,6 +16,9 @@ DEPS = $(wildcard $(IDIR)/*.h)
 
 SRC = $(wildcard $(SRCDIR)/*.c)
 OBJ = $(patsubst $(SRCDIR)/%.c,$(ODIR)/%.o,$(SRC))
+
+DIRECTORIO_OBJ_CFG:
+	mkdir -p $(ODIR) $(CFG)
 
 $(ODIR)/%.o: $(SRCDIR)/%.c $(DEPS) $(SHARED_DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)
