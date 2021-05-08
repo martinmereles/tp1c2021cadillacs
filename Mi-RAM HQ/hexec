@@ -1,5 +1,5 @@
 #!/bin/bash
-FILE=Mi-RAM-HQ
+FILE=Mi-RAM-HQ.out
 make $FILE
 if test -f "./$FILE"; then
     valgrind --tool=helgrind ./$FILE
