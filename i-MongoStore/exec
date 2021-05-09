@@ -1,6 +1,6 @@
 #!/bin/bash
 FILE=i-MongoStore
-make $FILE
+make
 if test -f "./$FILE.out"; then
     ./$FILE.out
 fi

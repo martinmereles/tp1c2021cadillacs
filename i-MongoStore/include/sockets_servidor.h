@@ -11,10 +11,7 @@
 #include <string.h>
 #include "sockets_shared.h"
 
-#define IP "127.0.0.1"
-#define PUERTO "4444"
-
-int iniciar_servidor(void);
+int iniciar_servidor(char*, char*);
 
 t_log* logger;
 

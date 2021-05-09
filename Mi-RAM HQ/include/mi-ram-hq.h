@@ -10,6 +10,7 @@
 #include <sys/fcntl.h>
 #include <poll.h>
 #include "sockets_servidor.h"
+#include "commons/config.h"
 
 enum server_status{
     RUNNING,

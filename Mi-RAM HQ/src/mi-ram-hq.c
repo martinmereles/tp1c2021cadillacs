@@ -4,7 +4,12 @@ int main(void)
 {
 	logger = log_create("./cfg/mi-ram-hq.log", "Mi-RAM HQ", 1, LOG_LEVEL_DEBUG);
 
-	int server_fd = iniciar_servidor();
+	// Leo IP y PUERTO del config
+	t_config *config = config_create("./cfg/mi-ram-hq.config");
+	char* puerto_escucha = config_get_string_value(config, "PUERTO");
+	char* ip = "127.0.0.1";
+
+	int server_fd = iniciar_servidor(ip, puerto_escucha);
 	log_info(logger, "Mi-RAM HQ listo para recibir al Discordiador");
 
 	pthread_t hilo_recibir_mensajes_discordiador, hilo_leer_consola;

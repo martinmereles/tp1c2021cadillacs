@@ -6,8 +6,8 @@ int main(void) {
 
 	// Leo IP y PUERTO del config
 	t_config *config = config_create("./cfg/discordiador.config");
-	char* direccion_IP_i_MongoStore = config_get_string_value(config, "IP_I_MONGOSTORE");
-	char* puerto_i_MongoStore = config_get_string_value(config, "PUERTO_I_MONGOSTORE");
+	char* direccion_IP_i_MongoStore = config_get_string_value(config, "IP_I_MONGO_STORE");
+	char* puerto_i_MongoStore = config_get_string_value(config, "PUERTO_I_MONGO_STORE");
 	char* direccion_IP_Mi_RAM_HQ = config_get_string_value(config, "IP_MI_RAM_HQ");
 	char* puerto_Mi_RAM_HQ = config_get_string_value(config, "PUERTO_MI_RAM_HQ");
 

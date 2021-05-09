@@ -17,8 +17,10 @@ DEPS = $(wildcard $(IDIR)/*.h)
 SRC = $(wildcard $(SRCDIR)/*.c)
 OBJ = $(patsubst $(SRCDIR)/%.c,$(ODIR)/%.o,$(SRC))
 
+all: DIRECTORIO_OBJ_CFG $(PROCESS_NAME)
+
 DIRECTORIO_OBJ_CFG:
-	mkdir -p $(ODIR) $(CFG)
+	mkdir -p $(ODIR) $(CFG) $(SHARED_ODIR)
 
 $(ODIR)/%.o: $(SRCDIR)/%.c $(DEPS) $(SHARED_DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)
