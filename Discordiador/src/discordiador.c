@@ -4,97 +4,240 @@ int main(void) {
 	// Creo logger
 	logger = log_create("./cfg/discordiador.log", "Discordiador", 1, LOG_LEVEL_DEBUG);
 
+	int i_mongo_store_fd;
+	int mi_ram_hq_fd;
+
 	// Leo IP y PUERTO del config
 	t_config *config = config_create("./cfg/discordiador.config");
-	char* direccion_IP_i_MongoStore = config_get_string_value(config, "IP_I_MONGO_STORE");
-	char* puerto_i_MongoStore = config_get_string_value(config, "PUERTO_I_MONGO_STORE");
-	char* direccion_IP_Mi_RAM_HQ = config_get_string_value(config, "IP_MI_RAM_HQ");
-	char* puerto_Mi_RAM_HQ = config_get_string_value(config, "PUERTO_MI_RAM_HQ");
+	string_append(direccion_IP_i_Mongo_Store, config_get_string_value(config, "IP_I_MONGO_STORE"));
+	string_append(puerto_i_Mongo_Store, config_get_string_value(config, "PUERTO_I_MONGO_STORE"));
+	string_append(direccion_IP_Mi_RAM_HQ, config_get_string_value(config, "IP_MI_RAM_HQ"));
+	string_append(puerto_Mi_RAM_HQ, config_get_string_value(config, "PUERTO_MI_RAM_HQ"));
 
 	// Intento conectarme con i-MongoStore
-	if(crear_conexion(direccion_IP_i_MongoStore, puerto_i_MongoStore, &i_mongostore_fd) == EXIT_FAILURE){
+	if(crear_conexion(direccion_IP_i_Mongo_Store, puerto_i_Mongo_Store, &i_mongo_store_fd) == EXIT_FAILURE){
 		log_error(logger, "No se pudo establecer la conexion con el i-MongoStore");
 		// Libero recursos
-		liberar_conexion(i_mongostore_fd);
+		liberar_conexion(i_mongo_store_fd);
 		log_destroy(logger);
 		config_destroy(config);
 		return EXIT_FAILURE;
 	}
 
-	// Intento conectarme con Mi-Ram HQ
-	if(crear_conexion(direccion_IP_Mi_RAM_HQ, puerto_Mi_RAM_HQ, &mi_ram_hq_fd) == EXIT_FAILURE){
-		log_error(logger, "No se pudo establecer la conexion con el i-MongoStore");
-		// Libero recursos
-		liberar_conexion(i_mongostore_fd);
-		liberar_conexion(mi_ram_hq_fd);
-		log_destroy(logger);
-		config_destroy(config);
-		return EXIT_FAILURE;
-	}
-
-	log_info(logger, "Conexion con los servidores exitosa");
+	log_info(logger, "Conexion con el i-Mongo-Store exitosa");
+	
 	servidor_desconectado = false;
 
-	// Creo hilos
-	pthread_t hilo_mandar_mensajes, hilo_recibir_mensajes_i_mongostore, hilo_recibir_mensajes_mi_ram_hq;
-
-	pthread_create(&hilo_mandar_mensajes, NULL, (void*) mandar_mensajes, NULL);
-	pthread_create(&hilo_recibir_mensajes_i_mongostore, NULL, (void*) recibir_operaciones_servidor, &i_mongostore_fd);
-	pthread_create(&hilo_recibir_mensajes_mi_ram_hq, NULL, (void*) recibir_operaciones_servidor, &mi_ram_hq_fd);
-
-	pthread_detach(hilo_recibir_mensajes_i_mongostore);
-	pthread_detach(hilo_recibir_mensajes_mi_ram_hq);
-	pthread_join(hilo_mandar_mensajes, (void**) NULL);
+	leer_fds(i_mongo_store_fd);
 
 	// Libero recursos
 	log_info(logger,"Finalizando Discordiador");
 	log_destroy(logger);
 	config_destroy(config);
-	liberar_conexion(i_mongostore_fd);
-	liberar_conexion(mi_ram_hq_fd);
+	liberar_conexion(i_mongo_store_fd);
 	
 	return EXIT_SUCCESS;
 }
 
-int recibir_operaciones_servidor(void *args) {
-	int servidor_fd = *((int*) args);
-	int cod_op;
+void leer_fds(int i_mongo_store_fd){
+	struct pollfd pfds[2];
 	char* mensaje;
+	pfds[0].fd = i_mongo_store_fd;	
+	pfds[0].events = POLLIN;	// Avisa cuando llego un mensaje del i-Mongo-Store
+	pfds[1].fd = 0;
+	pfds[1].events = POLLIN;	// Avisa cuando llego un mensaje de la consola
+	
+	int num_events;
 
-	while(1)
-	{
-		cod_op = recibir_operacion(servidor_fd);
-		switch(cod_op)
-		{
-		case MENSAJE:
-			mensaje = recibir_mensaje(servidor_fd);
-			log_info(logger, "Recibi el mensaje: %s", mensaje);
-			free(mensaje);
-			break;
-		case -1:
-			log_error(logger, "El servidor se desconecto. Terminando cliente");
-			liberar_conexion(servidor_fd);
-			servidor_desconectado = true;
-			return EXIT_FAILURE;
-		default:
-			log_warning(logger, "Operacion desconocida. No quieras meter la pata");
-			break;
+	while(1){
+		// Revisamos ocurrio un evento
+		num_events = poll(pfds, 2, 2500);
+
+		// Si ocurrio un evento
+		if(num_events != 0){		
+			// Si llego un mensaje por consola
+			if((pfds[1].revents & POLLIN)){
+				// Leemos la consola y procesamos el mensaje
+				leer_consola_y_procesar(i_mongo_store_fd);
+			}
+			else{
+				// Si llego un mensaje del i-Mongo-Store
+				if((pfds[0].revents & POLLIN)){
+					// Leemos el mensaje del socket y lo procesamos
+					//recibir_y_procesar_mensaje_i_mongo_store();
+					log_info(logger, "i-Mongo-Store envio un mensaje");
+				}
+				// Si ocurrio un evento inesperado
+				else{
+					log_error(logger, "Evento inesperado en los file descriptor: %s", strerror(pfds[0].revents));
+					log_error(logger, "Evento inesperado en los file descriptor: %s", strerror(pfds[1].revents));
+				}
+			}					
 		}
 	}
+}
+
+// REVISAR
+/*
+void recibir_y_procesar_mensaje_i_mongo_store(){
+	cod_op = recibir_operacion(i_mongo_store_fd);
+	switch(cod_op)
+	{
+	case MENSAJE:
+		mensaje = recibir_mensaje(i_mongo_store_fd);
+		log_info(logger, "Recibi el mensaje: %s", mensaje);
+		free(mensaje);
+		break;
+	case -1:
+		log_error(logger, "El servidor se desconecto. Terminando cliente");
+		liberar_conexion(i_mongo_store_fd);
+		servidor_desconectado = true;
+		return EXIT_FAILURE;
+	default:
+		log_warning(logger, "Operacion desconocida. No quieras meter la pata");
+		break;
+}*/
+
+void leer_consola_y_procesar(int i_mongo_store_fd) {
+	enum comando_discordiador comando;
+	char** argumentos;
+	char linea_consola[TAM_CONSOLA];
+	fgets(linea_consola,TAM_CONSOLA,stdin);
+	linea_consola[strlen(linea_consola)-1]='\0';	// Le saco el \n
+
+	argumentos = (char**) string_split(linea_consola, " ");
+	 
+	// Test: Mando cada argumento como un mensaje al i-Mongo-Store
+	/*
+	for(int i = 0;argumentos[i]!=NULL;i++){
+		log_info(logger, "Llego un mensaje por consola: %s", argumentos[i]);
+		// Enviamos el mensaje leido al i-MongoStore (porque pinto)
+		if(!servidor_desconectado)
+			estado_envio_mensaje = enviar_mensaje(i_mongo_store_fd, argumentos[i]);
+		if(estado_envio_mensaje != EXIT_SUCCESS)
+			log_error(logger, "No se pudo mandar el mensaje al i-Mongo-Store");
+	}*/
+
+	// Reviso cual fue el comando ingresado y lo ejecuto
+	comando = string_to_comando_discordiador(argumentos[0]);
+
+	switch(comando){
+		case INICIAR_PATOTA:
+			iniciar_patota(argumentos);
+			break;
+		case LISTAR_TRIPULANTES:
+			log_info(logger, "Listando tripulantes");
+			break;
+		case EXPULSAR_TRIPULANTES:
+			log_info(logger, "Expulsando tripulante");
+			break;
+		case INICIAR_PLANIFICACION:
+			log_info(logger, "Iniciando planificacion");
+			break;
+		case PAUSAR_PLANIFICACION:
+			log_info(logger, "Pausando planificacion");
+			break;
+		case OBTENER_BITACORA:
+			log_info(logger, "Obteniendo bitacora");
+			break;
+		default:
+			log_error(logger, "%s: comando no encontrado", argumentos[0]);
+	}
+
+	// Libero los recursos del array argumentos
+	for(int i = 0;argumentos[i]!=NULL;i++){
+		free(argumentos[i]);
+	}
+	free(argumentos);
+}
+
+int cantidad_argumentos(char** argumentos){
+	int cantidad = 0;
+	for(;argumentos[cantidad]!=NULL;cantidad++);
+	return cantidad;
+}
+
+int iniciar_patota(char** argumentos){
+	pthread_t *hilo_submodulo_tripulante;
+	int cantidad_args, cantidad_tripulantes;
+	FILE* archivo_de_tareas;
+
+	// Verificamos la cantidad de argumentos
+	cantidad_args = cantidad_argumentos(argumentos);
+	if(cantidad_args < 3){
+		log_error(logger, "INICIAR_PATOTA: Faltan argumentos");
+		return EXIT_FAILURE;
+	}
+	cantidad_tripulantes = atoi(argumentos[1]);
+	if(cantidad_args > cantidad_tripulantes + 3){
+		log_error(logger, "INICIAR_PATOTA: Sobran argumentos");
+		return EXIT_FAILURE;
+	}
+
+	// Abrimos el archivo de tareas
+	archivo_de_tareas = fopen(argumentos[2],"r");
+	if(archivo_de_tareas == NULL){
+		log_error(logger, "INICIAR_PATOTA: %s: No existe el archivo",argumentos[2]);
+		return EXIT_FAILURE;
+	}
+
+	// TODO Leemos el archivo de tareas
+
+	log_info(logger, "Iniciando patota");
+
+	for(int i = 1;i <= cantidad_tripulantes;i++){
+		// Creamos el hilo para el submodulo tripulante
+		// NOTA: el struct pthread_t de cada hilo tripulante se pierde
+		hilo_submodulo_tripulante = malloc(sizeof(pthread_t));
+		pthread_create(hilo_submodulo_tripulante, NULL, (void*) submodulo_tripulante, NULL);
+		pthread_detach(*hilo_submodulo_tripulante);
+		free(hilo_submodulo_tripulante);
+	}
+
+	log_info(logger, "La patota fue inicializada");
+
+	fclose(archivo_de_tareas);
 	return EXIT_SUCCESS;
 }
 
-void mandar_mensajes(void *args) {
-	int estado_envio_mensaje;
-	char* mensaje;
-	mensaje = readline("");
-	while(strcmp(mensaje,"") != 0 && !servidor_desconectado){
-		estado_envio_mensaje = enviar_mensaje(i_mongostore_fd, mensaje);
-		estado_envio_mensaje = enviar_mensaje(mi_ram_hq_fd, mensaje);
-		if(estado_envio_mensaje != EXIT_SUCCESS)
-			break;
-		free(mensaje);
-		mensaje = readline("");
+void submodulo_tripulante() {
+	int mi_ram_hq_fd;
+
+	// Intento conectarme con i-MongoStore
+	if(crear_conexion(direccion_IP_i_Mongo_Store, puerto_i_Mongo_Store, &i_mongo_store_fd) == EXIT_FAILURE){
+		log_error(logger, "Submodulo Tripulante: No se pudo establecer la conexion con el i-MongoStore");
+		// Libero recursos
+		liberar_conexion(i_mongo_store_fd);
+		return EXIT_FAILURE;
 	}
-	free(mensaje);
+
+	// Intento conectarme con Mi-Ram HQ
+	if(crear_conexion(direccion_IP_Mi_RAM_HQ, puerto_Mi_RAM_HQ, &mi_ram_hq_fd) == EXIT_FAILURE){
+		log_error(logger, "Submodulo Tripulante: No se pudo establecer la conexion con Mi-Ram HQ");
+		// Libero recursos
+		liberar_conexion(i_mongo_store_fd);
+		liberar_conexion(mi_ram_hq_fd);
+		return EXIT_FAILURE;
+	}
+
+	while(1){
+		sleep(5);
+		log_info(logger, "Hola soy un tripulante");
+	}
+}
+
+enum comando_discordiador string_to_comando_discordiador(char* string){
+	if(strcmp(string,"INICIAR_PATOTA")==0)
+		return INICIAR_PATOTA;
+	if(strcmp(string,"LISTAR_TRIPULANTES")==0)
+		return LISTAR_TRIPULANTES;
+	if(strcmp(string,"EXPULSAR_TRIPULANTES")==0)
+		return EXPULSAR_TRIPULANTES;
+	if(strcmp(string,"INICIAR_PLANIFICACION")==0)
+		return INICIAR_PLANIFICACION;
+	if(strcmp(string,"PAUSAR_PLANIFICACION")==0)
+		return PAUSAR_PLANIFICACION;
+	if(strcmp(string,"OBTENER_BITACORA")==0)
+		return OBTENER_BITACORA;
+	return ERROR;
 }
