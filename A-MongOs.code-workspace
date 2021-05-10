@@ -12,5 +12,10 @@
 		{
 			"path": "shared"
 		}
-	]
+	],
+	"settings": {
+		"files.associations": {
+			"mi-ram-hq.h": "c"
+		}
+	}
 }

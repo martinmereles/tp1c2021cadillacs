@@ -1,14 +1,11 @@
 #ifndef DISCORDIADOR_H_
 #define DISCORDIADOR_H_
 
-#include <readline/readline.h>
 #include <pthread.h>
 #include "commons/config.h"
 #include <poll.h>
-
+#include "commons/string.h"
 #include "sockets_cliente.h"
-
-#define TAM_CONSOLA 100
 
 enum comando_discordiador{  INICIAR_PATOTA, 
                             LISTAR_TRIPULANTES,
@@ -23,7 +20,7 @@ void leer_fds(int);
 enum comando_discordiador string_to_comando_discordiador(char*);
 int cantidad_argumentos(char** argumentos);
 int iniciar_patota(char** argumentos);
-void submodulo_tripulante();
+int submodulo_tripulante();
 
 char* direccion_IP_i_Mongo_Store;
 char* puerto_i_Mongo_Store;

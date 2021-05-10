@@ -2,5 +2,6 @@
 FILE=i-MongoStore
 make
 if test -f "./$FILE.out"; then
+    chmod 777 $FILE.out
     ./$FILE.out
 fi

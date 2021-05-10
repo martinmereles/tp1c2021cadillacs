@@ -1,19 +1,28 @@
 #include "discordiador.h"
 
 int main(void) {
+
 	// Creo logger
 	logger = log_create("./cfg/discordiador.log", "Discordiador", 1, LOG_LEVEL_DEBUG);
+	log_info(logger, "Inicializando el Discordiador");
 
 	int i_mongo_store_fd;
 	int mi_ram_hq_fd;
 
 	// Leo IP y PUERTO del config
 	t_config *config = config_create("./cfg/discordiador.config");
-	string_append(direccion_IP_i_Mongo_Store, config_get_string_value(config, "IP_I_MONGO_STORE"));
-	string_append(puerto_i_Mongo_Store, config_get_string_value(config, "PUERTO_I_MONGO_STORE"));
-	string_append(direccion_IP_Mi_RAM_HQ, config_get_string_value(config, "IP_MI_RAM_HQ"));
-	string_append(puerto_Mi_RAM_HQ, config_get_string_value(config, "PUERTO_MI_RAM_HQ"));
+	log_info(logger, "Iniciando configuracion");
+	direccion_IP_i_Mongo_Store = string_new();
+	puerto_i_Mongo_Store = string_new();
+	direccion_IP_Mi_RAM_HQ = string_new();
+	puerto_Mi_RAM_HQ = string_new();
+	string_append(&direccion_IP_i_Mongo_Store, config_get_string_value(config, "IP_I_MONGO_STORE"));
+	string_append(&puerto_i_Mongo_Store, config_get_string_value(config, "PUERTO_I_MONGO_STORE"));
+	string_append(&direccion_IP_Mi_RAM_HQ, config_get_string_value(config, "IP_MI_RAM_HQ"));
+	string_append(&puerto_Mi_RAM_HQ, config_get_string_value(config, "PUERTO_MI_RAM_HQ"));
+	log_info(logger, "Configuracion terminada");
 
+	log_info(logger, "Conectando con i-Mongo-Store");
 	// Intento conectarme con i-MongoStore
 	if(crear_conexion(direccion_IP_i_Mongo_Store, puerto_i_Mongo_Store, &i_mongo_store_fd) == EXIT_FAILURE){
 		log_error(logger, "No se pudo establecer la conexion con el i-MongoStore");
@@ -41,7 +50,6 @@ int main(void) {
 
 void leer_fds(int i_mongo_store_fd){
 	struct pollfd pfds[2];
-	char* mensaje;
 	pfds[0].fd = i_mongo_store_fd;	
 	pfds[0].events = POLLIN;	// Avisa cuando llego un mensaje del i-Mongo-Store
 	pfds[1].fd = 0;
@@ -50,7 +58,7 @@ void leer_fds(int i_mongo_store_fd){
 	int num_events;
 
 	while(1){
-		// Revisamos ocurrio un evento
+		// Revisamos si ocurrio un evento
 		num_events = poll(pfds, 2, 2500);
 
 		// Si ocurrio un evento
@@ -99,6 +107,7 @@ void recibir_y_procesar_mensaje_i_mongo_store(){
 }*/
 
 void leer_consola_y_procesar(int i_mongo_store_fd) {
+	int estado_envio_mensaje;
 	enum comando_discordiador comando;
 	char** argumentos;
 	char linea_consola[TAM_CONSOLA];
@@ -108,7 +117,6 @@ void leer_consola_y_procesar(int i_mongo_store_fd) {
 	argumentos = (char**) string_split(linea_consola, " ");
 	 
 	// Test: Mando cada argumento como un mensaje al i-Mongo-Store
-	/*
 	for(int i = 0;argumentos[i]!=NULL;i++){
 		log_info(logger, "Llego un mensaje por consola: %s", argumentos[i]);
 		// Enviamos el mensaje leido al i-MongoStore (porque pinto)
@@ -116,7 +124,7 @@ void leer_consola_y_procesar(int i_mongo_store_fd) {
 			estado_envio_mensaje = enviar_mensaje(i_mongo_store_fd, argumentos[i]);
 		if(estado_envio_mensaje != EXIT_SUCCESS)
 			log_error(logger, "No se pudo mandar el mensaje al i-Mongo-Store");
-	}*/
+	}
 
 	// Reviso cual fue el comando ingresado y lo ejecuto
 	comando = string_to_comando_discordiador(argumentos[0]);
@@ -200,30 +208,47 @@ int iniciar_patota(char** argumentos){
 	return EXIT_SUCCESS;
 }
 
-void submodulo_tripulante() {
-	int mi_ram_hq_fd;
+int submodulo_tripulante() {
+	int mi_ram_hq_fd_tripulante;
+	int i_mongo_store_fd_tripulante;
+	int estado_envio_mensaje;
+
+	log_info(logger, "Iniciando tripulante");
 
 	// Intento conectarme con i-MongoStore
-	if(crear_conexion(direccion_IP_i_Mongo_Store, puerto_i_Mongo_Store, &i_mongo_store_fd) == EXIT_FAILURE){
+	if(crear_conexion(direccion_IP_i_Mongo_Store, puerto_i_Mongo_Store, &i_mongo_store_fd_tripulante) == EXIT_FAILURE){
 		log_error(logger, "Submodulo Tripulante: No se pudo establecer la conexion con el i-MongoStore");
 		// Libero recursos
-		liberar_conexion(i_mongo_store_fd);
+		liberar_conexion(i_mongo_store_fd_tripulante);
 		return EXIT_FAILURE;
 	}
 
 	// Intento conectarme con Mi-Ram HQ
-	if(crear_conexion(direccion_IP_Mi_RAM_HQ, puerto_Mi_RAM_HQ, &mi_ram_hq_fd) == EXIT_FAILURE){
+	if(crear_conexion(direccion_IP_Mi_RAM_HQ, puerto_Mi_RAM_HQ, &mi_ram_hq_fd_tripulante) == EXIT_FAILURE){
 		log_error(logger, "Submodulo Tripulante: No se pudo establecer la conexion con Mi-Ram HQ");
 		// Libero recursos
-		liberar_conexion(i_mongo_store_fd);
-		liberar_conexion(mi_ram_hq_fd);
+		liberar_conexion(i_mongo_store_fd_tripulante);
+		liberar_conexion(mi_ram_hq_fd_tripulante);
 		return EXIT_FAILURE;
 	}
 
+	log_info(logger, "Tripulante inicializado");
+
 	while(1){
 		sleep(5);
-		log_info(logger, "Hola soy un tripulante");
+		// Test: Mando un mensaje al i-Mongo-Store y a Mi-Ram HQ
+		
+		// Hay que ver si el servidor esta conectado?
+		estado_envio_mensaje = enviar_mensaje(i_mongo_store_fd_tripulante, "Hola, soy un tripulante");
+		if(estado_envio_mensaje != EXIT_SUCCESS)
+			log_error(logger, "No se pudo mandar el mensaje al i-Mongo-Store");
+		// Hay que ver si el servidor esta conectado?
+		estado_envio_mensaje = enviar_mensaje(mi_ram_hq_fd_tripulante, "Hola, soy un tripulante");
+		if(estado_envio_mensaje != EXIT_SUCCESS)
+			log_error(logger, "No se pudo mandar el mensaje al Mi-Ram HQ");
 	}
+
+	return EXIT_SUCCESS;
 }
 
 enum comando_discordiador string_to_comando_discordiador(char* string){
