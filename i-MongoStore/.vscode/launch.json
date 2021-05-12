@@ -8,7 +8,7 @@
             "name": "i-MongoStore",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/i-MongoStore",
+            "program": "${workspaceFolder}/i-MongoStore.out",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
