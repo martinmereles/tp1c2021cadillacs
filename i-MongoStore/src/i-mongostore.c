@@ -2,6 +2,9 @@
 
 int main(void)
 {
+	// inicializo semaforos
+	sem_init(&semaforo_aceptar_conexiones, 0, 0);
+
 	logger = log_create("./cfg/i-mongostore.log", "I-MongoStore", 1, LOG_LEVEL_DEBUG);
 
 	// Leo IP y PUERTO del config
@@ -23,10 +26,6 @@ int main(void)
 
 void i_mongo_store(int servidor_fd) {
 	// Declaramos variables
-	struct sockaddr_in dir_cliente;					// auxiliar
-	int tam_direccion = sizeof(struct sockaddr_in);	// auxiliar
-	int *cliente_fd;
-
 	status_servidor = RUNNING;
 	pthread_t *hilo_atender_cliente;
 
@@ -46,17 +45,16 @@ void i_mongo_store(int servidor_fd) {
 		if(num_events != 0){
 			// Si llego un mensaje en el socket de escucha
 			if((pfds[0].revents & POLLIN)){
-				// Aceptamos la conexion
-				cliente_fd = malloc(sizeof(int));
-				*cliente_fd = accept(servidor_fd, (void*) &dir_cliente, (socklen_t*) &tam_direccion);
-				fcntl(cliente_fd, F_SETFL, O_NONBLOCK);
-				log_info(logger, "Se conecto un cliente!");
 				// Creamos el hilo que se encarga de atender el cliente
 				// NOTA: el struct pthread_t de cada hilo se pierde
 				hilo_atender_cliente = malloc(sizeof(pthread_t));
-				pthread_create(hilo_atender_cliente, NULL, (void*) atender_cliente, cliente_fd);
+				pthread_create(hilo_atender_cliente, NULL, (void*) atender_cliente, &servidor_fd);
 				pthread_detach(*hilo_atender_cliente);
 				free(hilo_atender_cliente);
+
+				// No dejo continuar la ejecucion hasta que se haya aceptado la conexion dentro del hilo creado
+				// Sino se pueden terminar creando mas hilos de los necesarios
+				sem_wait(&semaforo_aceptar_conexiones);
 			}
 			else{			
 				// Si llego un mensaje por consola
@@ -75,8 +73,20 @@ void i_mongo_store(int servidor_fd) {
 }
 
 void atender_cliente(void *args){
-	int cliente_fd = *((int*) args);
-	free(args);
+	// Declaramos variables
+	int servidor_fd = *((int*) args);
+	struct sockaddr_in dir_cliente;					// auxiliar
+	int tam_direccion = sizeof(struct sockaddr_in);	// auxiliar
+	int cliente_fd;
+
+	// Aceptamos la conexion
+	cliente_fd = accept(servidor_fd, (void*) &dir_cliente, (socklen_t*) &tam_direccion);
+	fcntl(&cliente_fd, F_SETFL, O_NONBLOCK);
+	log_info(logger, "Se conecto un cliente!");
+
+	// Posteamos en el semaforo
+	sem_post(&semaforo_aceptar_conexiones);
+
 	// Nos comunicamos con el cliente
 	comunicacion_cliente(cliente_fd);
 

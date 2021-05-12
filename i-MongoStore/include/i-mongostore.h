@@ -10,6 +10,7 @@
 #include <poll.h>
 #include "commons/config.h"
 #include "sockets_shared.h"
+#include <semaphore.h>
 
 enum server_status{
     RUNNING,
@@ -22,5 +23,6 @@ int comunicacion_cliente(int cliente_fd);
 void atender_cliente(void *args);
 
 int status_servidor;
+sem_t semaforo_aceptar_conexiones;
 
 #endif
