@@ -8,7 +8,7 @@
             "name": "Mi-RAM-HQ",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/Mi-RAM-HQ",
+            "program": "${workspaceFolder}/Mi-RAM-HQ.out",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
