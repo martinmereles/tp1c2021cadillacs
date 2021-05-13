@@ -81,7 +81,7 @@ void atender_cliente(void *args){
 
 	// Aceptamos la conexion
 	cliente_fd = accept(servidor_fd, (void*) &dir_cliente, (socklen_t*) &tam_direccion);
-	fcntl(&cliente_fd, F_SETFL, O_NONBLOCK);
+	fcntl(cliente_fd, F_SETFL, O_NONBLOCK);
 	log_info(logger, "Se conecto un cliente!");
 
 	// Posteamos en el semaforo
@@ -92,6 +92,7 @@ void atender_cliente(void *args){
 
 	log_info(logger,"Cerrando socket cliente");
 	close(cliente_fd);
+	log_info(logger,"Hilo cliente finalizado");
 }
 
 void leer_consola_y_procesar() {
@@ -106,12 +107,14 @@ void leer_consola_y_procesar() {
 }
 
 int comunicacion_cliente(int cliente_fd) {
+	bool cliente_conectado = true;
+
 	struct pollfd pfds[1];
 	pfds[0].fd = cliente_fd;	
 	pfds[0].events = POLLIN;	// Avisa cuando hay alguna operacion para leer en el buffer
 	int num_events;
 
-	while(status_servidor != END) {
+	while(status_servidor != END && cliente_conectado) {
 		// Revisamos si hay algun evento en el file descriptor del cliente
 		num_events = poll(pfds, 1, 2500);
 
@@ -119,7 +122,7 @@ int comunicacion_cliente(int cliente_fd) {
 		if(num_events != 0){
 			// Si hay un mensaje del cliente
 			if(pfds[0].revents & POLLIN)
-				leer_mensaje_cliente_y_procesar(cliente_fd);
+				cliente_conectado = leer_mensaje_cliente_y_procesar(cliente_fd);
 			else
 				log_error(logger, "Evento inesperado en file descriptor del cliente: %s", strerror(pfds[0].revents));
 		}
@@ -127,22 +130,21 @@ int comunicacion_cliente(int cliente_fd) {
 	return EXIT_SUCCESS;
 }
 
-void leer_mensaje_cliente_y_procesar(int cliente_fd){
-	char* mensaje;
+bool leer_mensaje_cliente_y_procesar(int cliente_fd){
+	bool cliente_conectado = true;
 	// Leo codigo de operacion
 	int cod_op = recibir_operacion(cliente_fd);
 	switch(cod_op) {
-		// Si mando un mensaje, lo logueo
-		case MENSAJE:
-			mensaje = recibir_mensaje(cliente_fd);
-			log_info(logger, "Recibi el mensaje: %s", mensaje);
-			free(mensaje);
+		case COD_MENSAJE:
+			recibir_payload_y_ejecutar(cliente_fd, loguear_mensaje);
 			break;
 		case -1:
 			log_error(logger, "El cliente se desconecto.");
-			return EXIT_FAILURE;
+			cliente_conectado = false;
+			break;
 		default:
 			log_warning(logger, "Operacion desconocida. No quieras meter la pata");
 			break;
 	}
+	return cliente_conectado;
 }

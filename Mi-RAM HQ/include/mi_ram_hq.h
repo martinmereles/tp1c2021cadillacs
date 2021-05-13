@@ -9,8 +9,8 @@
 #include <sys/fcntl.h>
 #include <poll.h>
 #include "commons/config.h"
-#include "sockets_shared.h"
 #include <semaphore.h>
+#include "servidor_mi_ram_hq.h"
 
 enum server_status{
     RUNNING,
@@ -39,6 +39,7 @@ void leer_consola_y_procesar();
 void mi_ram_hq(int);
 int comunicacion_cliente(int cliente_fd);
 void atender_cliente(void *args);
+bool leer_mensaje_cliente_y_procesar(int);
 
 int status_servidor;
 

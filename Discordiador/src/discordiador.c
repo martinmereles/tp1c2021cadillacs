@@ -2,6 +2,14 @@
 
 int main(void) {
 
+	// Inicializo variables globales
+	generadorPID = 0;
+	generadorTID = 0;
+
+	sem_init(&sem_generador_PID,0,1);
+	sem_init(&sem_generador_TID,0,1);
+	sem_init(&sem_struct_iniciar_tripulante,0,0);
+	
 	// Creo logger
 	logger = log_create("./cfg/discordiador.log", "Discordiador", 1, LOG_LEVEL_DEBUG);
 	log_info(logger, "Inicializando el Discordiador");
@@ -23,21 +31,33 @@ int main(void) {
 	log_info(logger, "Configuracion terminada");
 
 	log_info(logger, "Conectando con i-Mongo-Store");
-	// Intento conectarme con i-MongoStore
+	// Intento conectarme con i-Mongo-Store
 	if(crear_conexion(direccion_IP_i_Mongo_Store, puerto_i_Mongo_Store, &i_mongo_store_fd) == EXIT_FAILURE){
-		log_error(logger, "No se pudo establecer la conexion con el i-MongoStore");
+		log_error(logger, "No se pudo establecer la conexion con el i-Mongo-Store");
 		// Libero recursos
 		liberar_conexion(i_mongo_store_fd);
 		log_destroy(logger);
 		config_destroy(config);
 		return EXIT_FAILURE;
 	}
-
 	log_info(logger, "Conexion con el i-Mongo-Store exitosa");
+
+	log_info(logger, "Conectando con Mi-RAM HQ");
+	// Intento conectarme con Mi-RAM HQ
+	if(crear_conexion(direccion_IP_Mi_RAM_HQ, puerto_Mi_RAM_HQ, &mi_ram_hq_fd) == EXIT_FAILURE){
+		log_error(logger, "No se pudo establecer la conexion con Mi-RAM HQ");
+		// Libero recursos
+		liberar_conexion(i_mongo_store_fd);
+		liberar_conexion(mi_ram_hq_fd);
+		log_destroy(logger);
+		config_destroy(config);
+		return EXIT_FAILURE;
+	}
+	log_info(logger, "Conexion con el Mi-RAM HQ");
 	
 	servidor_desconectado = false;
 
-	leer_fds(i_mongo_store_fd);
+	leer_fds(i_mongo_store_fd, mi_ram_hq_fd);
 
 	// Libero recursos
 	log_info(logger,"Finalizando Discordiador");
@@ -48,7 +68,7 @@ int main(void) {
 	return EXIT_SUCCESS;
 }
 
-void leer_fds(int i_mongo_store_fd){
+void leer_fds(int i_mongo_store_fd, int mi_ram_hq_fd){
 	struct pollfd pfds[2];
 	pfds[0].fd = i_mongo_store_fd;	
 	pfds[0].events = POLLIN;	// Avisa cuando llego un mensaje del i-Mongo-Store
@@ -66,7 +86,7 @@ void leer_fds(int i_mongo_store_fd){
 			// Si llego un mensaje por consola
 			if((pfds[1].revents & POLLIN)){
 				// Leemos la consola y procesamos el mensaje
-				leer_consola_y_procesar(i_mongo_store_fd);
+				leer_consola_y_procesar(i_mongo_store_fd, mi_ram_hq_fd);
 			}
 			else{
 				// Si llego un mensaje del i-Mongo-Store
@@ -106,7 +126,7 @@ void recibir_y_procesar_mensaje_i_mongo_store(){
 		break;
 }*/
 
-void leer_consola_y_procesar(int i_mongo_store_fd) {
+void leer_consola_y_procesar(int i_mongo_store_fd, int mi_ram_hq_fd) {
 	int estado_envio_mensaje;
 	enum comando_discordiador comando;
 	char** argumentos;
@@ -131,7 +151,7 @@ void leer_consola_y_procesar(int i_mongo_store_fd) {
 
 	switch(comando){
 		case INICIAR_PATOTA:
-			iniciar_patota(argumentos);
+			iniciar_patota(argumentos, mi_ram_hq_fd);
 			break;
 		case LISTAR_TRIPULANTES:
 			log_info(logger, "Listando tripulantes");
@@ -165,11 +185,15 @@ int cantidad_argumentos(char** argumentos){
 	return cantidad;
 }
 
-int iniciar_patota(char** argumentos){
+int iniciar_patota(char** argumentos, int mi_ram_hq_fd){
 	pthread_t *hilo_submodulo_tripulante;
 	int cantidad_args, cantidad_tripulantes;
+	char* lista_de_tareas = "Lista de tareas";
 	FILE* archivo_de_tareas;
-
+	iniciar_tripulante_t struct_iniciar_tripulante;
+	char **posicion;
+	int PID;
+          
 	// Verificamos la cantidad de argumentos
 	cantidad_args = cantidad_argumentos(argumentos);
 	if(cantidad_args < 3){
@@ -189,15 +213,40 @@ int iniciar_patota(char** argumentos){
 		return EXIT_FAILURE;
 	}
 
-	// TODO Leemos el archivo de tareas
-
 	log_info(logger, "Iniciando patota");
 
-	for(int i = 1;i <= cantidad_tripulantes;i++){
+	// TODO: Leemos el archivo de tareas
+
+	// Generamos un nuevo PID
+	PID	= generarNuevoPID();
+	struct_iniciar_tripulante.PID = PID;
+
+	// Le pedimos a Mi-RAM HQ que inicie la patota
+	enviar_op_iniciar_patota(mi_ram_hq_fd, PID, lista_de_tareas);
+
+	for(int i = 0;i < cantidad_tripulantes;i++){
+		sem_wait(&sem_struct_iniciar_tripulante);
+		if( 3 + i < cantidad_args){
+			posicion = string_split(argumentos[3 + i],"|");
+			struct_iniciar_tripulante.posicion_X = atoi(posicion[0]);
+			struct_iniciar_tripulante.posicion_Y = atoi(posicion[1]);
+			// Libero los recursos del array posicion
+			for(int i = 0;posicion[i]!=NULL;i++){
+				free(posicion[i]);
+			}
+			free(posicion);
+		}
+		else{
+			struct_iniciar_tripulante.posicion_X = 0;
+			struct_iniciar_tripulante.posicion_Y = 0;
+		}
+
+		struct_iniciar_tripulante.TID = generarNuevoTID();
+
 		// Creamos el hilo para el submodulo tripulante
 		// NOTA: el struct pthread_t de cada hilo tripulante se pierde
 		hilo_submodulo_tripulante = malloc(sizeof(pthread_t));
-		pthread_create(hilo_submodulo_tripulante, NULL, (void*) submodulo_tripulante, NULL);
+		pthread_create(hilo_submodulo_tripulante, NULL, (void*) submodulo_tripulante, &struct_iniciar_tripulante);
 		pthread_detach(*hilo_submodulo_tripulante);
 		free(hilo_submodulo_tripulante);
 	}
@@ -208,7 +257,10 @@ int iniciar_patota(char** argumentos){
 	return EXIT_SUCCESS;
 }
 
-int submodulo_tripulante() {
+int submodulo_tripulante(void* args) {
+	iniciar_tripulante_t struct_iniciar_tripulante = *((iniciar_tripulante_t*) args);
+	sem_post(&sem_struct_iniciar_tripulante);
+
 	int mi_ram_hq_fd_tripulante;
 	int i_mongo_store_fd_tripulante;
 	int estado_envio_mensaje;
@@ -232,6 +284,10 @@ int submodulo_tripulante() {
 		return EXIT_FAILURE;
 	}
 
+	// Le pedimos a Mi-RAM HQ que inicie al tripulante
+	estado_envio_mensaje = enviar_op_iniciar_tripulante(mi_ram_hq_fd_tripulante, struct_iniciar_tripulante);
+	if(estado_envio_mensaje != EXIT_SUCCESS)
+		log_error(logger, "No se pudo mandar el mensaje al Mi-Ram HQ");
 	log_info(logger, "Tripulante inicializado");
 
 	while(1){
@@ -265,4 +321,22 @@ enum comando_discordiador string_to_comando_discordiador(char* string){
 	if(strcmp(string,"OBTENER_BITACORA")==0)
 		return OBTENER_BITACORA;
 	return ERROR;
+}
+
+int generarNuevoPID() {
+	int nuevo_valor;
+	sem_wait(&sem_generador_PID);
+	generadorPID++;
+	nuevo_valor = generadorPID;
+	sem_post(&sem_generador_PID);
+	return nuevo_valor;
+}
+
+int generarNuevoTID() {
+	int nuevo_valor;
+	sem_wait(&sem_generador_TID);
+	generadorTID++;
+	nuevo_valor = generadorTID;
+	sem_post(&sem_generador_TID);
+	return nuevo_valor;
 }

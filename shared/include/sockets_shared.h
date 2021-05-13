@@ -15,11 +15,16 @@
 
 
 // PROTOCOLO: CODIGOS DE OPERACION 
-typedef enum
-{
-	MENSAJE,
-    FIN_COMUNICACION
-}op_code;
+enum op_code{
+	COD_MENSAJE,
+    // Codigos para servidor Mi-RAM HQ
+    COD_INICIAR_PATOTA,
+    COD_INICIAR_TRIPULANTE,
+    COD_RECIBIR_UBICACION_TRIPULANTE,
+    COD_ENVIAR_PROXIMA_TAREA,
+    COD_EXPULSAR_TRIPULANTE
+    // Codigos para servidor i-Mongo-Store: FALTA
+};
 
 int recibir_operacion(int servidor_fd);
 void* recibir_payload(int socket_emisor);
@@ -28,5 +33,6 @@ int enviar_fin_comunicacion(int socket_destino);
 int enviar_mensaje(int socket_destino, char* mensaje);
 int enviar_operacion(int fd_destino, int codigo_operacion, char* payload);
 int iniciar_servidor(char*, char*);
+void recibir_payload_y_ejecutar(int socket_fd, void(*funcion_a_ejecutar)(char*));
 
 #endif

@@ -9,6 +9,12 @@ int recibir_operacion(int servidor_fd)
 		return -1;
 }
 
+void recibir_payload_y_ejecutar(int socket_fd, void(*funcion_a_ejecutar)(char*)){
+	char* payload = recibir_payload(socket_fd);
+	funcion_a_ejecutar(payload);
+	free(payload);
+}
+
 void* recibir_payload(int socket_emisor)
 {
 	void * payload;
@@ -27,19 +33,15 @@ char* recibir_mensaje(int socket_cliente)
 	return mensaje;
 }
 
-int enviar_fin_comunicacion(int fd_destino){
-	return enviar_operacion(fd_destino, FIN_COMUNICACION, NULL);
-}
-
 int enviar_mensaje(int fd_destino, char* mensaje){	
-	return enviar_operacion(fd_destino, MENSAJE, mensaje);
+	return enviar_operacion(fd_destino, COD_MENSAJE, mensaje);
 }
 
 int enviar_operacion(int fd_destino, int codigo_operacion, char* payload) {
 	int bytes_enviados;
 	int exit_status = EXIT_SUCCESS;
 	char* stream;
-	char offset = 0;
+	int offset = 0;
 	int cantidad_bytes;
 	int tamanio_stream;
 
