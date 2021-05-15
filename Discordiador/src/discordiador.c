@@ -8,7 +8,7 @@ int main(void) {
 
 	sem_init(&sem_generador_PID,0,1);
 	sem_init(&sem_generador_TID,0,1);
-	sem_init(&sem_struct_iniciar_tripulante,0,0);
+	sem_init(&sem_struct_iniciar_tripulante,0,1);
 	
 	// Creo logger
 	logger = log_create("./cfg/discordiador.log", "Discordiador", 1, LOG_LEVEL_DEBUG);
