@@ -3,12 +3,14 @@
 int main(void) {
 
 	// Inicializo variables globales
+	status_discordiador = RUNNING;
+
 	generadorPID = 0;
 	generadorTID = 0;
 
 	sem_init(&sem_generador_PID,0,1);
 	sem_init(&sem_generador_TID,0,1);
-	sem_init(&sem_struct_iniciar_tripulante,0,1);
+	sem_init(&sem_struct_iniciar_tripulante,0,0);
 	
 	// Creo logger
 	logger = log_create("./cfg/discordiador.log", "Discordiador", 1, LOG_LEVEL_DEBUG);
@@ -54,8 +56,6 @@ int main(void) {
 		return EXIT_FAILURE;
 	}
 	log_info(logger, "Conexion con el Mi-RAM HQ");
-	
-	servidor_desconectado = false;
 
 	leer_fds(i_mongo_store_fd, mi_ram_hq_fd);
 
@@ -64,6 +64,7 @@ int main(void) {
 	log_destroy(logger);
 	config_destroy(config);
 	liberar_conexion(i_mongo_store_fd);
+	liberar_conexion(mi_ram_hq_fd);
 	
 	return EXIT_SUCCESS;
 }
@@ -77,7 +78,7 @@ void leer_fds(int i_mongo_store_fd, int mi_ram_hq_fd){
 	
 	int num_events;
 
-	while(1){
+	while(status_discordiador != END){
 		// Revisamos si ocurrio un evento
 		num_events = poll(pfds, 2, 2500);
 
@@ -92,8 +93,7 @@ void leer_fds(int i_mongo_store_fd, int mi_ram_hq_fd){
 				// Si llego un mensaje del i-Mongo-Store
 				if((pfds[0].revents & POLLIN)){
 					// Leemos el mensaje del socket y lo procesamos
-					//recibir_y_procesar_mensaje_i_mongo_store();
-					log_info(logger, "i-Mongo-Store envio un mensaje");
+					recibir_y_procesar_mensaje_i_mongo_store(i_mongo_store_fd);
 				}
 				// Si ocurrio un evento inesperado
 				else{
@@ -105,26 +105,25 @@ void leer_fds(int i_mongo_store_fd, int mi_ram_hq_fd){
 	}
 }
 
-// REVISAR
-/*
-void recibir_y_procesar_mensaje_i_mongo_store(){
-	cod_op = recibir_operacion(i_mongo_store_fd);
+void recibir_y_procesar_mensaje_i_mongo_store(int i_mongo_store_fd){
+	char* mensaje;
+	int cod_op = recibir_operacion(i_mongo_store_fd);
 	switch(cod_op)
 	{
-	case MENSAJE:
-		mensaje = recibir_mensaje(i_mongo_store_fd);
-		log_info(logger, "Recibi el mensaje: %s", mensaje);
-		free(mensaje);
-		break;
-	case -1:
-		log_error(logger, "El servidor se desconecto. Terminando cliente");
-		liberar_conexion(i_mongo_store_fd);
-		servidor_desconectado = true;
-		return EXIT_FAILURE;
-	default:
-		log_warning(logger, "Operacion desconocida. No quieras meter la pata");
-		break;
-}*/
+		case COD_MENSAJE:
+			mensaje = recibir_mensaje(i_mongo_store_fd);
+			log_info(logger, "i-Mongo-Store envio un mensaje: %s", mensaje);
+			free(mensaje);
+			break;
+		case -1:
+			log_error(logger, "El i-Mongo-Store se desconecto. Terminando Discordiador");
+			status_discordiador = END;
+			break;
+		default:
+			log_warning(logger, "Operacion desconocida. No quieras meter la pata");
+			break;
+	}
+}
 
 void leer_consola_y_procesar(int i_mongo_store_fd, int mi_ram_hq_fd) {
 	int estado_envio_mensaje;
@@ -138,10 +137,9 @@ void leer_consola_y_procesar(int i_mongo_store_fd, int mi_ram_hq_fd) {
 	 
 	// Test: Mando cada argumento como un mensaje al i-Mongo-Store
 	for(int i = 0;argumentos[i]!=NULL;i++){
-		log_info(logger, "Llego un mensaje por consola: %s", argumentos[i]);
+		//log_info(logger, "Llego un mensaje por consola: %s", argumentos[i]);
 		// Enviamos el mensaje leido al i-MongoStore (porque pinto)
-		if(!servidor_desconectado)
-			estado_envio_mensaje = enviar_mensaje(i_mongo_store_fd, argumentos[i]);
+		estado_envio_mensaje = enviar_mensaje(i_mongo_store_fd, argumentos[i]);
 		if(estado_envio_mensaje != EXIT_SUCCESS)
 			log_error(logger, "No se pudo mandar el mensaje al i-Mongo-Store");
 	}
@@ -188,11 +186,13 @@ int cantidad_argumentos(char** argumentos){
 int iniciar_patota(char** argumentos, int mi_ram_hq_fd){
 	pthread_t *hilo_submodulo_tripulante;
 	int cantidad_args, cantidad_tripulantes;
-	char* lista_de_tareas = "Lista de tareas";
-	FILE* archivo_de_tareas;
 	iniciar_tripulante_t struct_iniciar_tripulante;
 	char **posicion;
 	int PID;
+
+	FILE* archivo_de_tareas;
+	char* lista_de_tareas = string_new();
+	char tarea[TAM_TAREA];
           
 	// Verificamos la cantidad de argumentos
 	cantidad_args = cantidad_argumentos(argumentos);
@@ -215,7 +215,13 @@ int iniciar_patota(char** argumentos, int mi_ram_hq_fd){
 
 	log_info(logger, "Iniciando patota");
 
-	// TODO: Leemos el archivo de tareas
+	// Leemos el archivo de tareas
+	log_info(logger, "Leyendo archivo de tareas");
+	while(!feof(archivo_de_tareas)){
+		fgets(tarea, TAM_CONSOLA, archivo_de_tareas);
+		string_append(&lista_de_tareas, tarea);
+	}
+	log_info(logger, "Archivo de tareas leido");
 
 	// Generamos un nuevo PID
 	PID	= generarNuevoPID();
@@ -225,7 +231,6 @@ int iniciar_patota(char** argumentos, int mi_ram_hq_fd){
 	enviar_op_iniciar_patota(mi_ram_hq_fd, PID, lista_de_tareas);
 
 	for(int i = 0;i < cantidad_tripulantes;i++){
-		sem_wait(&sem_struct_iniciar_tripulante);
 		if( 3 + i < cantidad_args){
 			posicion = string_split(argumentos[3 + i],"|");
 			struct_iniciar_tripulante.posicion_X = atoi(posicion[0]);
@@ -249,6 +254,10 @@ int iniciar_patota(char** argumentos, int mi_ram_hq_fd){
 		pthread_create(hilo_submodulo_tripulante, NULL, (void*) submodulo_tripulante, &struct_iniciar_tripulante);
 		pthread_detach(*hilo_submodulo_tripulante);
 		free(hilo_submodulo_tripulante);
+
+		// Los hilos comparten el struct "struct_iniciar_tripulante"
+		// Espero hasta que el hilo creado haya terminado de usarlo
+		sem_wait(&sem_struct_iniciar_tripulante);
 	}
 
 	log_info(logger, "La patota fue inicializada");
@@ -259,7 +268,7 @@ int iniciar_patota(char** argumentos, int mi_ram_hq_fd){
 
 int submodulo_tripulante(void* args) {
 	iniciar_tripulante_t struct_iniciar_tripulante = *((iniciar_tripulante_t*) args);
-	sem_post(&sem_struct_iniciar_tripulante);
+	//sem_post(&sem_struct_iniciar_tripulante);
 
 	int mi_ram_hq_fd_tripulante;
 	int i_mongo_store_fd_tripulante;
@@ -290,8 +299,10 @@ int submodulo_tripulante(void* args) {
 		log_error(logger, "No se pudo mandar el mensaje al Mi-Ram HQ");
 	log_info(logger, "Tripulante inicializado");
 
+	sem_post(&sem_struct_iniciar_tripulante);
+
 	while(1){
-		sleep(5);
+		sleep(15);
 		// Test: Mando un mensaje al i-Mongo-Store y a Mi-Ram HQ
 		
 		// Hay que ver si el servidor esta conectado?
@@ -299,9 +310,11 @@ int submodulo_tripulante(void* args) {
 		if(estado_envio_mensaje != EXIT_SUCCESS)
 			log_error(logger, "No se pudo mandar el mensaje al i-Mongo-Store");
 		// Hay que ver si el servidor esta conectado?
+		/*
 		estado_envio_mensaje = enviar_mensaje(mi_ram_hq_fd_tripulante, "Hola, soy un tripulante");
 		if(estado_envio_mensaje != EXIT_SUCCESS)
 			log_error(logger, "No se pudo mandar el mensaje al Mi-Ram HQ");
+		*/
 	}
 
 	return EXIT_SUCCESS;

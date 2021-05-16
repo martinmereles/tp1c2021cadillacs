@@ -15,9 +15,9 @@ void recibir_payload_y_ejecutar(int socket_fd, void(*funcion_a_ejecutar)(char*))
 	free(payload);
 }
 
-void* recibir_payload(int socket_emisor)
+char* recibir_payload(int socket_emisor)
 {
-	void * payload;
+	char* payload;
 	int longitud_payload;
 
 	recv(socket_emisor, &longitud_payload, sizeof(int), MSG_WAITALL);
@@ -34,15 +34,14 @@ char* recibir_mensaje(int socket_cliente)
 }
 
 int enviar_mensaje(int fd_destino, char* mensaje){	
-	return enviar_operacion(fd_destino, COD_MENSAJE, mensaje);
+	return enviar_operacion(fd_destino, COD_MENSAJE, mensaje, strlen(mensaje)+1);
 }
 
-int enviar_operacion(int fd_destino, int codigo_operacion, char* payload) {
+int enviar_operacion(int fd_destino, int codigo_operacion, void* payload, int longitud_payload) {
 	int bytes_enviados;
 	int exit_status = EXIT_SUCCESS;
 	char* stream;
 	int offset = 0;
-	int cantidad_bytes;
 	int tamanio_stream;
 
 	// Si no hay payload, solo se envia el codigo de operacion
@@ -57,19 +56,18 @@ int enviar_operacion(int fd_destino, int codigo_operacion, char* payload) {
 
 	// Si hay payload, enviamos codigo de operacion + longitud + payload
 	else {
-		cantidad_bytes = strlen(payload) + 1;
-		tamanio_stream = sizeof(codigo_operacion) + sizeof(cantidad_bytes) + cantidad_bytes;
+		tamanio_stream = sizeof(codigo_operacion) + sizeof(longitud_payload) + longitud_payload;
 	
 		stream = malloc(tamanio_stream);
 	
 		memcpy(stream + offset, &codigo_operacion, sizeof(int));
 		offset += sizeof(int);
 		
-		memcpy(stream + offset, &cantidad_bytes, sizeof(cantidad_bytes));
-		offset += sizeof(cantidad_bytes);
+		memcpy(stream + offset, &longitud_payload, sizeof(longitud_payload));
+		offset += sizeof(int);
 
-		memcpy(stream + offset, payload, cantidad_bytes);
-		offset += sizeof(char) * cantidad_bytes;
+		memcpy(stream + offset, payload, longitud_payload);
+		offset += sizeof(char) * longitud_payload;
 	}
 
 	bytes_enviados = send(fd_destino, stream, tamanio_stream, 0);

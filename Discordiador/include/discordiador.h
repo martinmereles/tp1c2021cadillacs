@@ -8,6 +8,9 @@
 #include "sockets_cliente.h"
 #include <semaphore.h>
 
+enum status_discordiador{   RUNNING,
+                            END };
+
 enum comando_discordiador{  INICIAR_PATOTA, 
                             LISTAR_TRIPULANTES,
                             EXPULSAR_TRIPULANTES, 
@@ -24,14 +27,14 @@ int iniciar_patota(char** argumentos, int);
 int submodulo_tripulante();
 int generarNuevoPID();
 int generarNuevoTID();
+void recibir_y_procesar_mensaje_i_mongo_store(int i_mongo_store_fd);
 
 char* direccion_IP_i_Mongo_Store;
 char* puerto_i_Mongo_Store;
 char* direccion_IP_Mi_RAM_HQ;
 char* puerto_Mi_RAM_HQ;
 
-// Hace falta?
-bool servidor_desconectado;
+enum status_discordiador status_discordiador;
 
 int generadorPID;
 int generadorTID;

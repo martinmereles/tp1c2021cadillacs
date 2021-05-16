@@ -13,7 +13,7 @@ int main(void)
 	char* puerto_escucha = config_get_string_value(config, "PUERTO");
 	char* ip = "127.0.0.1";
 
-	tamanio_memoria = config_get_string_value(config, "TAMANIO_MEMORIA");
+	tamanio_memoria = atoi(config_get_string_value(config, "TAMANIO_MEMORIA"));
 	memoria_principal = malloc(tamanio_memoria);
 	
 
@@ -139,6 +139,7 @@ bool leer_mensaje_cliente_y_procesar(int cliente_fd){
 	bool cliente_conectado = true;
 	// Leo codigo de operacion
 	int cod_op = recibir_operacion(cliente_fd);
+
 	switch(cod_op) {
 		case COD_MENSAJE:
 			recibir_payload_y_ejecutar(cliente_fd, loguear_mensaje);

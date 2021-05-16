@@ -53,16 +53,20 @@ void liberar_conexion(int servidor_fd)
 int enviar_op_iniciar_patota(int mi_ram_hq_fd, int PID, char* lista_de_tareas){
 	int exit_status;
 	int longitud_lista_tareas = strlen(lista_de_tareas) + 1;
-	char* stream = malloc(sizeof(PID) + longitud_lista_tareas);
+	int longitud_stream = sizeof(PID) + sizeof(longitud_lista_tareas) + longitud_lista_tareas;
+	void* stream = malloc(longitud_stream);
 	int offset = 0;
 
 	memcpy(stream + offset, &PID, sizeof(int));
 	offset += sizeof(int);
 
+	memcpy(stream + offset, &longitud_lista_tareas, sizeof(int));
+	offset += sizeof(int);
+
 	memcpy(stream + offset, lista_de_tareas, longitud_lista_tareas);
 	offset += longitud_lista_tareas;
 
-	exit_status = enviar_operacion(mi_ram_hq_fd, COD_INICIAR_PATOTA, stream);
+	exit_status = enviar_operacion(mi_ram_hq_fd, COD_INICIAR_PATOTA, stream, longitud_stream);
 	free(stream);
 	
 	return exit_status;
@@ -70,11 +74,14 @@ int enviar_op_iniciar_patota(int mi_ram_hq_fd, int PID, char* lista_de_tareas){
 
 int enviar_op_iniciar_tripulante(int mi_ram_hq_fd, iniciar_tripulante_t struct_iniciar_tripulante){
 	int exit_status;
-
-	char* stream = malloc(sizeof(int) * 4);
+	int longitud_stream = sizeof(int) * 4;
+	char* stream = malloc(longitud_stream);
 	int offset = 0;
 
 	memcpy(stream + offset, &struct_iniciar_tripulante.PID, sizeof(int));
+	offset += sizeof(int);
+
+	memcpy(stream + offset, &struct_iniciar_tripulante.TID, sizeof(int));
 	offset += sizeof(int);
 
 	memcpy(stream + offset, &struct_iniciar_tripulante.posicion_X, sizeof(int));
@@ -83,10 +90,7 @@ int enviar_op_iniciar_tripulante(int mi_ram_hq_fd, iniciar_tripulante_t struct_i
 	memcpy(stream + offset, &struct_iniciar_tripulante.posicion_Y, sizeof(int));
 	offset += sizeof(int);
 
-	memcpy(stream + offset, &struct_iniciar_tripulante.TID, sizeof(int));
-	offset += sizeof(int);
-
-	exit_status = enviar_operacion(mi_ram_hq_fd, COD_INICIAR_TRIPULANTE, stream);
+	exit_status = enviar_operacion(mi_ram_hq_fd, COD_INICIAR_TRIPULANTE, stream, longitud_stream);
 	free(stream);
 
 	return exit_status;
