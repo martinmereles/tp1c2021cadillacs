@@ -9,10 +9,12 @@ int recibir_operacion(int servidor_fd)
 		return -1;
 }
 
-void recibir_payload_y_ejecutar(int socket_fd, void(*funcion_a_ejecutar)(char*)){
+int recibir_payload_y_ejecutar(int socket_fd, int(*funcion_a_ejecutar)(char*)){
+	int exit_status;
 	char* payload = recibir_payload(socket_fd);
-	funcion_a_ejecutar(payload);
+	exit_status = funcion_a_ejecutar(payload);
 	free(payload);
+	return exit_status;
 }
 
 char* recibir_payload(int socket_emisor)

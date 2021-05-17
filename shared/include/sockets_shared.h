@@ -2,8 +2,6 @@
 #define SOCKETS_SHARED_H_
 
 #include <stdbool.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <signal.h>
 #include <unistd.h>
 #include <sys/socket.h>
@@ -33,6 +31,6 @@ int enviar_fin_comunicacion(int socket_destino);
 int enviar_mensaje(int socket_destino, char* mensaje);
 int enviar_operacion(int fd_destino, int codigo_operacion, void* payload, int longitud_payload);
 int iniciar_servidor(char*, char*);
-void recibir_payload_y_ejecutar(int socket_fd, void(*funcion_a_ejecutar)(char*));
+int recibir_payload_y_ejecutar(int socket_fd, int(*funcion_a_ejecutar)(char*));
 
 #endif

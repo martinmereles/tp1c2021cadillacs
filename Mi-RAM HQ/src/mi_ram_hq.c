@@ -5,7 +5,6 @@ int main(void)
 	// inicializo semaforos
 	sem_init(&semaforo_aceptar_conexiones, 0, 0);
 
-	int tamanio_memoria;
 	logger = log_create("./cfg/mi-ram-hq.log", "Mi-RAM HQ", 1, LOG_LEVEL_DEBUG);
 
 	// Leo IP y PUERTO del config
@@ -13,17 +12,17 @@ int main(void)
 	char* puerto_escucha = config_get_string_value(config, "PUERTO");
 	char* ip = "127.0.0.1";
 
-	tamanio_memoria = atoi(config_get_string_value(config, "TAMANIO_MEMORIA"));
-	memoria_principal = malloc(tamanio_memoria);
-	
+	inicializar_estructuras_memoria(config);
 
 	int server_fd = iniciar_servidor(ip, puerto_escucha);
 	log_info(logger, "Mi-RAM HQ listo para recibir al Discordiador");
 
 	mi_ram_hq(server_fd);
 
+
 	log_info(logger, "Cerrando socket servidor");
 	close(server_fd);
+	liberar_estructuras_memoria();
 	log_destroy(logger);
 
 	return EXIT_SUCCESS;
