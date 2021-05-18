@@ -104,6 +104,14 @@ void leer_consola_y_procesar() {
 	fgets(linea_consola,TAM_CONSOLA,stdin);
 	linea_consola[strlen(linea_consola)-1]='\0';	// Le saco el \n
 
+	if(strcmp(linea_consola,"DUMP") == 0){
+		log_info(logger,"Dump: %s",temporal_get_string_time("%d/%m/%y %H:%M:%S"));
+		log_info(logger,"PATOTAS");
+		list_iterate(tablas_de_segmentos_de_patotas, dump_patota);
+		log_info(logger,"TRIPULANTES");
+		list_iterate(tablas_de_segmentos_de_tripulantes, dump_tripulante);
+	}
+
 	if(strcmp(linea_consola,"FIN") == 0){
 		status_servidor = END;
 		log_info(logger, "Finalizando Mi-RAM HQ");

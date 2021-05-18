@@ -9,12 +9,20 @@
 #include <string.h>
 
 #define TAMANIO_PCB 8
-#define TAMANIO_TCB 17
+#define TAMANIO_TCB 21
 
 #define DIR_LOG_PCB     0x00000000
 #define DIR_LOG_TAREAS  0x80000000
-#define DESPL_PID       0x00000000 
-#define DESPL_TAREAS    0x00000004 
+#define DESPL_PID       0 
+#define DESPL_TAREAS    4 
+
+#define DIR_LOG_TCB         0x00000000
+#define DESPL_TID           0
+#define DESPL_ESTADO        4
+#define DESPL_POS_X         5
+#define DESPL_POS_Y         9
+#define DESPL_PROX_INSTR    13
+#define DESPL_DIR_PCB       17
 
 // Una tabla de segmentos es un array de filas??
 /*
@@ -38,7 +46,12 @@ void liberar_estructuras_memoria();
 fila_tabla_segmentos_t* reservar_segmento(int tamanio);
 void liberar_segmento(fila_tabla_segmentos_t* fila);
 int first_fit(int memoria_pedida);
-void memcpy_tabla_segmentos(tabla_segmentos_t*, uint32_t, void*, int);
+int escribir_memoria_principal(tabla_segmentos_t*, uint32_t, void*, int);
+int leer_memoria_principal(tabla_segmentos_t*, uint32_t, void*, int);
+int calcular_direccion_fisica(tabla_segmentos_t* , uint32_t );
+void dump_patota(tabla_segmentos_t* tabla_patota);
+void dump_tripulante(tabla_segmentos_t* tabla_tripulante);
+
 
 void* memoria_principal;
 int tamanio_memoria;
