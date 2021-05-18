@@ -12,11 +12,10 @@
 #define TAMANIO_TCB 21
 
 #define DIR_LOG_PCB     0x00000000
-#define DIR_LOG_TAREAS  0x80000000
+#define DIR_LOG_TAREAS  0x00010000
 #define DESPL_PID       0 
 #define DESPL_TAREAS    4 
 
-#define DIR_LOG_TCB         0x00000000
 #define DESPL_TID           0
 #define DESPL_ESTADO        4
 #define DESPL_POS_X         5
@@ -28,8 +27,8 @@
 /*
 direccion logica = nro segmento | desplazamiento
 
-nro segmento: 1 bit
-desplazamiento: 31 bits
+nro segmento: 16 bit    ??
+desplazamiento: 16 bits ??
 */
 
 typedef struct{
@@ -38,7 +37,7 @@ typedef struct{
 } fila_tabla_segmentos_t;
 
 typedef struct{
-    fila_tabla_segmentos_t** filas;
+    t_list *filas;
 } tabla_segmentos_t;
 
 void inicializar_estructuras_memoria(t_config* config);
@@ -50,8 +49,16 @@ int escribir_memoria_principal(tabla_segmentos_t*, uint32_t, void*, int);
 int leer_memoria_principal(tabla_segmentos_t*, uint32_t, void*, int);
 int calcular_direccion_fisica(tabla_segmentos_t* , uint32_t );
 void dump_patota(tabla_segmentos_t* tabla_patota);
-void dump_tripulante(tabla_segmentos_t* tabla_tripulante);
-
+void dump_tripulante(tabla_segmentos_t* tabla, int nro_fila);
+tabla_segmentos_t* obtener_tabla_patota(int PID_buscado);
+void quitar_fila(tabla_segmentos_t* tabla, int numero_fila);
+uint32_t agregar_fila(tabla_segmentos_t* tabla, fila_tabla_segmentos_t* fila);
+fila_tabla_segmentos_t* obtener_fila(tabla_segmentos_t* tabla, int numero_fila);
+int cantidad_filas(tabla_segmentos_t* tabla);
+tabla_segmentos_t* crear_tabla_segmentos();
+void destruir_tabla_segmentos(tabla_segmentos_t* tabla);
+uint32_t numero_de_segmento(uint32_t direccion_logica);
+uint32_t desplazamiento(uint32_t direccion_logica);
 
 void* memoria_principal;
 int tamanio_memoria;
@@ -61,8 +68,7 @@ int tamanio_memoria;
 // SEGMENTACION
 
 // Tablas de segmentos
-t_list* tablas_de_segmentos_de_patotas;
-t_list* tablas_de_segmentos_de_tripulantes;
+t_list* tablas_de_segmentos;
 
 // Mapa de posiciones de memoria libres (segmentacion)
 t_bitarray*	mapa_memoria_disponible;

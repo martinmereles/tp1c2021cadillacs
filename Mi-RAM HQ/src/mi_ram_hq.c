@@ -107,9 +107,7 @@ void leer_consola_y_procesar() {
 	if(strcmp(linea_consola,"DUMP") == 0){
 		log_info(logger,"Dump: %s",temporal_get_string_time("%d/%m/%y %H:%M:%S"));
 		log_info(logger,"PATOTAS");
-		list_iterate(tablas_de_segmentos_de_patotas, dump_patota);
-		log_info(logger,"TRIPULANTES");
-		list_iterate(tablas_de_segmentos_de_tripulantes, dump_tripulante);
+		list_iterate(tablas_de_segmentos, dump_patota);
 	}
 
 	if(strcmp(linea_consola,"FIN") == 0){
