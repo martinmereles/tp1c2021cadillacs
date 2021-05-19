@@ -106,7 +106,6 @@ void leer_consola_y_procesar() {
 
 	if(strcmp(linea_consola,"DUMP") == 0){
 		log_info(logger,"Dump: %s",temporal_get_string_time("%d/%m/%y %H:%M:%S"));
-		log_info(logger,"PATOTAS");
 		list_iterate(tablas_de_segmentos, dump_patota);
 	}
 
@@ -117,6 +116,8 @@ void leer_consola_y_procesar() {
 }
 
 int comunicacion_cliente(int cliente_fd) {
+	tabla_segmentos_t* tabla_patota = NULL;
+	uint32_t dir_log = -1;
 	bool cliente_conectado = true;
 
 	struct pollfd pfds[1];
@@ -132,7 +133,7 @@ int comunicacion_cliente(int cliente_fd) {
 		if(num_events != 0){
 			// Si hay un mensaje del cliente
 			if(pfds[0].revents & POLLIN)
-				cliente_conectado = leer_mensaje_cliente_y_procesar(cliente_fd);
+				cliente_conectado = leer_mensaje_cliente_y_procesar(cliente_fd, &tabla_patota, &dir_log);
 			else
 				log_error(logger, "Evento inesperado en file descriptor del cliente: %s", strerror(pfds[0].revents));
 		}
@@ -140,10 +141,13 @@ int comunicacion_cliente(int cliente_fd) {
 	return EXIT_SUCCESS;
 }
 
-bool leer_mensaje_cliente_y_procesar(int cliente_fd){
+// Cada tripulante sabe a que segmento pertenece y a que proceso pertenece
+
+bool leer_mensaje_cliente_y_procesar(int cliente_fd, tabla_segmentos_t** tabla_patota, uint32_t* dir_log){
 	bool cliente_conectado = true;
 	// Leo codigo de operacion
 	int cod_op = recibir_operacion(cliente_fd);
+	char* payload;
 
 	switch(cod_op) {
 		case COD_MENSAJE:
@@ -153,16 +157,24 @@ bool leer_mensaje_cliente_y_procesar(int cliente_fd){
 			recibir_payload_y_ejecutar(cliente_fd, iniciar_patota);
 			break;
 		case COD_INICIAR_TRIPULANTE:
-			recibir_payload_y_ejecutar(cliente_fd, iniciar_tripulante);
+			payload = recibir_payload(cliente_fd);
+			iniciar_tripulante(payload, tabla_patota, dir_log);
+			free(payload);
 			break;
 		case COD_RECIBIR_UBICACION_TRIPULANTE:
-			recibir_payload_y_ejecutar(cliente_fd, recibir_ubicacion_tripulante);
+			payload = recibir_payload(cliente_fd);
+			recibir_ubicacion_tripulante(payload, tabla_patota, dir_log);
+			free(payload);
 			break;
 		case COD_ENVIAR_PROXIMA_TAREA:
-			recibir_payload_y_ejecutar(cliente_fd, enviar_proxima_tarea);
+			payload = recibir_payload(cliente_fd);
+			enviar_proxima_tarea(payload, tabla_patota, dir_log);
+			free(payload);
 			break;
 		case COD_EXPULSAR_TRIPULANTE:
-			recibir_payload_y_ejecutar(cliente_fd, expulsar_tripulante);
+			payload = recibir_payload(cliente_fd);
+			expulsar_tripulante(payload, tabla_patota, dir_log);
+			free(payload);
 			break;
 		case -1:
 			log_error(logger, "El cliente se desconecto.");

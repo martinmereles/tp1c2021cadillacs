@@ -273,6 +273,9 @@ int submodulo_tripulante(void* args) {
 	int mi_ram_hq_fd_tripulante;
 	int i_mongo_store_fd_tripulante;
 	int estado_envio_mensaje;
+	int pos_X, pos_Y;
+	pos_X = 0;
+	pos_Y = 0;
 
 	log_info(logger, "Iniciando tripulante");
 
@@ -302,19 +305,21 @@ int submodulo_tripulante(void* args) {
 	sem_post(&sem_struct_iniciar_tripulante);
 
 	while(1){
-		sleep(15);
+		sleep(10);
 		// Test: Mando un mensaje al i-Mongo-Store y a Mi-Ram HQ
 		
 		// Hay que ver si el servidor esta conectado?
 		estado_envio_mensaje = enviar_mensaje(i_mongo_store_fd_tripulante, "Hola, soy un tripulante");
 		if(estado_envio_mensaje != EXIT_SUCCESS)
 			log_error(logger, "No se pudo mandar el mensaje al i-Mongo-Store");
+		
 		// Hay que ver si el servidor esta conectado?
-		/*
-		estado_envio_mensaje = enviar_mensaje(mi_ram_hq_fd_tripulante, "Hola, soy un tripulante");
+		estado_envio_mensaje = enviar_op_recibir_ubicacion_tripulante(mi_ram_hq_fd_tripulante, pos_X, pos_Y);
 		if(estado_envio_mensaje != EXIT_SUCCESS)
 			log_error(logger, "No se pudo mandar el mensaje al Mi-Ram HQ");
-		*/
+		pos_X++;
+		pos_Y++;
+		pos_Y++;
 	}
 
 	return EXIT_SUCCESS;

@@ -50,18 +50,18 @@ void liberar_conexion(int servidor_fd)
 	close(servidor_fd);
 }
 
-int enviar_op_iniciar_patota(int mi_ram_hq_fd, int PID, char* lista_de_tareas){
+int enviar_op_iniciar_patota(int mi_ram_hq_fd, uint32_t PID, char* lista_de_tareas){
 	int exit_status;
-	int longitud_lista_tareas = strlen(lista_de_tareas) + 1;
-	int longitud_stream = sizeof(PID) + sizeof(longitud_lista_tareas) + longitud_lista_tareas;
+	uint32_t longitud_lista_tareas = strlen(lista_de_tareas) + 1;
+	uint32_t longitud_stream = sizeof(PID) + sizeof(longitud_lista_tareas) + longitud_lista_tareas;
 	void* stream = malloc(longitud_stream);
 	int offset = 0;
 
-	memcpy(stream + offset, &PID, sizeof(int));
-	offset += sizeof(int);
+	memcpy(stream + offset, &PID, sizeof(uint32_t));
+	offset += sizeof(uint32_t);
 
-	memcpy(stream + offset, &longitud_lista_tareas, sizeof(int));
-	offset += sizeof(int);
+	memcpy(stream + offset, &longitud_lista_tareas, sizeof(uint32_t));
+	offset += sizeof(uint32_t);
 
 	memcpy(stream + offset, lista_de_tareas, longitud_lista_tareas);
 	offset += longitud_lista_tareas;
@@ -74,21 +74,21 @@ int enviar_op_iniciar_patota(int mi_ram_hq_fd, int PID, char* lista_de_tareas){
 
 int enviar_op_iniciar_tripulante(int mi_ram_hq_fd, iniciar_tripulante_t struct_iniciar_tripulante){
 	int exit_status;
-	int longitud_stream = sizeof(int) * 4;
+	uint32_t longitud_stream = sizeof(uint32_t) * 4;
 	char* stream = malloc(longitud_stream);
 	int offset = 0;
 
-	memcpy(stream + offset, &struct_iniciar_tripulante.PID, sizeof(int));
-	offset += sizeof(int);
+	memcpy(stream + offset, &struct_iniciar_tripulante.PID, sizeof(uint32_t));
+	offset += sizeof(uint32_t);
 
-	memcpy(stream + offset, &struct_iniciar_tripulante.TID, sizeof(int));
-	offset += sizeof(int);
+	memcpy(stream + offset, &struct_iniciar_tripulante.TID, sizeof(uint32_t));
+	offset += sizeof(uint32_t);
 
-	memcpy(stream + offset, &struct_iniciar_tripulante.posicion_X, sizeof(int));
-	offset += sizeof(int);
+	memcpy(stream + offset, &struct_iniciar_tripulante.posicion_X, sizeof(uint32_t));
+	offset += sizeof(uint32_t);
 
-	memcpy(stream + offset, &struct_iniciar_tripulante.posicion_Y, sizeof(int));
-	offset += sizeof(int);
+	memcpy(stream + offset, &struct_iniciar_tripulante.posicion_Y, sizeof(uint32_t));
+	offset += sizeof(uint32_t);
 
 	exit_status = enviar_operacion(mi_ram_hq_fd, COD_INICIAR_TRIPULANTE, stream, longitud_stream);
 	free(stream);
@@ -96,3 +96,20 @@ int enviar_op_iniciar_tripulante(int mi_ram_hq_fd, iniciar_tripulante_t struct_i
 	return exit_status;
 }
 
+int enviar_op_recibir_ubicacion_tripulante(int mi_ram_hq_fd, uint32_t posicion_X, uint32_t posicion_Y){
+	int exit_status;
+	uint32_t longitud_stream = sizeof(uint32_t) * 2;
+	char* stream = malloc(longitud_stream);
+	int offset = 0;
+
+	memcpy(stream + offset, &posicion_X, sizeof(uint32_t));
+	offset += sizeof(uint32_t);
+
+	memcpy(stream + offset, &posicion_Y, sizeof(uint32_t));
+	offset += sizeof(uint32_t);
+
+	exit_status = enviar_operacion(mi_ram_hq_fd, COD_RECIBIR_UBICACION_TRIPULANTE, stream, longitud_stream);
+	free(stream);
+
+	return exit_status;
+}

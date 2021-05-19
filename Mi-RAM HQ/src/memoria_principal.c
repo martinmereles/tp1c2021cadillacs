@@ -50,6 +50,29 @@ fila_tabla_segmentos_t* obtener_fila(tabla_segmentos_t* tabla, int numero_seg){
     return list_get(tabla->filas, numero_seg);
 }
 
+// REVISAR
+/*
+int obtener_tabla_y_direccion_tripulante(uint32_t TID_buscado, tabla_segmentos_t* tabla, uint32_t* dir_log_TCB){
+    t_list_iterator* iterador_tablas = list_iterator_create(tablas_de_segmentos);
+    fila_tabla_segmentos_t* fila;
+    uint32_t TID;
+
+    while(list_iterator_has_next(iterador_tablas)){
+        tabla = list_iterator_next(iterador);
+        for(int i = 2;i < cantidad_filas(tabla),i++){
+            fila = obtener_fila(tabla, i);
+            leer_memoria_principal(tabla, fila->inicio + DESPL_TID, &TID, sizeof(uint32_t))
+            if(TID == TID_buscado){
+                list_iterator_destroy(iterador_tablas);
+                return EXIT_SUCCESS;
+            }
+        }
+    }
+    tabla = NULL;
+    *dir_log_TCB = - 1;
+    list_iterator_destroy(iterador_tablas);
+    return EXIT_FAILURE;
+}*/
 
 tabla_segmentos_t* crear_tabla_segmentos(){
     tabla_segmentos_t* tabla = malloc(sizeof(tabla_segmentos_t));
@@ -132,7 +155,7 @@ int escribir_memoria_principal(tabla_segmentos_t* tabla, uint32_t direccion_logi
     int direccion_fisica_dato = calcular_direccion_fisica(tabla, direccion_logica);
     fila_tabla_segmentos_t* fila = obtener_fila(tabla, numero_seg);
     if(fila->inicio + fila->tamanio < direccion_fisica_dato + tamanio){
-        log_error(logger,"ERROR. Segmentation fault. Esta intentando escribir en una posicion de memoria no reservada");
+        log_error(logger,"ERROR. Segmentation fault. Direccionamiento invalido en escritura");
         return EXIT_FAILURE;
     }
     memcpy(memoria_principal+direccion_fisica_dato, dato, tamanio);
@@ -144,7 +167,7 @@ int leer_memoria_principal(tabla_segmentos_t* tabla, uint32_t direccion_logica, 
     int direccion_fisica_dato = calcular_direccion_fisica(tabla, direccion_logica);
     fila_tabla_segmentos_t* fila = obtener_fila(tabla,numero_seg);
     if(fila->inicio + fila->tamanio < direccion_fisica_dato + tamanio){
-        log_error(logger,"ERROR. Esta intentando leer en una posicion de memoria no reservada");
+        log_error(logger,"ERROR. Segmentation fault. Direccionamiento invalido en lectura");
         return EXIT_FAILURE;
     }
     memcpy(dato, memoria_principal+direccion_fisica_dato, tamanio);
@@ -196,7 +219,8 @@ void dump_patota(tabla_segmentos_t* tabla_patota){
 }
 
 void dump_tripulante(tabla_segmentos_t* tabla, int nro_fila){
-    // Proceso: 1	Segmento: 1	Inicio: 0x0000	Tam: 20b  
+    // Proceso: 1	Segmento: 1	Inicio: 0x0000	Tam: 20b
+    log_info(logger,"PATOTA");
     uint32_t inicio = obtener_fila(tabla,nro_fila)->inicio;
     uint32_t tamanio = obtener_fila(tabla,nro_fila)->tamanio;
     uint32_t TID, posicion_X, posicion_Y, id_proxima_instruccion, dir_log_pcb, PID;
