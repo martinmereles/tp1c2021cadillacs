@@ -8,6 +8,8 @@ int main(void) {
 	generadorPID = 0;
 	generadorTID = 0;
 
+	//cola_new=create_queue();
+
 	sem_init(&sem_generador_PID,0,1);
 	sem_init(&sem_generador_TID,0,1);
 	sem_init(&sem_struct_iniciar_tripulante,0,0);
@@ -26,10 +28,13 @@ int main(void) {
 	puerto_i_Mongo_Store = string_new();
 	direccion_IP_Mi_RAM_HQ = string_new();
 	puerto_Mi_RAM_HQ = string_new();
+	//algoritmo_Planificador = string_new();
 	string_append(&direccion_IP_i_Mongo_Store, config_get_string_value(config, "IP_I_MONGO_STORE"));
 	string_append(&puerto_i_Mongo_Store, config_get_string_value(config, "PUERTO_I_MONGO_STORE"));
 	string_append(&direccion_IP_Mi_RAM_HQ, config_get_string_value(config, "IP_MI_RAM_HQ"));
 	string_append(&puerto_Mi_RAM_HQ, config_get_string_value(config, "PUERTO_MI_RAM_HQ"));
+	//string_append(&algoritmo_Planificador, config_get_string_value(config, "ALGORITMO"));
+	
 	log_info(logger, "Configuracion terminada");
 
 	log_info(logger, "Conectando con i-Mongo-Store");
@@ -189,6 +194,7 @@ int iniciar_patota(char** argumentos, int mi_ram_hq_fd){
 	iniciar_tripulante_t struct_iniciar_tripulante;
 	char **posicion;
 	int PID;
+	//t_key_tripulante *nuevo = malloc(sizeof(t_key_tripulante));
 
 	FILE* archivo_de_tareas;
 	char* lista_de_tareas = string_new();
@@ -247,6 +253,10 @@ int iniciar_patota(char** argumentos, int mi_ram_hq_fd){
 		}
 
 		struct_iniciar_tripulante.TID = generarNuevoTID();
+
+		//nuevo->TID = struct_iniciar_tripulante.TID
+		//nuevo->PID = struct_iniciar_tripulante.PID
+		//queue_push(cola_new,nuevo);
 
 		// Creamos el hilo para el submodulo tripulante
 		// NOTA: el struct pthread_t de cada hilo tripulante se pierde

@@ -7,6 +7,7 @@
 #include "commons/string.h"
 #include "sockets_cliente.h"
 #include <semaphore.h>
+#include "planificador.h"
 
 enum status_discordiador{   RUNNING,
                             END };
