@@ -66,6 +66,7 @@ void i_mongo_store(int servidor_fd) {
 				else{
 					log_error(logger, "Evento inesperado en los file descriptor: %s", strerror(pfds[0].revents));
 					log_error(logger, "Evento inesperado en los file descriptor: %s", strerror(pfds[1].revents));
+					status_servidor = END;
 				}
 			}
 		}
@@ -123,8 +124,10 @@ int comunicacion_cliente(int cliente_fd) {
 			// Si hay un mensaje del cliente
 			if(pfds[0].revents & POLLIN)
 				cliente_conectado = leer_mensaje_cliente_y_procesar(cliente_fd);
-			else
+			else{
 				log_error(logger, "Evento inesperado en file descriptor del cliente: %s", strerror(pfds[0].revents));
+				status_servidor = END;
+			}	
 		}
 	}
 	return EXIT_SUCCESS;

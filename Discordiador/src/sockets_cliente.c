@@ -113,3 +113,11 @@ int enviar_op_recibir_ubicacion_tripulante(int mi_ram_hq_fd, uint32_t posicion_X
 
 	return exit_status;
 }
+
+int enviar_op_enviar_proxima_tarea(int mi_ram_hq_fd){
+	return enviar_operacion(mi_ram_hq_fd, COD_ENVIAR_PROXIMA_TAREA, NULL, 0);
+}
+
+int enviar_op_expulsar_tripulante(int mi_ram_hq_fd){
+	return enviar_operacion(mi_ram_hq_fd, COD_EXPULSAR_TRIPULANTE, NULL, 0);
+}

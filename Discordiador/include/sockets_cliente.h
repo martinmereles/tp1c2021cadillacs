@@ -23,6 +23,8 @@ void liberar_conexion(int socket_cliente);
 int enviar_op_iniciar_patota(int mi_ram_hq_fd, uint32_t PID, char* lista_de_tareas);
 int enviar_op_iniciar_tripulante(int mi_ram_hq_fd, iniciar_tripulante_t struct_iniciar_tripulante);
 int enviar_op_recibir_ubicacion_tripulante(int mi_ram_hq_fd, uint32_t posicion_X, uint32_t posicion_Y);
+int enviar_op_enviar_proxima_tarea(int mi_ram_hq_fd);
+int enviar_op_expulsar_tripulante(int mi_ram_hq_fd);
 
 t_log* logger;
 

@@ -28,13 +28,42 @@ void inicializar_estructuras_memoria(t_config* config){
 
 void liberar_estructuras_memoria(){
     log_info(logger, "Liberando estructuras administrativas de la memoria principal");
-    free(memoria_principal);
-    // Destruir listas de tablas
-    //      tablas_de_segmentos_de_patotas;
-    //      tablas_de_segmentos_de_tripulantes;
+    list_destroy_and_destroy_elements(tablas_de_segmentos, destruir_tabla_segmentos);
     free(bitarray_mapa_memoria_disponible);
     bitarray_destroy(mapa_memoria_disponible);
+    free(memoria_principal);
 }
+
+
+void quitar_y_destruir_tabla(tabla_segmentos_t* tabla_a_destruir){
+    int PID_tabla_a_destruir;
+    leer_memoria_principal(tabla_a_destruir, DIR_LOG_PCB + DESPL_PID, &PID_tabla_a_destruir, sizeof(uint32_t));
+
+    bool tienePID(void* args){
+        tabla_segmentos_t* una_tabla = (tabla_segmentos_t*) args;
+        int PID_una_tabla;
+        leer_memoria_principal(una_tabla, DIR_LOG_PCB + DESPL_PID, &PID_una_tabla, sizeof(uint32_t));
+        return PID_una_tabla == PID_tabla_a_destruir;
+    }
+
+    list_remove_and_destroy_by_condition(tablas_de_segmentos, tienePID, destruir_tabla_segmentos);    
+}
+
+void destruir_tabla_segmentos(void* args){
+    tabla_segmentos_t* tabla = (tabla_segmentos_t*) args;
+    // Destruir todas las filas y liberar segmentos;
+    list_destroy_and_destroy_elements(tabla->filas, destruir_fila);
+    free(tabla);
+}
+
+void quitar_y_destruir_fila(tabla_segmentos_t* tabla, int numero_seg){
+    bool tiene_numero_de_segmento(void* args){
+        fila_tabla_segmentos_t* fila = (fila_tabla_segmentos_t*) args;
+        return fila->numero_segmento == numero_seg; 
+    }
+    list_remove_and_destroy_by_condition(tabla->filas, tiene_numero_de_segmento, destruir_fila);
+}
+ 
 
 tabla_segmentos_t* obtener_tabla_patota(int PID_buscado){
     bool tienePID(void* args){
@@ -47,58 +76,52 @@ tabla_segmentos_t* obtener_tabla_patota(int PID_buscado){
 }
 
 fila_tabla_segmentos_t* obtener_fila(tabla_segmentos_t* tabla, int numero_seg){
-    return list_get(tabla->filas, numero_seg);
-}
-
-// REVISAR
-/*
-int obtener_tabla_y_direccion_tripulante(uint32_t TID_buscado, tabla_segmentos_t* tabla, uint32_t* dir_log_TCB){
-    t_list_iterator* iterador_tablas = list_iterator_create(tablas_de_segmentos);
-    fila_tabla_segmentos_t* fila;
-    uint32_t TID;
-
-    while(list_iterator_has_next(iterador_tablas)){
-        tabla = list_iterator_next(iterador);
-        for(int i = 2;i < cantidad_filas(tabla),i++){
-            fila = obtener_fila(tabla, i);
-            leer_memoria_principal(tabla, fila->inicio + DESPL_TID, &TID, sizeof(uint32_t))
-            if(TID == TID_buscado){
-                list_iterator_destroy(iterador_tablas);
-                return EXIT_SUCCESS;
-            }
-        }
+    bool tiene_numero_de_segmento(void* args){
+        fila_tabla_segmentos_t* fila = (fila_tabla_segmentos_t*) args;
+        return fila->numero_segmento == numero_seg; 
     }
-    tabla = NULL;
-    *dir_log_TCB = - 1;
-    list_iterator_destroy(iterador_tablas);
-    return EXIT_FAILURE;
-}*/
+    /*
+    bool tiene_numero_de_segmento(fila_tabla_segmentos_t* fila){
+        return fila->numero_segmento == numero_seg; 
+    }*/
+    return list_find(tabla->filas, tiene_numero_de_segmento);
+}
 
 tabla_segmentos_t* crear_tabla_segmentos(){
     tabla_segmentos_t* tabla = malloc(sizeof(tabla_segmentos_t));
     tabla->filas = list_create();
+    tabla->proximo_numero_segmento = 0;
     return tabla;
-}
-
-void destruir_tabla_segmentos(tabla_segmentos_t* tabla){
-    // FALTA LIBERAR LAS FILAS DE SEGMENTOS
-    free(tabla->filas);
-    free(tabla);
 }
 
 int cantidad_filas(tabla_segmentos_t* tabla){
     return list_size(tabla->filas);
 }
 
-void quitar_fila(tabla_segmentos_t* tabla, int numero_seg){
-    // TODO
+void destruir_fila(fila_tabla_segmentos_t* fila){
+    liberar_segmento(fila);
+    free(fila);
 }
 
-uint32_t agregar_fila(tabla_segmentos_t* tabla, fila_tabla_segmentos_t* fila){
+fila_tabla_segmentos_t* crear_fila(tabla_segmentos_t* tabla, int tamanio){
+    fila_tabla_segmentos_t* fila = reservar_segmento(tamanio);
+    agregar_fila(tabla,fila);
+    return fila;
+}
+
+void agregar_fila(tabla_segmentos_t* tabla, fila_tabla_segmentos_t* fila){
     list_add(tabla->filas,fila);
-    uint32_t numero_fila_nueva = cantidad_filas(tabla);
-    uint32_t direccion_logica = (numero_fila_nueva - 1) << 16;
-    return direccion_logica;
+    fila->numero_segmento = generar_nuevo_numero_segmento(tabla);
+}
+
+int generar_nuevo_numero_segmento(tabla_segmentos_t* tabla){
+    int nuevo = tabla->proximo_numero_segmento;
+    tabla->proximo_numero_segmento++;
+    return nuevo;
+}
+
+uint32_t direccion_logica(fila_tabla_segmentos_t* fila){
+    return fila->numero_segmento << 16;
 }
 
 fila_tabla_segmentos_t* reservar_segmento(int tamanio){
@@ -121,7 +144,6 @@ void liberar_segmento(fila_tabla_segmentos_t* fila){
     for(int pos = inicio;pos < inicio + tamanio;pos++){
         bitarray_clean_bit(mapa_memoria_disponible, pos);
     }
-    free(fila);
 }
 
 int first_fit(int memoria_pedida) {
@@ -150,7 +172,7 @@ int first_fit(int memoria_pedida) {
 }
 
 int escribir_memoria_principal(tabla_segmentos_t* tabla, uint32_t direccion_logica, void* dato, int tamanio){
-    log_info(logger,"Escribiendo en memoria principal");
+    //log_info(logger,"Escribiendo en memoria principal");
     int numero_seg = numero_de_segmento(direccion_logica);
     int direccion_fisica_dato = calcular_direccion_fisica(tabla, direccion_logica);
     fila_tabla_segmentos_t* fila = obtener_fila(tabla, numero_seg);
@@ -174,8 +196,43 @@ int leer_memoria_principal(tabla_segmentos_t* tabla, uint32_t direccion_logica, 
     return EXIT_SUCCESS;
 }
 
+void leer_tarea_memoria_principal(tabla_segmentos_t* tabla, uint32_t dir_log_tareas, char** tarea, int id_prox_tarea){
+    fila_tabla_segmentos_t* fila = obtener_fila(tabla, numero_de_segmento(dir_log_tareas));
+    int tamanio = fila->tamanio;
+    char* tareas = malloc(tamanio);
+    leer_memoria_principal(tabla, dir_log_tareas, tareas, tamanio);
+    char** array_tareas = (char**) string_split(tareas, "\n");
+    int cant_tareas = cantidad_tareas(array_tareas); 
+    if(id_prox_tarea < cant_tareas)
+        *tarea = string_duplicate(array_tareas[id_prox_tarea]);
+    else{
+        if(id_prox_tarea == cant_tareas)
+            *tarea = string_duplicate("FIN");
+        else{
+            *tarea = NULL;
+            log_error(logger,"ERROR. No existe la instruccion con el identificador solicitado");
+        }
+    }
+    // Libero el string tareas
+    free(tareas);
+	// Libero el array de tareas
+	for(int i = 0;array_tareas[i]!=NULL;i++){
+		free(array_tareas[i]);
+	}
+	free(array_tareas);
+}
+
+int cantidad_tareas(char** array_tareas){
+	int cantidad = 0;
+	for(;array_tareas[cantidad]!=NULL;cantidad++);
+	return cantidad;
+}
+
 int calcular_direccion_fisica(tabla_segmentos_t* tabla, uint32_t direccion_logica){
     fila_tabla_segmentos_t* fila = obtener_fila(tabla, numero_de_segmento(direccion_logica));
+    if(fila == NULL){
+        log_error(logger,"NO EXISTE LA FILA");
+    }
     return fila->inicio + desplazamiento(direccion_logica);
 }
 
@@ -194,6 +251,8 @@ void dump_patota(tabla_segmentos_t* tabla_patota){
     uint32_t PID;
     char* tareas;
     uint32_t direccion_tareas;
+
+    log_info(logger,"PATOTA");
 
     // Mostramos informacion del PCB
     leer_memoria_principal(tabla_patota, DIR_LOG_PCB + DESPL_PID, &PID, sizeof(uint32_t));
@@ -220,7 +279,6 @@ void dump_patota(tabla_segmentos_t* tabla_patota){
 
 void dump_tripulante(tabla_segmentos_t* tabla, int nro_fila){
     // Proceso: 1	Segmento: 1	Inicio: 0x0000	Tam: 20b
-    log_info(logger,"PATOTA");
     uint32_t inicio = obtener_fila(tabla,nro_fila)->inicio;
     uint32_t tamanio = obtener_fila(tabla,nro_fila)->tamanio;
     uint32_t TID, posicion_X, posicion_Y, id_proxima_instruccion, dir_log_pcb, PID;

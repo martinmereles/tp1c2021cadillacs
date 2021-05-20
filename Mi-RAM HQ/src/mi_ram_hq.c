@@ -168,7 +168,7 @@ bool leer_mensaje_cliente_y_procesar(int cliente_fd, tabla_segmentos_t** tabla_p
 			break;
 		case COD_ENVIAR_PROXIMA_TAREA:
 			payload = recibir_payload(cliente_fd);
-			enviar_proxima_tarea(payload, tabla_patota, dir_log);
+			enviar_proxima_tarea(cliente_fd, payload, tabla_patota, dir_log);
 			free(payload);
 			break;
 		case COD_EXPULSAR_TRIPULANTE:

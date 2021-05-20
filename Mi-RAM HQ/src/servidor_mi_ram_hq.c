@@ -29,26 +29,33 @@ int iniciar_patota(char* payload){
     offset += sizeof(longitud_tareas);
     log_info(logger, "La lista de tareas del proceso es: %s",tareas);
 
-    // Buscamos un espacio en memoria para el PCB y las tareas
-    fila_tabla_segmentos_t* fila_PCB = reservar_segmento(TAMANIO_PCB);
-    if(fila_PCB == NULL) {
-        log_error(logger, "ERROR. No hay espacio para guardar el PCB de la patota. %d",TAMANIO_PCB);
-        return EXIT_FAILURE;
-    }
-
-    fila_tabla_segmentos_t* fila_tareas = reservar_segmento(longitud_tareas);
-    if(fila_tareas == NULL) {
-        log_error(logger, "ERROR. No hay espacio para guardar las tareas de la patota.");
-        liberar_segmento(fila_PCB);
-        return EXIT_FAILURE;
-    }
-
     // Crear una tabla de segmentos para la patota
     tabla_segmentos_t* tabla_patota;
     tabla_patota = crear_tabla_segmentos();
 
-    int direccion_logica_PCB = agregar_fila(tabla_patota, fila_PCB);
-    int direccion_logica_tareas = agregar_fila(tabla_patota, fila_tareas);
+    // Buscamos un espacio en memoria para el PCB y las tareas
+    fila_tabla_segmentos_t* fila_PCB = crear_fila(tabla_patota, TAMANIO_PCB);
+    if(fila_PCB == NULL) {
+        log_error(logger, "ERROR. No hay espacio para guardar el PCB de la patota. %d",TAMANIO_PCB);
+        destruir_tabla_segmentos(tabla_patota);
+        return EXIT_FAILURE;
+    }
+
+    log_info(logger,"La cantidad de filas es: %d",cantidad_filas(tabla_patota));
+    log_info(logger,"El nro de segmento es: %d",fila_PCB->numero_segmento);
+
+    fila_tabla_segmentos_t* fila_tareas = crear_fila(tabla_patota, longitud_tareas);
+    if(fila_tareas == NULL) {
+        log_error(logger, "ERROR. No hay espacio para guardar las tareas de la patota.");
+        destruir_tabla_segmentos(tabla_patota);
+        return EXIT_FAILURE;
+    }
+
+    log_info(logger,"La cantidad de filas es: %d",cantidad_filas(tabla_patota));
+    log_info(logger,"El nro de segmento es: %d",fila_tareas->numero_segmento);
+
+    int direccion_logica_PCB = direccion_logica(fila_PCB);
+    int direccion_logica_tareas = direccion_logica(fila_tareas);
 
     log_info(logger, "Direccion logica PCB: %x",direccion_logica_PCB);
     log_info(logger, "Direccion logica tareas: %x",direccion_logica_tareas);
@@ -95,19 +102,20 @@ int iniciar_tripulante(char* payload, tabla_segmentos_t** tabla, uint32_t* dir_l
     }
 
     // Buscamos un espacio en memoria para el TCB
-    fila_tabla_segmentos_t* fila_TCB = reservar_segmento(TAMANIO_TCB);
+    // Agregamos la fila para el segmento del TCB a la tabla de la patota
+    fila_tabla_segmentos_t* fila_TCB = crear_fila(*tabla, TAMANIO_TCB);
 
     if(fila_TCB == NULL) {
         log_error(logger, "ERROR. No hay espacio para guardar el TCB del tripulante. %d",TAMANIO_TCB);
+        quitar_y_destruir_fila(*tabla, fila_TCB->numero_segmento);
         return EXIT_FAILURE;
     }
 
-    // Agregamos la fila para el segmento del TCB a la tabla de la patota
-    *dir_log_tcb = agregar_fila(*tabla, fila_TCB);
+    *dir_log_tcb = direccion_logica(fila_TCB);
 
     // Guardo el TID, el estado, la posicion, el identificador de la proxima instruccion y la direccion logica del PCB
     char estado = 'N';
-    uint32_t id_proxima_instruccion = 1;
+    uint32_t id_proxima_instruccion = 0;
     uint32_t dir_log_pcb = DIR_LOG_PCB;
     escribir_memoria_principal(*tabla, *dir_log_tcb + DESPL_TID, &TID, sizeof(uint32_t));
     escribir_memoria_principal(*tabla, *dir_log_tcb + DESPL_ESTADO, &estado, sizeof(char));
@@ -139,10 +147,48 @@ int recibir_ubicacion_tripulante(char* payload, tabla_segmentos_t** tabla, uint3
     return EXIT_SUCCESS;
 }
 
-int enviar_proxima_tarea(char* payload, tabla_segmentos_t** tabla, uint32_t* dir_log_tcb){
+int enviar_proxima_tarea(int tripulante_fd, char* payload, tabla_segmentos_t** tabla, uint32_t* dir_log_tcb){
+    uint32_t id_prox_tarea, dir_log_pcb, dir_log_tareas;
+    char* tarea;
+
+    log_info(logger, "Enviando proxima tarea");
+    log_info(logger, "Leyendo tareas");
+    // Leemos la lista de tareas
+    leer_memoria_principal(*tabla, *dir_log_tcb + DESPL_PROX_INSTR, &id_prox_tarea, sizeof(uint32_t));
+    leer_memoria_principal(*tabla, *dir_log_tcb + DESPL_DIR_PCB, &dir_log_pcb, sizeof(uint32_t));
+    leer_memoria_principal(*tabla, dir_log_pcb + DESPL_TAREAS, &dir_log_tareas, sizeof(uint32_t));
+    leer_tarea_memoria_principal(*tabla, dir_log_tareas, &tarea, id_prox_tarea);
+
+    if(tarea == NULL){
+        log_error(logger, "ERROR. No se encontro la proxima instruccion");
+        return EXIT_FAILURE;
+    }
+
+    log_info(logger, "Enviando proxima tarea: %s", tarea);
+    // enviamos la proxima tarea al submodulo tripulante
+    enviar_operacion(tripulante_fd, COD_PROXIMA_TAREA, tarea, strlen(tarea) + 1);
+    free(tarea);
+
+    log_info(logger, "Incrementamos proxima tarea");
+    // Sumamos 1 al identificador de la proxima instruccion
+    id_prox_tarea++;
+    escribir_memoria_principal(*tabla, *dir_log_tcb + DESPL_PROX_INSTR, &id_prox_tarea, sizeof(uint32_t));
+
     return EXIT_SUCCESS;
 }
 
-int expulsar_tripulante(char* payload, tabla_segmentos_t** tabla, uint32_t* dir_log_tcb){
+int expulsar_tripulante(char* payload, tabla_segmentos_t** tabla, uint32_t* direccion_logica_TCB){
+    
+    log_info(logger,"Expulsando tripulante");
+
+    // Quitamos la fila de la tabla de segmentos (tambien se encarga de liberar la memoria)
+    quitar_y_destruir_fila(*tabla, numero_de_segmento(*direccion_logica_TCB));
+ 
+    // Si no quedan tripulantes en la patota, destruimos su tabla y liberamos sus recursos
+    if(cantidad_filas(*tabla) <= 2){
+        quitar_y_destruir_tabla(*tabla);
+    }
+
     return EXIT_SUCCESS;
 }
+

@@ -15,6 +15,10 @@
 // PROTOCOLO: CODIGOS DE OPERACION 
 enum op_code{
 	COD_MENSAJE,
+
+    // Codigos para servidor Submodulo tripulante
+    COD_PROXIMA_TAREA,
+
     // Codigos para servidor Mi-RAM HQ
     COD_INICIAR_PATOTA,
     COD_INICIAR_TRIPULANTE,

@@ -55,7 +55,7 @@ int main(void) {
 		config_destroy(config);
 		return EXIT_FAILURE;
 	}
-	log_info(logger, "Conexion con el Mi-RAM HQ");
+	log_info(logger, "Conexion con Mi-RAM HQ exitosa");
 
 	leer_fds(i_mongo_store_fd, mi_ram_hq_fd);
 
@@ -169,7 +169,6 @@ void leer_consola_y_procesar(int i_mongo_store_fd, int mi_ram_hq_fd) {
 		default:
 			log_error(logger, "%s: comando no encontrado", argumentos[0]);
 	}
-
 	// Libero los recursos del array argumentos
 	for(int i = 0;argumentos[i]!=NULL;i++){
 		free(argumentos[i]);
@@ -268,7 +267,8 @@ int iniciar_patota(char** argumentos, int mi_ram_hq_fd){
 
 int submodulo_tripulante(void* args) {
 	iniciar_tripulante_t struct_iniciar_tripulante = *((iniciar_tripulante_t*) args);
-	//sem_post(&sem_struct_iniciar_tripulante);
+	char* tarea;
+	char estado_tripulante = 'E';
 
 	int mi_ram_hq_fd_tripulante;
 	int i_mongo_store_fd_tripulante;
@@ -304,7 +304,7 @@ int submodulo_tripulante(void* args) {
 
 	sem_post(&sem_struct_iniciar_tripulante);
 
-	while(1){
+	while(status_discordiador != END && estado_tripulante != 'F'){
 		sleep(10);
 		// Test: Mando un mensaje al i-Mongo-Store y a Mi-Ram HQ
 		
@@ -316,13 +316,49 @@ int submodulo_tripulante(void* args) {
 		// Hay que ver si el servidor esta conectado?
 		estado_envio_mensaje = enviar_op_recibir_ubicacion_tripulante(mi_ram_hq_fd_tripulante, pos_X, pos_Y);
 		if(estado_envio_mensaje != EXIT_SUCCESS)
-			log_error(logger, "No se pudo mandar el mensaje al Mi-Ram HQ");
+			log_error(logger, "No se pudo mandar el mensaje a Mi-Ram HQ");
 		pos_X++;
 		pos_Y++;
 		pos_Y++;
+
+		estado_envio_mensaje = enviar_op_enviar_proxima_tarea(mi_ram_hq_fd_tripulante);
+		if(estado_envio_mensaje != EXIT_SUCCESS)
+			log_error(logger, "No se pudo mandar el mensaje a Mi-Ram HQ");
+		tarea = leer_proxima_tarea_mi_ram_hq(mi_ram_hq_fd_tripulante);
+		log_info(logger,"La proxima tarea a ejecutar es:\n%s",tarea);
+		if(strcmp(tarea,"FIN") == 0)
+			estado_tripulante = 'F';
+		free(tarea);
 	}
+	
+	estado_envio_mensaje = enviar_op_expulsar_tripulante(mi_ram_hq_fd_tripulante);
+	if(estado_envio_mensaje != EXIT_SUCCESS)
+		log_error(logger, "No se pudo mandar el mensaje a Mi-Ram HQ");
+
+	// Libero recursos
+	liberar_conexion(i_mongo_store_fd_tripulante);
+	liberar_conexion(mi_ram_hq_fd_tripulante);
 
 	return EXIT_SUCCESS;
+}
+
+char* leer_proxima_tarea_mi_ram_hq(int mi_ram_hq_fd_tripulante){
+	char* tarea = NULL;
+	int cod_op = recibir_operacion(mi_ram_hq_fd_tripulante);
+	switch(cod_op)
+	{
+		case COD_PROXIMA_TAREA:
+			tarea = recibir_payload(mi_ram_hq_fd_tripulante);
+			break;
+		case -1:
+			log_error(logger, "Mi-RAM HQ se desconecto. Terminando discordiador");
+			status_discordiador = END;
+			break;
+		default:
+			log_warning(logger, "Operacion desconocida. No quieras meter la pata");
+			break;
+	}
+	return tarea;
 }
 
 enum comando_discordiador string_to_comando_discordiador(char* string){

@@ -7,6 +7,7 @@
 #include "commons/collections/list.h"
 #include <sys/types.h>
 #include <string.h>
+#include "commons/string.h"
 
 #define TAMANIO_PCB 8
 #define TAMANIO_TCB 21
@@ -23,23 +24,24 @@
 #define DESPL_PROX_INSTR    13
 #define DESPL_DIR_PCB       17
 
-// Una tabla de segmentos es un array de filas??
 /*
 direccion logica = nro segmento | desplazamiento
-
-nro segmento: 16 bit    ??
-desplazamiento: 16 bits ??
+nro segmento: 16 bits
+desplazamiento: 16 bits
 */
 
 typedef struct{
+    uint32_t numero_segmento;
     uint32_t inicio;
     uint32_t tamanio;
 } fila_tabla_segmentos_t;
 
 typedef struct{
     t_list *filas;
+    uint32_t proximo_numero_segmento;
 } tabla_segmentos_t;
 
+fila_tabla_segmentos_t* crear_fila(tabla_segmentos_t* tabla, int tamanio);
 void inicializar_estructuras_memoria(t_config* config);
 void liberar_estructuras_memoria();
 fila_tabla_segmentos_t* reservar_segmento(int tamanio);
@@ -52,13 +54,20 @@ void dump_patota(tabla_segmentos_t* tabla_patota);
 void dump_tripulante(tabla_segmentos_t* tabla, int nro_fila);
 tabla_segmentos_t* obtener_tabla_patota(int PID_buscado);
 void quitar_fila(tabla_segmentos_t* tabla, int numero_fila);
-uint32_t agregar_fila(tabla_segmentos_t* tabla, fila_tabla_segmentos_t* fila);
+void agregar_fila(tabla_segmentos_t* tabla, fila_tabla_segmentos_t* fila);
 fila_tabla_segmentos_t* obtener_fila(tabla_segmentos_t* tabla, int numero_fila);
 int cantidad_filas(tabla_segmentos_t* tabla);
 tabla_segmentos_t* crear_tabla_segmentos();
-void destruir_tabla_segmentos(tabla_segmentos_t* tabla);
+void destruir_tabla_segmentos(void* tabla_de_segmentos);
 uint32_t numero_de_segmento(uint32_t direccion_logica);
 uint32_t desplazamiento(uint32_t direccion_logica);
+void leer_tarea_memoria_principal(tabla_segmentos_t* tabla, uint32_t dir_log_tareas, char** tarea, int id_prox_tarea);
+int cantidad_tareas(char** array_tareas);
+int generar_nuevo_numero_segmento(tabla_segmentos_t* tabla);
+void destruir_fila(fila_tabla_segmentos_t* fila);
+void quitar_y_destruir_fila(tabla_segmentos_t* tabla, int numero_seg);
+uint32_t direccion_logica(fila_tabla_segmentos_t* fila);
+void quitar_y_destruir_tabla(tabla_segmentos_t* tabla_a_destruir);
 
 void* memoria_principal;
 int tamanio_memoria;

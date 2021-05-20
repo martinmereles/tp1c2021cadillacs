@@ -28,6 +28,7 @@ int submodulo_tripulante();
 int generarNuevoPID();
 int generarNuevoTID();
 void recibir_y_procesar_mensaje_i_mongo_store(int i_mongo_store_fd);
+char* leer_proxima_tarea_mi_ram_hq(int mi_ram_hq_fd_tripulante);
 
 char* direccion_IP_i_Mongo_Store;
 char* puerto_i_Mongo_Store;
