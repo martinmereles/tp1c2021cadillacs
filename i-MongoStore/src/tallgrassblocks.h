@@ -27,7 +27,7 @@ typedef struct {
 	char* open;
 } t_metadata;
 
-//estructura superblocke 
+//estructura superbloque 
 typedef struct {
 	uint32_t block_size;
 	uint32_t block_count;
@@ -40,6 +40,14 @@ typedef struct {
 typedef struct {
 	uint32_t size;
 	uint32_t block_count;
-	t_list*  blocks
-	char* valor_md5 
-}
+	t_list*  blocks;
+	char* caracter_llenado;
+	char* valor_md5;
+} t_file
+
+//estructura bitacora
+
+typedef struct {
+	uint32_t size
+	t_list* blocks
+} t_bitacora
