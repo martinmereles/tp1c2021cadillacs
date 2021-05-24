@@ -12,7 +12,9 @@ int main(void)
 	char* puerto_escucha = config_get_string_value(config, "PUERTO");
 	char* ip = "127.0.0.1";
 
-	inicializar_estructuras_memoria(config);
+	// Inicializar las estructuras para administrar la memoria
+	if(inicializar_estructuras_memoria(config)==EXIT_FAILURE)
+		return EXIT_FAILURE;
 
 	int server_fd = iniciar_servidor(ip, puerto_escucha);
 	log_info(logger, "Mi-RAM HQ listo para recibir al Discordiador");

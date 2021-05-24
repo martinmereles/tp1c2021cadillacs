@@ -42,11 +42,10 @@ typedef struct{
 } tabla_segmentos_t;
 
 fila_tabla_segmentos_t* crear_fila(tabla_segmentos_t* tabla, int tamanio);
-void inicializar_estructuras_memoria(t_config* config);
+int inicializar_estructuras_memoria(t_config* config);
 void liberar_estructuras_memoria();
 fila_tabla_segmentos_t* reservar_segmento(int tamanio);
 void liberar_segmento(fila_tabla_segmentos_t* fila);
-int first_fit(int memoria_pedida);
 int escribir_memoria_principal(tabla_segmentos_t*, uint32_t, void*, int);
 int leer_memoria_principal(tabla_segmentos_t*, uint32_t, void*, int);
 int calcular_direccion_fisica(tabla_segmentos_t* , uint32_t );
@@ -69,8 +68,15 @@ void quitar_y_destruir_fila(tabla_segmentos_t* tabla, int numero_seg);
 uint32_t direccion_logica(fila_tabla_segmentos_t* fila);
 void quitar_y_destruir_tabla(tabla_segmentos_t* tabla_a_destruir);
 
+
 void* memoria_principal;
 int tamanio_memoria;
+
+// ALGORITMOS DE UBICACION DE SEGMENTOS
+int (*algoritmo_de_ubicacion)(int);
+int first_fit(int memoria_pedida);
+int best_fit(int memoria_pedida);
+int inicializar_algoritmo_de_ubicacion(t_config* config);
 
 // ESTRUCTURAS PARA ADMINISTRAR LA MEMORIA PRINCIPAL
 

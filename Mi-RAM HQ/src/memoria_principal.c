@@ -1,6 +1,6 @@
 #include "memoria_principal.h"
 
-void inicializar_estructuras_memoria(t_config* config){
+int inicializar_estructuras_memoria(t_config* config){
 	// Inicializo las estructuras para administrar la RAM
 	tamanio_memoria = atoi(config_get_string_value(config, "TAMANIO_MEMORIA"));
 	memoria_principal = malloc(tamanio_memoria);
@@ -22,9 +22,31 @@ void inicializar_estructuras_memoria(t_config* config){
 		bitarray_clean_bit(mapa_memoria_disponible, i);
 	}
 
+    // Inicializo el algoritmo de ubicacion
+    if(inicializar_algoritmo_de_ubicacion(config) == EXIT_FAILURE)
+        return EXIT_FAILURE;
+
 	log_info(logger, "El tamanio de la RAM es: %d",tamanio_memoria);
 	log_info(logger, "El tamanio del mapa de memoria disponible es: %d",bitarray_get_max_bit(mapa_memoria_disponible));
+    return EXIT_SUCCESS;
 }
+
+int inicializar_algoritmo_de_ubicacion(t_config* config){
+    char* string_algoritmo_ubicacion = config_get_string_value(config, "ALGORITMO_UBICACION");
+    if(strcmp(string_algoritmo_ubicacion,"FIRST_FIT")==0){
+        log_info(logger,"El algoritmo de ubicacion es: First Fit");
+        algoritmo_de_ubicacion = &first_fit;
+        return EXIT_SUCCESS;
+    }
+    if(strcmp(string_algoritmo_ubicacion,"BEST_FIT")==0){
+        log_info(logger,"El algoritmo de ubicacion es: Best Fit");
+        algoritmo_de_ubicacion = &best_fit;
+        return EXIT_SUCCESS;
+    }
+    log_error(logger,"%s: Algoritmo de ubicacion invalido",string_algoritmo_ubicacion);
+    return EXIT_FAILURE;
+}
+   
 
 void liberar_estructuras_memoria(){
     log_info(logger, "Liberando estructuras administrativas de la memoria principal");
@@ -125,7 +147,7 @@ uint32_t direccion_logica(fila_tabla_segmentos_t* fila){
 }
 
 fila_tabla_segmentos_t* reservar_segmento(int tamanio){
-    int inicio = first_fit(tamanio);
+    int inicio = algoritmo_de_ubicacion(tamanio);
     fila_tabla_segmentos_t* fila = NULL;
     if(inicio >= 0){
         fila = malloc(sizeof(fila_tabla_segmentos_t));
@@ -169,6 +191,56 @@ int first_fit(int memoria_pedida) {
     }   
 
     return posicion_memoria_disponible;
+}
+
+int best_fit(int memoria_pedida) {
+    int memoria_disponible = 0;
+    int posicion_memoria_disponible = 0;
+    int mejor_memoria_disponible = 0;
+    int mejor_posicion_memoria_disponible = -1;
+
+    log_info(logger,"ARRANCA EL BEST FIT");
+    
+    // Me fijo byte por byte de la memoria principal cuales estan disponibles
+    for(int nro_byte = 0;nro_byte < tamanio_memoria;nro_byte++){
+        // Si el byte esta ocupado
+        if(bitarray_test_bit(mapa_memoria_disponible, nro_byte)){
+
+            // Me fijo si la memoria pedida entra en la memoria hallada
+            if(memoria_disponible >= memoria_pedida){
+                // Si entra, la comparo con la mejor que habia encontrado
+                if(mejor_memoria_disponible > memoria_disponible || mejor_posicion_memoria_disponible == -1){
+                    // Si es mejor, se convierte en la nueva mejor
+                    mejor_memoria_disponible = memoria_disponible;
+                    mejor_posicion_memoria_disponible = posicion_memoria_disponible;
+                }
+            }
+
+            memoria_disponible = 0;
+            posicion_memoria_disponible = nro_byte + 1;
+        }
+        // Si el byte esta disponible
+        else{
+            memoria_disponible++;
+        }
+    }
+
+    // Verifico si hay memoria disponible al final de la memoria principal
+    // Me fijo si la memoria pedida entra en la memoria hallada
+    if(memoria_disponible >= memoria_pedida){
+        // Si entra, la comparo con la mejor que habia encontrado
+        if(mejor_memoria_disponible > memoria_disponible || mejor_posicion_memoria_disponible == -1){
+            // Si es mejor, se convierte en la nueva mejor
+            mejor_memoria_disponible = memoria_disponible;
+            mejor_posicion_memoria_disponible = posicion_memoria_disponible;
+        }
+    }
+
+    log_info(logger,"El mejor ajuste es de tamanio %d", mejor_memoria_disponible);
+    log_info(logger,"La direccion del mejor ajuste es %d", mejor_posicion_memoria_disponible);
+    // Retorno la mejor posicion de memoria encontrada
+    // Si no se encontro un espacio de memoria del tamanio pedido, retorna -1
+    return mejor_posicion_memoria_disponible;
 }
 
 int escribir_memoria_principal(tabla_segmentos_t* tabla, uint32_t direccion_logica, void* dato, int tamanio){
