@@ -314,6 +314,7 @@ int submodulo_tripulante(void* args) {
 			log_error(logger, "No se pudo mandar el mensaje al i-Mongo-Store");
 		
 		// Hay que ver si el servidor esta conectado?
+		
 		estado_envio_mensaje = enviar_op_recibir_ubicacion_tripulante(mi_ram_hq_fd_tripulante, pos_X, pos_Y);
 		if(estado_envio_mensaje != EXIT_SUCCESS)
 			log_error(logger, "No se pudo mandar el mensaje a Mi-Ram HQ");
@@ -329,6 +330,7 @@ int submodulo_tripulante(void* args) {
 		if(strcmp(tarea,"FIN") == 0)
 			estado_tripulante = 'F';
 		free(tarea);
+		
 	}
 	
 	estado_envio_mensaje = enviar_op_expulsar_tripulante(mi_ram_hq_fd_tripulante);
