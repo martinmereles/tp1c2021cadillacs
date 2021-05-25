@@ -101,6 +101,10 @@ void pasar_todos_new_to_ready(enum algoritmo cod_algor){
     }
 }
 
+void ordenamiento_ready_algoritmo_fifo(t_queue *nueva_cola,void* dato,t_queue *cola_origen){
+    switch_cola_to(nueva_cola,dato,cola_origen);
+}
+
 bool es_algoritmo_valido(char* cod_algor){
     if(strcpy(cod_algor, "FIFO") || strcpy(cod_algor,"RR"))
         return true;
