@@ -12,6 +12,13 @@
 #include <unistd.h>
 #include <string.h>
 
+#include <fcntl.h>
+#include <dirent.h>
+#include <limits.h>
+#include <string.h>
+#include <sys/mman.h>
+#include <errno.h>
+
 
 #define DIRECTORIO "DIRECTORY=Y\n"
 #define ARCHIVO "DIRECTORY=N\n"
@@ -19,6 +26,13 @@
 #define BLOQUES "BLOCKS=[]\n"
 #define ABIERTO "OPEN=Y\n"
 #define CERRADO "OPEN=N\n"
+
+//METADATA_FS
+#define TAMANIO_BLOQUE "BLOCK_SIZE=%d\n"
+#define BLOQUES_METADATA_FS "BLOCKS=%d\n"
+#define NUMERO_MAGICO "MAGIC_NUMBER=TALL-GRASS\n"
+
+
 // estructura metadata
 typedef struct {
 	char* directory;
@@ -34,7 +48,7 @@ typedef struct {
 	char* mount;
 	t_bitarray* bitmap;
 	t_log* log_tallgrass;
-} t_tallgrass_blocks;
+} t_superbloque;
 
 //estructura file
 typedef struct {
@@ -51,3 +65,14 @@ typedef struct {
 	uint32_t size
 	t_list* blocks
 } t_bitacora
+
+typedef struct {
+	char* mount;
+	t_log* logger;
+	t_superbloque* blocks;
+} t_filesystem;
+
+
+// FUNCIONES TALL-GRASS
+t_filesystem* iniciar_filesystem(char* mount, int blocks,
+		int block_size, t_log* logger);
