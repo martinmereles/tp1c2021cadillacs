@@ -1,4 +1,4 @@
-#include "tallgrassblocks.h"
+#include "i-filesystem.h"
 
 //funciones del blockes
 
@@ -12,18 +12,18 @@ t_filesystem* iniciar_filesystem(char* mount, int block, int block_size,
 	crear_bloques(mount, block, logger);
 	t_bitarray* bitmap = crear_bitmap(mount, (block / 8), logger);
 
-	t_superbloque* blocks = malloc(sizeof(t_tallgrass_blocks));
+	t_superbloque* superbloque = malloc(sizeof(t_superbloque));
 	t_filesystem* fs = malloc(sizeof(t_filesystem));
 
 	fs->logger = logger;
 	fs->mount = strdup(mount);
 	fs->blocks = blocks;
 
-	blocks->mount = strdup(mount);
-	blocks->block_count = block;
-	blocks->block_size = block_size;
-	blocks->bitmap = bitmap;
-	blocks->log_tallgrass = logger;
+	superbloque->mount = strdup(mount);
+	superbloque->block_count = block;
+	superbloque->block_size = block_size;
+	superbloque->bitmap = bitmap;
+	superbloque->log_tallgrass = logger;
 
 	crear_metadata_tallgrass(fs, block, block_size);
 	banner_inicio(block, block_size);
@@ -58,7 +58,7 @@ void crear_un_bloque(char* pto_montaje, uint32_t indice, t_log* logger) {
 	string_append(&path, "blocks/");
 	char* numero = string_itoa(indice);
 	string_append(&path, numero);
-	string_append(&path, ".bin");
+	string_append(&path, ".ims");
 
 	int fd = crear_archivo(path, logger);
 	close(fd);

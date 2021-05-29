@@ -18,6 +18,7 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <errno.h>
+#include <"i-filesystem.c>
 
 
 #define DIRECTORIO "DIRECTORY=Y\n"
