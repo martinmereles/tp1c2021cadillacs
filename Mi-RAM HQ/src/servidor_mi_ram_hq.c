@@ -191,4 +191,3 @@ int expulsar_tripulante(char* payload, tabla_segmentos_t** tabla, uint32_t* dire
 
     return EXIT_SUCCESS;
 }
-
