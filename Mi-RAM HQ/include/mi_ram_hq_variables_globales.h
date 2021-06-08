@@ -20,4 +20,14 @@ int tamanio_memoria;
 t_bitarray*	mapa_memoria_disponible;
 char* bitarray_mapa_memoria_disponible;
 
+// ESTRUCTURAS PARA ADMINISTRAR LA MEMORIA PRINCIPAL
+
+// Tablas de patotas
+t_list* tablas_de_patotas;
+
+// PUNTEROS A FUNCIONES GLOBALES
+// Sirven para apuntar a las funciones que implementan segmentacion o paginacion, segun la configuracion
+void (*dump_patota)(void*);
+
+
 #endif

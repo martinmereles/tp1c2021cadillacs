@@ -56,15 +56,14 @@ void quitar_y_destruir_fila(tabla_segmentos_t* tabla, int numero_seg);
 uint32_t direccion_logica(fila_tabla_segmentos_t* fila);
 void quitar_y_destruir_tabla(tabla_segmentos_t* tabla_a_destruir);
 
+// Dump - Funciones
+void dump_patota_segmentacion(void*);
+void dump_tripulante_segmentacion(tabla_segmentos_t* tabla, int nro_fila);
+
 // ALGORITMOS DE UBICACION DE SEGMENTOS
 int (*algoritmo_de_ubicacion)(int);
 int first_fit(int memoria_pedida);
 int best_fit(int memoria_pedida);
 int inicializar_algoritmo_de_ubicacion(t_config* config);
-
-// ESTRUCTURAS PARA ADMINISTRAR LA MEMORIA PRINCIPAL
-
-// Tablas de segmentos
-t_list* tablas_de_segmentos;
 
 #endif

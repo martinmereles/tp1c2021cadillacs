@@ -108,7 +108,7 @@ void leer_consola_y_procesar() {
 
 	if(strcmp(linea_consola,"DUMP") == 0){
 		log_info(logger,"Dump: %s",temporal_get_string_time("%d/%m/%y %H:%M:%S"));
-		list_iterate(tablas_de_segmentos, dump_patota);
+		list_iterate(tablas_de_patotas, dump_patota);
 	}
 
 	if(strcmp(linea_consola,"FIN") == 0){
@@ -118,7 +118,7 @@ void leer_consola_y_procesar() {
 }
 
 int comunicacion_cliente(int cliente_fd) {
-	tabla_segmentos_t* tabla_patota = NULL;
+	void* tabla_patota = NULL;
 	uint32_t dir_log = -1;
 	bool cliente_conectado = true;
 
@@ -145,7 +145,7 @@ int comunicacion_cliente(int cliente_fd) {
 
 // Cada tripulante sabe a que segmento pertenece y a que proceso pertenece
 
-bool leer_mensaje_cliente_y_procesar(int cliente_fd, tabla_segmentos_t** tabla_patota, uint32_t* dir_log){
+bool leer_mensaje_cliente_y_procesar(int cliente_fd, void** tabla_patota, uint32_t* dir_log){
 	bool cliente_conectado = true;
 	// Leo codigo de operacion
 	int cod_op = recibir_operacion(cliente_fd);

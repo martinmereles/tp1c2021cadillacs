@@ -61,7 +61,7 @@ int iniciar_patota(char* payload){
     log_info(logger, "Direccion logica tareas: %x",direccion_logica_tareas);
 
     // Agregar la tabla a la lista de tablas
-    list_add(tablas_de_segmentos, tabla_patota);
+    list_add(tablas_de_patotas, tabla_patota);
 
     // Guardo el PID y la direccion logica de las tareas en el PCB
     escribir_memoria_principal(tabla_patota, direccion_logica_PCB + DESPL_PID, &PID, sizeof(uint32_t));
@@ -73,7 +73,7 @@ int iniciar_patota(char* payload){
     return EXIT_SUCCESS;  
 }   
 
-int iniciar_tripulante(char* payload, tabla_segmentos_t** tabla, uint32_t* dir_log_tcb){
+int iniciar_tripulante(char* payload, void** tabla, uint32_t* dir_log_tcb){
     int PID, posicion_X, posicion_Y, TID;
     int offset = 0;
     
@@ -127,7 +127,7 @@ int iniciar_tripulante(char* payload, tabla_segmentos_t** tabla, uint32_t* dir_l
     return EXIT_SUCCESS;
 }
 
-int recibir_ubicacion_tripulante(char* payload, tabla_segmentos_t** tabla, uint32_t* direccion_logica_TCB){
+int recibir_ubicacion_tripulante(char* payload, void** tabla, uint32_t* direccion_logica_TCB){
     uint32_t posicion_X, posicion_Y;
     int offset = 0;
     
@@ -147,7 +147,7 @@ int recibir_ubicacion_tripulante(char* payload, tabla_segmentos_t** tabla, uint3
     return EXIT_SUCCESS;
 }
 
-int enviar_proxima_tarea(int tripulante_fd, char* payload, tabla_segmentos_t** tabla, uint32_t* dir_log_tcb){
+int enviar_proxima_tarea(int tripulante_fd, char* payload, void** tabla, uint32_t* dir_log_tcb){
     uint32_t id_prox_tarea, dir_log_pcb, dir_log_tareas;
     char* tarea;
 
@@ -177,7 +177,7 @@ int enviar_proxima_tarea(int tripulante_fd, char* payload, tabla_segmentos_t** t
     return EXIT_SUCCESS;
 }
 
-int expulsar_tripulante(char* payload, tabla_segmentos_t** tabla, uint32_t* direccion_logica_TCB){
+int expulsar_tripulante(char* payload, void** tabla, uint32_t* direccion_logica_TCB){
     
     log_info(logger,"Expulsando tripulante");
 

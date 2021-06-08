@@ -23,7 +23,7 @@ void leer_consola_y_procesar();
 void mi_ram_hq(int);
 int comunicacion_cliente(int cliente_fd);
 void atender_cliente(void *args);
-bool leer_mensaje_cliente_y_procesar(int, tabla_segmentos_t**, uint32_t*);
+bool leer_mensaje_cliente_y_procesar(int, void**, uint32_t*);
 int status_servidor;
 
 // Semaforos
