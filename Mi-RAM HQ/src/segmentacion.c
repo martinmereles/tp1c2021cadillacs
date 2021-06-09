@@ -191,10 +191,7 @@ fila_tabla_segmentos_t* obtener_fila(tabla_segmentos_t* tabla, int numero_seg){
         fila_tabla_segmentos_t* fila = (fila_tabla_segmentos_t*) args;
         return fila->numero_segmento == numero_seg; 
     }
-    /*
-    bool tiene_numero_de_segmento(fila_tabla_segmentos_t* fila){
-        return fila->numero_segmento == numero_seg; 
-    }*/
+
     return list_find(tabla->filas, tiene_numero_de_segmento);
 }
 
