@@ -41,8 +41,9 @@ int inicializar_esquema_memoria(t_config* config){
             return EXIT_FAILURE;
 
         // Inicializo vectores a funciones
-        dump_patota = &dump_patota_segmentacion;
-        crear_tabla = &crear_tabla_segmentacion;
+        dump_memoria = &dump_memoria_segmentacion;
+        crear_patota = &crear_patota_segmentacion;
+        crear_tripulante = &crear_tripulante_segmentacion;
 
         return EXIT_SUCCESS;
     }
@@ -55,8 +56,9 @@ int inicializar_esquema_memoria(t_config* config){
         // Inicializo ALGORITMO REEMPLAZO
 
         // Inicializo vectores a funciones
-        // dump_patota = &dump_patota_paginacion;
-        // crear_tabla = &crear_tabla_paginacion;
+        // dump_memoria = &dump_memoria_paginacion;
+        // crear_patota = &crear_patota_paginacion;
+        // crear_tripulante = &crear_tripulante_paginacion;
 
         return EXIT_SUCCESS;
     }

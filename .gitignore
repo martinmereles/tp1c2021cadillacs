@@ -53,3 +53,4 @@ dkms.conf
 
 # Log files
 *.log
+*.dmp

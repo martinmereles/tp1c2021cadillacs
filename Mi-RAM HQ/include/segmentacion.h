@@ -45,8 +45,11 @@ void agregar_fila(tabla_segmentos_t* tabla, fila_tabla_segmentos_t* fila);
 fila_tabla_segmentos_t* obtener_fila(tabla_segmentos_t* tabla, int numero_fila);
 int cantidad_filas(tabla_segmentos_t* tabla);
 
+// Patotas y Tripulantes
+int crear_patota_segmentacion(uint32_t PID, uint32_t longitud_tareas, char* tareas);
+int crear_tripulante_segmentacion(void**, uint32_t*, uint32_t, uint32_t, uint32_t, uint32_t);
+
 // Tablas de segmentos
-void* crear_tabla_segmentacion();
 void destruir_tabla_segmentos(void* tabla_de_segmentos);
 uint32_t numero_de_segmento(uint32_t direccion_logica);
 uint32_t desplazamiento(uint32_t direccion_logica);
@@ -59,8 +62,11 @@ uint32_t direccion_logica(fila_tabla_segmentos_t* fila);
 void quitar_y_destruir_tabla(tabla_segmentos_t* tabla_a_destruir);
 
 // Dump
-void dump_patota_segmentacion(void*);
-void dump_tripulante_segmentacion(tabla_segmentos_t* tabla, int nro_fila);
+void dump_memoria_segmentacion();
+void dump_patota_segmentacion(tabla_segmentos_t* tabla_patota, FILE* archivo_dump);
+void dump_segmento(FILE* archivo_dump, tabla_segmentos_t* tabla, int PID, int nro_segmento);
+void dump_patota_segmentacion_pruebas(void* args);
+void dump_tripulante_segmentacion_pruebas(tabla_segmentos_t* tabla, int nro_fila);
 
 // ALGORITMOS DE UBICACION DE SEGMENTOS
 int (*algoritmo_de_ubicacion)(int);

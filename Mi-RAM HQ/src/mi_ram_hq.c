@@ -107,8 +107,7 @@ void leer_consola_y_procesar() {
 	linea_consola[strlen(linea_consola)-1]='\0';	// Le saco el \n
 
 	if(strcmp(linea_consola,"DUMP") == 0){
-		log_info(logger,"Dump: %s",temporal_get_string_time("%d/%m/%y %H:%M:%S"));
-		list_iterate(tablas_de_patotas, dump_patota);
+		dump_memoria();
 	}
 
 	if(strcmp(linea_consola,"FIN") == 0){

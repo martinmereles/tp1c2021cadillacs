@@ -11,6 +11,7 @@
 #include <sys/types.h>
 #include <string.h>
 #include "commons/string.h"
+#include "commons/temporal.h"
 
 // MEMORIA PRINCIPAL
 void* memoria_principal;
@@ -27,7 +28,8 @@ t_list* tablas_de_patotas;
 
 // PUNTEROS A FUNCIONES GLOBALES
 // Sirven para apuntar a las funciones que implementan segmentacion o paginacion, segun la configuracion
-void (*dump_patota)(void*);    
-void* (*crear_tabla)(void);
+void (*dump_memoria)(void);
+int (*crear_patota)(uint32_t, uint32_t, char*);
+int (*crear_tripulante)(void**, uint32_t*, uint32_t, uint32_t, uint32_t, uint32_t);
 
 #endif
