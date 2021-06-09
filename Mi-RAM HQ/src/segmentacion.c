@@ -198,11 +198,53 @@ fila_tabla_segmentos_t* obtener_fila(tabla_segmentos_t* tabla, int numero_seg){
     return list_find(tabla->filas, tiene_numero_de_segmento);
 }
 
-tabla_segmentos_t* crear_tabla_segmentos(){
-    tabla_segmentos_t* tabla = malloc(sizeof(tabla_segmentos_t));
-    tabla->filas = list_create();
-    tabla->proximo_numero_segmento = 0;
-    return tabla;
+int crear_tabla_segmentacion(void** tabla, uint32_t PID, uint32_t longitud_tareas, char* tareas){
+    // Creamos la tabla de segmentos de la patota
+    *tabla = malloc(sizeof(tabla_segmentos_t));
+    *tabla->filas = list_create();
+    *tabla->proximo_numero_segmento = 0;
+
+    // Buscamos un espacio en memoria para el PCB y creamos su fila en la tabla de segmentos
+    fila_tabla_segmentos_t* fila_PCB = crear_fila(*tabla_patota, TAMANIO_PCB);
+    if(fila_PCB == NULL) {
+        log_error(logger, "ERROR. No hay espacio para guardar el PCB de la patota. %d",TAMANIO_PCB);
+        destruir_tabla_segmentos(*tabla_patota);
+        return EXIT_FAILURE;
+    }    
+
+    log_info(logger,"La cantidad de filas es: %d",cantidad_filas(*tabla_patota));
+    log_info(logger,"El nro de segmento es: %d",fila_PCB->numero_segmento);
+
+    // Buscamos un espacio en memoria para las tareas y creamos su fila en la tabla de segmentos
+
+    fila_tabla_segmentos_t* fila_tareas = crear_fila(*tabla_patota, longitud_tareas);
+    if(fila_tareas == NULL) {
+        log_error(logger, "ERROR. No hay espacio para guardar las tareas de la patota.");
+        destruir_tabla_segmentos(*tabla_patota);
+        return EXIT_FAILURE;
+    }
+
+    log_info(logger,"La cantidad de filas es: %d",cantidad_filas(*tabla_patota));
+    log_info(logger,"El nro de segmento es: %d",fila_tareas->numero_segmento);
+
+    int direccion_logica_PCB = direccion_logica(fila_PCB);
+    int direccion_logica_tareas = direccion_logica(fila_tareas);
+
+    log_info(logger, "Direccion logica PCB: %x",direccion_logica_PCB);
+    log_info(logger, "Direccion logica tareas: %x",direccion_logica_tareas);
+
+    // Agregar la tabla a la lista de tablas
+    list_add(tablas_de_patotas, *tabla_patota);
+
+    // Guardo el PID y la direccion logica de las tareas en el PCB
+    escribir_memoria_principal(*tabla_patota, direccion_logica_PCB + DESPL_PID, &PID, sizeof(uint32_t));
+    escribir_memoria_principal(*tabla_patota, direccion_logica_PCB + DESPL_TAREAS, &direccion_logica_tareas, sizeof(uint32_t));  
+
+    // Guardo las tareas en el segmento de tareas
+    escribir_memoria_principal(*tabla_patota, direccion_logica_tareas, tareas, longitud_tareas);
+    log_info(logger, "Estructuras de la patota inicializadas exitosamente");
+
+    return EXIT_SUCCESS;
 }
 
 int cantidad_filas(tabla_segmentos_t* tabla){

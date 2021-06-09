@@ -42,6 +42,7 @@ int inicializar_esquema_memoria(t_config* config){
 
         // Inicializo vectores a funciones
         dump_patota = &dump_patota_segmentacion;
+        crear_tabla = &crear_tabla_segmentacion;
 
         return EXIT_SUCCESS;
     }
@@ -55,6 +56,7 @@ int inicializar_esquema_memoria(t_config* config){
 
         // Inicializo vectores a funciones
         // dump_patota = &dump_patota_paginacion;
+        // crear_tabla = &crear_tabla_paginacion;
 
         return EXIT_SUCCESS;
     }

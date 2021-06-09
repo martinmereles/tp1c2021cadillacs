@@ -44,7 +44,9 @@ void quitar_fila(tabla_segmentos_t* tabla, int numero_fila);
 void agregar_fila(tabla_segmentos_t* tabla, fila_tabla_segmentos_t* fila);
 fila_tabla_segmentos_t* obtener_fila(tabla_segmentos_t* tabla, int numero_fila);
 int cantidad_filas(tabla_segmentos_t* tabla);
-tabla_segmentos_t* crear_tabla_segmentos();
+
+// Tablas de segmentos
+void* crear_tabla_segmentacion();
 void destruir_tabla_segmentos(void* tabla_de_segmentos);
 uint32_t numero_de_segmento(uint32_t direccion_logica);
 uint32_t desplazamiento(uint32_t direccion_logica);
@@ -56,7 +58,7 @@ void quitar_y_destruir_fila(tabla_segmentos_t* tabla, int numero_seg);
 uint32_t direccion_logica(fila_tabla_segmentos_t* fila);
 void quitar_y_destruir_tabla(tabla_segmentos_t* tabla_a_destruir);
 
-// Dump - Funciones
+// Dump
 void dump_patota_segmentacion(void*);
 void dump_tripulante_segmentacion(tabla_segmentos_t* tabla, int nro_fila);
 

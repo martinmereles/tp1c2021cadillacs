@@ -27,7 +27,7 @@ t_list* tablas_de_patotas;
 
 // PUNTEROS A FUNCIONES GLOBALES
 // Sirven para apuntar a las funciones que implementan segmentacion o paginacion, segun la configuracion
-void (*dump_patota)(void*);
-
+void (*dump_patota)(void*);    
+void* (*crear_tabla)(void);
 
 #endif

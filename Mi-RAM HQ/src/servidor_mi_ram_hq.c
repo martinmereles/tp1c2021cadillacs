@@ -30,8 +30,12 @@ int iniciar_patota(char* payload){
     log_info(logger, "La lista de tareas del proceso es: %s",tareas);
 
     // Crear una tabla de segmentos para la patota
-    tabla_segmentos_t* tabla_patota;
-    tabla_patota = crear_tabla_segmentos();
+    void* tabla_patota;
+    tabla_patota = crear_tabla(PID, longitud_tareas, tareas);
+    //tabla_patota = crear_tabla_segmentos();
+
+    // Al crearse la tabla, deberia hacerse con el PCB y las tareas incluidas?
+    /*
 
     // Buscamos un espacio en memoria para el PCB y las tareas
     fila_tabla_segmentos_t* fila_PCB = crear_fila(tabla_patota, TAMANIO_PCB);
@@ -70,6 +74,8 @@ int iniciar_patota(char* payload){
     // Guardo las tareas en el segmento de tareas
     escribir_memoria_principal(tabla_patota, direccion_logica_tareas, tareas, longitud_tareas);
     log_info(logger, "Estructuras de la patota inicializadas exitosamente");
+
+    */
     return EXIT_SUCCESS;  
 }   
 
