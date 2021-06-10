@@ -12,20 +12,6 @@ int inicializar_estructuras_memoria(t_config* config){
     // Inicializo la lista de tablas de segmentos
     tablas_de_patotas = list_create();
 
-	// Cada byte del mapa representa 8 bytes en RAM
-	int tamanio_mapa_memoria_disponible = tamanio_memoria/8;
-	// Le sumo 1 byte en el caso que el tamanio en bytes de la RAM no sea multiplo de 8
-	if(tamanio_memoria%8 != 0)
-		tamanio_mapa_memoria_disponible++;
-	bitarray_mapa_memoria_disponible = malloc(tamanio_mapa_memoria_disponible);
-	mapa_memoria_disponible = bitarray_create_with_mode(bitarray_mapa_memoria_disponible,
-														tamanio_mapa_memoria_disponible,
-														LSB_FIRST);
-	// Inicializo todos los bits del mapa en 0
-	for(int i = 0;i < tamanio_memoria;i++){
-		bitarray_clean_bit(mapa_memoria_disponible, i);
-	}
-
 	log_info(logger, "El tamanio de la RAM es: %d",tamanio_memoria);
 	log_info(logger, "El tamanio del mapa de memoria disponible es: %d",bitarray_get_max_bit(mapa_memoria_disponible));
     return EXIT_SUCCESS;
@@ -36,6 +22,21 @@ int inicializar_esquema_memoria(t_config* config){
     if(strcmp(string_algoritmo_ubicacion,"SEGMENTACION")==0){
         log_info(logger,"El esquema de memoria es: SEGMENTACION");
 
+        // Cada byte del mapa representa 8 bytes en RAM
+        int tamanio_mapa_memoria_disponible = tamanio_memoria/8;
+        // Le sumo 1 byte en el caso que el tamanio en bytes de la RAM no sea multiplo de 8
+        if(tamanio_memoria%8 != 0)
+            tamanio_mapa_memoria_disponible++;
+        bitarray_mapa_memoria_disponible = malloc(tamanio_mapa_memoria_disponible);
+        mapa_memoria_disponible = bitarray_create_with_mode(bitarray_mapa_memoria_disponible,
+                                                            tamanio_mapa_memoria_disponible,
+                                                            LSB_FIRST);
+
+        // Inicializo todos los bits del mapa de memoria disponible en 0
+        for(int i = 0;i < tamanio_memoria;i++){
+            bitarray_clean_bit(mapa_memoria_disponible, i);
+        }
+
         // Inicializo ALGORITMO UBICACION
         if(inicializar_algoritmo_de_ubicacion(config) == EXIT_FAILURE)
             return EXIT_FAILURE;
@@ -44,24 +45,56 @@ int inicializar_esquema_memoria(t_config* config){
         dump_memoria = &dump_memoria_segmentacion;
         crear_patota = &crear_patota_segmentacion;
         crear_tripulante = &crear_tripulante_segmentacion;
+        escribir_memoria_principal = &escribir_memoria_principal_segmentacion;
+        leer_memoria_principal = &leer_memoria_principal_segmentacion;
 
         return EXIT_SUCCESS;
     }
+
     if(strcmp(string_algoritmo_ubicacion,"PAGINACION")==0){
         log_info(logger,"El esquema de memoria es: PAGINACION");
 
         // Inicializo TAMANIO PAGINA
+	    tamanio_pagina = atoi(config_get_string_value(config, "TAMANIO_PAGINA"));
+
+        if(tamanio_memoria % tamanio_pagina != 0){
+            log_error(logger,"ERROR. El tamanio de la memoria no es multiplo del tamanio de pagina");
+            return EXIT_FAILURE;
+        }
+
+        cantidad_marcos = tamanio_memoria/tamanio_pagina;
+
+        // Cada bit del mapa representa 1 marco de la memoria RAM
+        int tamanio_mapa_memoria_disponible = cantidad_marcos/8;
+        // Le sumo 1 byte en el caso que la cantidad de marcos no sea multiplo de 8
+        if(cantidad_marcos % 8 != 0)
+            tamanio_mapa_memoria_disponible++;
+
+        // Creamos el mapa de memoria disponible
+        bitarray_mapa_memoria_disponible = malloc(tamanio_mapa_memoria_disponible);
+        mapa_memoria_disponible = bitarray_create_with_mode(bitarray_mapa_memoria_disponible,
+                                                            tamanio_mapa_memoria_disponible,
+                                                            LSB_FIRST);
+
+        // Inicializo todos los bits del mapa de memoria disponible en 0
+        for(int i = 0;i < cantidad_marcos;i++){
+            bitarray_clean_bit(mapa_memoria_disponible, i);
+        }
+        
         // Inicializo TAMANIO SWAP
         // Inicializo PATH SWAP
         // Inicializo ALGORITMO REEMPLAZO
 
         // Inicializo vectores a funciones
         // dump_memoria = &dump_memoria_paginacion;
-        // crear_patota = &crear_patota_paginacion;
-        // crear_tripulante = &crear_tripulante_paginacion;
+        crear_patota = &crear_patota_paginacion;
+        crear_tripulante = &crear_tripulante_paginacion;
+        escribir_memoria_principal = &escribir_memoria_principal_paginacion;
+        leer_memoria_principal = &leer_memoria_principal_paginacion;
 
         return EXIT_SUCCESS;
     }
+
     log_error(logger,"%s: Esquema de memoria invalido",string_algoritmo_ubicacion);
     return EXIT_FAILURE;
 }

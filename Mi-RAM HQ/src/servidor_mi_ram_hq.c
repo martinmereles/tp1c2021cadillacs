@@ -79,8 +79,8 @@ int recibir_ubicacion_tripulante(char* payload, void** tabla, uint32_t* direccio
 
     log_info(logger, "Nueva ubicacion del tripulante: (%d,%d)",posicion_X,posicion_Y);
 
-    escribir_memoria_principal(*tabla, *direccion_logica_TCB + DESPL_POS_X, &posicion_X, sizeof(uint32_t));
-    escribir_memoria_principal(*tabla, *direccion_logica_TCB + DESPL_POS_Y, &posicion_Y, sizeof(uint32_t));
+    escribir_memoria_principal(*tabla, *direccion_logica_TCB, DESPL_POS_X, &posicion_X, sizeof(uint32_t));
+    escribir_memoria_principal(*tabla, *direccion_logica_TCB, DESPL_POS_Y, &posicion_Y, sizeof(uint32_t));
 
     return EXIT_SUCCESS;
 }
@@ -92,10 +92,10 @@ int enviar_proxima_tarea(int tripulante_fd, char* payload, void** tabla, uint32_
     log_info(logger, "Enviando proxima tarea");
     log_info(logger, "Leyendo tareas");
     // Leemos la lista de tareas
-    leer_memoria_principal(*tabla, *dir_log_tcb + DESPL_PROX_INSTR, &id_prox_tarea, sizeof(uint32_t));
-    leer_memoria_principal(*tabla, *dir_log_tcb + DESPL_DIR_PCB, &dir_log_pcb, sizeof(uint32_t));
-    leer_memoria_principal(*tabla, dir_log_pcb + DESPL_TAREAS, &dir_log_tareas, sizeof(uint32_t));
-    leer_tarea_memoria_principal(*tabla, dir_log_tareas, &tarea, id_prox_tarea);
+    leer_memoria_principal(*tabla, *dir_log_tcb, DESPL_PROX_INSTR, &id_prox_tarea, sizeof(uint32_t));
+    leer_memoria_principal(*tabla, *dir_log_tcb, DESPL_DIR_PCB, &dir_log_pcb, sizeof(uint32_t));
+    leer_memoria_principal(*tabla, dir_log_pcb, DESPL_TAREAS, &dir_log_tareas, sizeof(uint32_t));
+    leer_tarea_memoria_principal(*tabla, dir_log_tareas, &tarea, id_prox_tarea);   // Hay que cambiar interfaz?
 
     if(tarea == NULL){
         log_error(logger, "ERROR. No se encontro la proxima instruccion");
@@ -110,7 +110,7 @@ int enviar_proxima_tarea(int tripulante_fd, char* payload, void** tabla, uint32_
     log_info(logger, "Incrementamos proxima tarea");
     // Sumamos 1 al identificador de la proxima instruccion
     id_prox_tarea++;
-    escribir_memoria_principal(*tabla, *dir_log_tcb + DESPL_PROX_INSTR, &id_prox_tarea, sizeof(uint32_t));
+    escribir_memoria_principal(*tabla, *dir_log_tcb, DESPL_PROX_INSTR, &id_prox_tarea, sizeof(uint32_t));
 
     return EXIT_SUCCESS;
 }

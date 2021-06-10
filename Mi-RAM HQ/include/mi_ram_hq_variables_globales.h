@@ -13,9 +13,25 @@
 #include "commons/string.h"
 #include "commons/temporal.h"
 
+// DESPLAZAMIENTOS LOGICOS
+// Para el PCB
+#define DESPL_PID       0
+#define DESPL_TAREAS    4
+// Para el TCB
+#define DESPL_TID           0
+#define DESPL_ESTADO        4
+#define DESPL_POS_X         5
+#define DESPL_POS_Y         9
+#define DESPL_PROX_INSTR    13
+#define DESPL_DIR_PCB       17
+
 // MEMORIA PRINCIPAL
 void* memoria_principal;
 int tamanio_memoria;
+
+// PAGINACION
+int tamanio_pagina;
+int cantidad_marcos
 
 // Mapa de posiciones de memoria libres
 t_bitarray*	mapa_memoria_disponible;
@@ -31,5 +47,9 @@ t_list* tablas_de_patotas;
 void (*dump_memoria)(void);
 int (*crear_patota)(uint32_t, uint32_t, char*);
 int (*crear_tripulante)(void**, uint32_t*, uint32_t, uint32_t, uint32_t, uint32_t);
+int (*escribir_memoria_principal)(void*, uint32_t, uint32_t, void*, int);
+int (*leer_memoria_principal)(void*, uint32_t, uint32_t, void*, int);
+//  uint32_t (*direccion_logica)(uint32_t, uint32_t);   // Hace falta??
+
 
 #endif

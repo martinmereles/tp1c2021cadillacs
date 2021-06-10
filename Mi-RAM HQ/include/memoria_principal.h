@@ -2,6 +2,7 @@
 #define MEMORIA_PRINCIPAL_H_
 
 #include "segmentacion.h"
+#include "paginacion.h"
 
 // NO DEBE DEPENDER DEL ESQUEMA DE MEMORIA (SEGMENTACION O PAGINACION)
 int inicializar_estructuras_memoria(t_config* config);

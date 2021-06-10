@@ -18,6 +18,7 @@ typedef struct{
 typedef struct{
     t_list *filas;
     uint32_t proximo_numero_pagina; // Hace falta??
+    int fragmentacion_interna;
 } tabla_paginas_t;
 
 // Patotas y Tripulantes

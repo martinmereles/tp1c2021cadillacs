@@ -85,10 +85,16 @@ int best_fit(int memoria_pedida) {
     return mejor_posicion_memoria_disponible;
 }
 
-// LECTURA/ESCRITURA EN MEMORIA PRINCIPAL (TIENE QUE SER POLIMORFICO?)
+// LECTURA/ESCRITURA EN MEMORIA PRINCIPAL
 
-int escribir_memoria_principal(tabla_segmentos_t* tabla, uint32_t direccion_logica, void* dato, int tamanio){
+uint32_t direccion_logica_segmentacion(uint32_t inicio_logico, uint32_t desplazamiento_logico){
+    return inicio_logico + desplazamiento_logico;
+}
+
+int escribir_memoria_principal_segmentacion(void* args, uint32_t inicio_logico, uint32_t desplazamiento_logico, void* dato, int tamanio){
     //log_info(logger,"Escribiendo en memoria principal");
+    tabla_segmentos_t* tabla = (tabla_segmentos_t*) args;
+    uint32_t direccion_logica = direccion_logica_segmentacion(inicio_logico, desplazamiento_logico);
     int numero_seg = numero_de_segmento(direccion_logica);
     int direccion_fisica_dato = calcular_direccion_fisica(tabla, direccion_logica);
     fila_tabla_segmentos_t* fila = obtener_fila(tabla, numero_seg);
@@ -100,7 +106,9 @@ int escribir_memoria_principal(tabla_segmentos_t* tabla, uint32_t direccion_logi
     return EXIT_SUCCESS;
 }
 
-int leer_memoria_principal(tabla_segmentos_t* tabla, uint32_t direccion_logica, void* dato, int tamanio){
+int leer_memoria_principal_segmentacion(void* args, uint32_t inicio_logico, uint32_t desplazamiento_logico, void* dato, int tamanio){
+    tabla_segmentos_t* tabla = (tabla_segmentos_t*) args;
+    uint32_t direccion_logica = direccion_logica_segmentacion(inicio_logico, desplazamiento_logico);
     int numero_seg = numero_de_segmento(direccion_logica);
     int direccion_fisica_dato = calcular_direccion_fisica(tabla, direccion_logica);
     fila_tabla_segmentos_t* fila = obtener_fila(tabla,numero_seg);
@@ -112,11 +120,13 @@ int leer_memoria_principal(tabla_segmentos_t* tabla, uint32_t direccion_logica, 
     return EXIT_SUCCESS;
 }
 
+
+// AGREGAR POLIMORFISMO??
 void leer_tarea_memoria_principal(tabla_segmentos_t* tabla, uint32_t dir_log_tareas, char** tarea, int id_prox_tarea){
     fila_tabla_segmentos_t* fila = obtener_fila(tabla, numero_de_segmento(dir_log_tareas));
     int tamanio = fila->tamanio;
     char* tareas = malloc(tamanio);
-    leer_memoria_principal(tabla, dir_log_tareas, tareas, tamanio);
+    leer_memoria_principal(tabla, dir_log_tareas, 0, tareas, tamanio);
     char** array_tareas = (char**) string_split(tareas, "\n");
     int cant_tareas = cantidad_tareas(array_tareas); 
     if(id_prox_tarea < cant_tareas)
@@ -148,12 +158,12 @@ int cantidad_tareas(char** array_tareas){
 
 void quitar_y_destruir_tabla(tabla_segmentos_t* tabla_a_destruir){
     int PID_tabla_a_destruir;
-    leer_memoria_principal(tabla_a_destruir, DIR_LOG_PCB + DESPL_PID, &PID_tabla_a_destruir, sizeof(uint32_t));
+    leer_memoria_principal(tabla_a_destruir, DIR_LOG_PCB, DESPL_PID, &PID_tabla_a_destruir, sizeof(uint32_t));
 
     bool tienePID(void* args){
         tabla_segmentos_t* una_tabla = (tabla_segmentos_t*) args;
         int PID_una_tabla;
-        leer_memoria_principal(una_tabla, DIR_LOG_PCB + DESPL_PID, &PID_una_tabla, sizeof(uint32_t));
+        leer_memoria_principal(una_tabla, DIR_LOG_PCB, DESPL_PID, &PID_una_tabla, sizeof(uint32_t));
         return PID_una_tabla == PID_tabla_a_destruir;
     }
 
@@ -180,7 +190,7 @@ tabla_segmentos_t* obtener_tabla_patota(int PID_buscado){
     bool tienePID(void* args){
         tabla_segmentos_t* tabla = (tabla_segmentos_t*) args;
         int PID_tabla;
-        leer_memoria_principal(tabla, DIR_LOG_PCB + DESPL_PID, &PID_tabla, sizeof(uint32_t));
+        leer_memoria_principal(tabla, DIR_LOG_PCB, DESPL_PID, &PID_tabla, sizeof(uint32_t));
         return PID_tabla == PID_buscado;
     }
     return list_find(tablas_de_patotas, tienePID);
@@ -225,8 +235,8 @@ int crear_patota_segmentacion(uint32_t PID, uint32_t longitud_tareas, char* tare
     //log_info(logger,"La cantidad de filas es: %d",cantidad_filas(tabla_patota));
     //log_info(logger,"El nro de segmento es: %d",fila_tareas->numero_segmento);
 
-    int direccion_logica_PCB = direccion_logica(fila_PCB);
-    int direccion_logica_tareas = direccion_logica(fila_tareas);
+    int direccion_logica_PCB = direccion_logica_segmento(fila_PCB);
+    int direccion_logica_tareas = direccion_logica_segmento(fila_tareas);
 
     //log_info(logger, "Direccion logica PCB: %x",direccion_logica_PCB);
     //log_info(logger, "Direccion logica tareas: %x",direccion_logica_tareas);
@@ -235,11 +245,11 @@ int crear_patota_segmentacion(uint32_t PID, uint32_t longitud_tareas, char* tare
     list_add(tablas_de_patotas, tabla_patota);
 
     // Guardo el PID y la direccion logica de las tareas en el PCB
-    escribir_memoria_principal(tabla_patota, direccion_logica_PCB + DESPL_PID, &PID, sizeof(uint32_t));
-    escribir_memoria_principal(tabla_patota, direccion_logica_PCB + DESPL_TAREAS, &direccion_logica_tareas, sizeof(uint32_t));  
+    escribir_memoria_principal(tabla_patota, direccion_logica_PCB, DESPL_PID, &PID, sizeof(uint32_t));
+    escribir_memoria_principal(tabla_patota, direccion_logica_PCB, DESPL_TAREAS, &direccion_logica_tareas, sizeof(uint32_t));  
 
     // Guardo las tareas en el segmento de tareas
-    escribir_memoria_principal(tabla_patota, direccion_logica_tareas, tareas, longitud_tareas);
+    escribir_memoria_principal(tabla_patota, direccion_logica_tareas, 0, tareas, longitud_tareas);
     log_info(logger, "Estructuras de la patota inicializadas exitosamente");
 
     return EXIT_SUCCESS;
@@ -265,18 +275,18 @@ int crear_tripulante_segmentacion(void** tabla, uint32_t* dir_log_tcb,
         return EXIT_FAILURE;
     }
 
-    *dir_log_tcb = direccion_logica(fila_TCB);
+    *dir_log_tcb = direccion_logica_segmento(fila_TCB);
 
     // Guardo el TID, el estado, la posicion, el identificador de la proxima instruccion y la direccion logica del PCB
     char estado = 'N';
     uint32_t id_proxima_instruccion = 0;
     uint32_t dir_log_pcb = DIR_LOG_PCB;
-    escribir_memoria_principal(*tabla, *dir_log_tcb + DESPL_TID, &TID, sizeof(uint32_t));
-    escribir_memoria_principal(*tabla, *dir_log_tcb + DESPL_ESTADO, &estado, sizeof(char));
-    escribir_memoria_principal(*tabla, *dir_log_tcb + DESPL_POS_X, &posicion_X, sizeof(uint32_t));
-    escribir_memoria_principal(*tabla, *dir_log_tcb + DESPL_POS_Y, &posicion_Y, sizeof(uint32_t));
-    escribir_memoria_principal(*tabla, *dir_log_tcb + DESPL_PROX_INSTR, &id_proxima_instruccion, sizeof(uint32_t));
-    escribir_memoria_principal(*tabla, *dir_log_tcb + DESPL_DIR_PCB, &dir_log_pcb, sizeof(uint32_t));
+    escribir_memoria_principal(*tabla, *dir_log_tcb, DESPL_TID, &TID, sizeof(uint32_t));
+    escribir_memoria_principal(*tabla, *dir_log_tcb, DESPL_ESTADO, &estado, sizeof(char));
+    escribir_memoria_principal(*tabla, *dir_log_tcb, DESPL_POS_X, &posicion_X, sizeof(uint32_t));
+    escribir_memoria_principal(*tabla, *dir_log_tcb, DESPL_POS_Y, &posicion_Y, sizeof(uint32_t));
+    escribir_memoria_principal(*tabla, *dir_log_tcb, DESPL_PROX_INSTR, &id_proxima_instruccion, sizeof(uint32_t));
+    escribir_memoria_principal(*tabla, *dir_log_tcb, DESPL_DIR_PCB, &dir_log_pcb, sizeof(uint32_t));
 
     return EXIT_SUCCESS;
 }
@@ -335,7 +345,7 @@ void liberar_segmento(fila_tabla_segmentos_t* fila){
 
 // DIRECCIONAMIENTO
 
-uint32_t direccion_logica(fila_tabla_segmentos_t* fila){
+uint32_t direccion_logica_segmento(fila_tabla_segmentos_t* fila){
     return fila->numero_segmento << 16;
 }
 
@@ -405,7 +415,7 @@ void dump_patota_segmentacion(tabla_segmentos_t* tabla_patota, FILE* archivo_dum
 
     // Obtenemos el PID
     uint32_t PID;
-    leer_memoria_principal(tabla_patota, DIR_LOG_PCB + DESPL_PID, &PID, sizeof(uint32_t));
+    leer_memoria_principal(tabla_patota, DIR_LOG_PCB, DESPL_PID, &PID, sizeof(uint32_t));
     //log_info(logger,"Dumpeamos patota %d",PID);
 
     // Por cada segmento, hacemos un dump de su informacion
@@ -447,7 +457,7 @@ void dump_patota_segmentacion_pruebas(void* args){
     log_info(logger,"PATOTA");
 
     // Mostramos informacion del PCB
-    leer_memoria_principal(tabla_patota, DIR_LOG_PCB + DESPL_PID, &PID, sizeof(uint32_t));
+    leer_memoria_principal(tabla_patota, DIR_LOG_PCB, DESPL_PID, &PID, sizeof(uint32_t));
     log_info(logger, "Proceso: %d   Segmento: %d    Inicio: %d  Tam: %db",PID,1,inicio,tamanio);
 
     // Mostramos informacion del segmento de tareas
@@ -456,8 +466,8 @@ void dump_patota_segmentacion_pruebas(void* args){
     log_info(logger, "Proceso: %d   Segmento: %d    Inicio: %d  Tam: %db",PID,2,inicio,tamanio);
 
     tareas = malloc(tamanio);
-    leer_memoria_principal(tabla_patota, DIR_LOG_PCB + DESPL_TAREAS, &direccion_tareas, sizeof(uint32_t));
-    leer_memoria_principal(tabla_patota, direccion_tareas, tareas, tamanio);
+    leer_memoria_principal(tabla_patota, DIR_LOG_PCB, DESPL_TAREAS, &direccion_tareas, sizeof(uint32_t));
+    leer_memoria_principal(tabla_patota, direccion_tareas, 0, tareas, tamanio);
     log_info(logger, "Tareas: \n%s",tareas);
     free(tareas);
 
@@ -476,13 +486,13 @@ void dump_tripulante_segmentacion_pruebas(tabla_segmentos_t* tabla, int nro_fila
     uint32_t TID, posicion_X, posicion_Y, id_proxima_instruccion, dir_log_pcb, PID;
     uint32_t dir_log_tcb = nro_fila << 16;
     char estado;
-    leer_memoria_principal(tabla, dir_log_tcb + DESPL_TID, &TID, sizeof(uint32_t));    
-    leer_memoria_principal(tabla, dir_log_tcb + DESPL_ESTADO, &estado, sizeof(char));
-    leer_memoria_principal(tabla, dir_log_tcb + DESPL_POS_X, &posicion_X, sizeof(uint32_t));
-    leer_memoria_principal(tabla, dir_log_tcb + DESPL_POS_Y, &posicion_Y, sizeof(uint32_t));
-    leer_memoria_principal(tabla, dir_log_tcb + DESPL_PROX_INSTR, &id_proxima_instruccion, sizeof(uint32_t));
-    leer_memoria_principal(tabla, dir_log_tcb + DESPL_DIR_PCB, &dir_log_pcb, sizeof(uint32_t));
-    leer_memoria_principal(tabla, dir_log_pcb + DESPL_PID, &PID, sizeof(uint32_t));   
+    leer_memoria_principal(tabla, dir_log_tcb, DESPL_TID, &TID, sizeof(uint32_t));    
+    leer_memoria_principal(tabla, dir_log_tcb, DESPL_ESTADO, &estado, sizeof(char));
+    leer_memoria_principal(tabla, dir_log_tcb, DESPL_POS_X, &posicion_X, sizeof(uint32_t));
+    leer_memoria_principal(tabla, dir_log_tcb, DESPL_POS_Y, &posicion_Y, sizeof(uint32_t));
+    leer_memoria_principal(tabla, dir_log_tcb, DESPL_PROX_INSTR, &id_proxima_instruccion, sizeof(uint32_t));
+    leer_memoria_principal(tabla, dir_log_tcb, DESPL_DIR_PCB, &dir_log_pcb, sizeof(uint32_t));
+    leer_memoria_principal(tabla, dir_log_pcb, DESPL_PID, &PID, sizeof(uint32_t));   
  
     log_info(logger, "Tripulane: %d Proceso: %d Inicio: %d Tam: %db",TID,PID,inicio,tamanio);
     log_info(logger, "Posicion: (%d,%d) Proxima instruccion: %d",posicion_X,posicion_Y,id_proxima_instruccion);
