@@ -29,10 +29,6 @@
 void* memoria_principal;
 int tamanio_memoria;
 
-// PAGINACION
-int tamanio_pagina;
-int cantidad_marcos
-
 // Mapa de posiciones de memoria libres
 t_bitarray*	mapa_memoria_disponible;
 char* bitarray_mapa_memoria_disponible;

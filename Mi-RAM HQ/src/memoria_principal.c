@@ -64,29 +64,23 @@ int inicializar_esquema_memoria(t_config* config){
 
         cantidad_marcos = tamanio_memoria/tamanio_pagina;
 
-        // Cada bit del mapa representa 1 marco de la memoria RAM
-        int tamanio_mapa_memoria_disponible = cantidad_marcos/8;
-        // Le sumo 1 byte en el caso que la cantidad de marcos no sea multiplo de 8
-        if(cantidad_marcos % 8 != 0)
-            tamanio_mapa_memoria_disponible++;
+        // Creamos la lista global de marcos
+        lista_de_marcos = list_create();
+        marco_t* marco;
 
-        // Creamos el mapa de memoria disponible
-        bitarray_mapa_memoria_disponible = malloc(tamanio_mapa_memoria_disponible);
-        mapa_memoria_disponible = bitarray_create_with_mode(bitarray_mapa_memoria_disponible,
-                                                            tamanio_mapa_memoria_disponible,
-                                                            LSB_FIRST);
-
-        // Inicializo todos los bits del mapa de memoria disponible en 0
+        // Inicializo todos los marcos
         for(int i = 0;i < cantidad_marcos;i++){
-            bitarray_clean_bit(mapa_memoria_disponible, i);
+            marco = malloc(sizeof(marco));
+            marco->numero_marco = i;
+            marco->estado = LIBRE;        
         }
-        
+
         // Inicializo TAMANIO SWAP
         // Inicializo PATH SWAP
         // Inicializo ALGORITMO REEMPLAZO
 
         // Inicializo vectores a funciones
-        // dump_memoria = &dump_memoria_paginacion;
+        dump_memoria = &dump_memoria_paginacion;
         crear_patota = &crear_patota_paginacion;
         crear_tripulante = &crear_tripulante_paginacion;
         escribir_memoria_principal = &escribir_memoria_principal_paginacion;

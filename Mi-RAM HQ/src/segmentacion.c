@@ -432,9 +432,9 @@ void dump_segmento(FILE* archivo_dump, tabla_segmentos_t* tabla, int PID, int nr
     // Proceso: 1	Segmento: 1	Inicio: 0x0000	Tam: 20b
     char* info_segmento = string_new();                                               // Creamos el string vacio
     string_append(&info_segmento, "\n");                                              // Agregamos salto de linea
-    string_append(&info_segmento, string_from_format("Proceso: %d ", PID));           // Agregamos Proceso
-    string_append(&info_segmento, string_from_format("Segmento: %d ", nro_segmento)); // Agregamos Segmento
-    string_append(&info_segmento, string_from_format("Inicio: %d ", inicio));         // Agregamos Inicio
+    string_append(&info_segmento, string_from_format("Proceso: %3d ", PID));           // Agregamos Proceso
+    string_append(&info_segmento, string_from_format("Segmento: %3d ", nro_segmento)); // Agregamos Segmento
+    string_append(&info_segmento, string_from_format("Inicio: %8d ", inicio));         // Agregamos Inicio
     string_append(&info_segmento, string_from_format("Tam: %db", tamanio));           // Agregamos Fin
     
     fwrite(info_segmento, sizeof(char), strlen(info_segmento), archivo_dump);   // Escribimos la info en el archivo
@@ -494,6 +494,6 @@ void dump_tripulante_segmentacion_pruebas(tabla_segmentos_t* tabla, int nro_fila
     leer_memoria_principal(tabla, dir_log_tcb, DESPL_DIR_PCB, &dir_log_pcb, sizeof(uint32_t));
     leer_memoria_principal(tabla, dir_log_pcb, DESPL_PID, &PID, sizeof(uint32_t));   
  
-    log_info(logger, "Tripulane: %d Proceso: %d Inicio: %d Tam: %db",TID,PID,inicio,tamanio);
+    log_info(logger, "Tripulante: %d Proceso: %d Inicio: %d Tam: %db",TID,PID,inicio,tamanio);
     log_info(logger, "Posicion: (%d,%d) Proxima instruccion: %d",posicion_X,posicion_Y,id_proxima_instruccion);
 }
