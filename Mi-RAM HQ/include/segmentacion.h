@@ -3,7 +3,6 @@
 
 #include "mi_ram_hq_variables_globales.h"
 
-#define DIR_LOG_PCB     0x00000000
 #define DIR_LOG_TAREAS  0x00010000
 
 /*
@@ -21,6 +20,7 @@ typedef struct{
 typedef struct{
     t_list *filas;
     uint32_t proximo_numero_segmento;
+    uint32_t tamanio_tareas;
 } tabla_segmentos_t;
 
 // FUNCIONES SEGMENTACION
@@ -28,7 +28,7 @@ fila_tabla_segmentos_t* reservar_segmento(int tamanio);
 void liberar_segmento(fila_tabla_segmentos_t* fila);
 fila_tabla_segmentos_t* crear_fila(tabla_segmentos_t* tabla, int tamanio);
 int calcular_direccion_fisica(tabla_segmentos_t* , uint32_t );
-tabla_segmentos_t* obtener_tabla_patota(int PID_buscado);
+tabla_segmentos_t* obtener_tabla_patota_segmentacion(int PID_buscado);
 void quitar_fila(tabla_segmentos_t* tabla, int numero_fila);
 void agregar_fila(tabla_segmentos_t* tabla, fila_tabla_segmentos_t* fila);
 fila_tabla_segmentos_t* obtener_fila(tabla_segmentos_t* tabla, int numero_fila);
@@ -50,7 +50,7 @@ int crear_tripulante_segmentacion(void**, uint32_t*, uint32_t, uint32_t, uint32_
 
 // Tablas de segmentos
 void destruir_tabla_segmentos(void* tabla_de_segmentos);
-void leer_tarea_memoria_principal(tabla_segmentos_t* tabla, uint32_t dir_log_tareas, char** tarea, int id_prox_tarea);
+int leer_tarea_memoria_principal(tabla_segmentos_t* tabla, char** tarea, uint32_t* id_prox_tarea);
 int cantidad_tareas(char** array_tareas);
 int generar_nuevo_numero_segmento(tabla_segmentos_t* tabla);
 void destruir_fila(void* fila);

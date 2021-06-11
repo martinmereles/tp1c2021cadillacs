@@ -86,16 +86,15 @@ int recibir_ubicacion_tripulante(char* payload, void** tabla, uint32_t* direccio
 }
 
 int enviar_proxima_tarea(int tripulante_fd, char* payload, void** tabla, uint32_t* dir_log_tcb){
-    uint32_t id_prox_tarea, dir_log_pcb, dir_log_tareas;
+    uint32_t id_prox_tarea;
     char* tarea;
 
     log_info(logger, "Enviando proxima tarea");
     log_info(logger, "Leyendo tareas");
+
     // Leemos la lista de tareas
     leer_memoria_principal(*tabla, *dir_log_tcb, DESPL_PROX_INSTR, &id_prox_tarea, sizeof(uint32_t));
-    leer_memoria_principal(*tabla, *dir_log_tcb, DESPL_DIR_PCB, &dir_log_pcb, sizeof(uint32_t));
-    leer_memoria_principal(*tabla, dir_log_pcb, DESPL_TAREAS, &dir_log_tareas, sizeof(uint32_t));
-    leer_tarea_memoria_principal(*tabla, dir_log_tareas, &tarea, id_prox_tarea);   // Hay que cambiar interfaz?
+    leer_tarea_memoria_principal(*tabla, &tarea, &id_prox_tarea);
 
     if(tarea == NULL){
         log_error(logger, "ERROR. No se encontro la proxima instruccion");
@@ -107,9 +106,7 @@ int enviar_proxima_tarea(int tripulante_fd, char* payload, void** tabla, uint32_
     enviar_operacion(tripulante_fd, COD_PROXIMA_TAREA, tarea, strlen(tarea) + 1);
     free(tarea);
 
-    log_info(logger, "Incrementamos proxima tarea");
-    // Sumamos 1 al identificador de la proxima instruccion
-    id_prox_tarea++;
+    // Escribimos el identificador de la proxima instruccion
     escribir_memoria_principal(*tabla, *dir_log_tcb, DESPL_PROX_INSTR, &id_prox_tarea, sizeof(uint32_t));
 
     return EXIT_SUCCESS;

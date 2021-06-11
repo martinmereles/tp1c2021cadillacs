@@ -120,8 +120,7 @@ int leer_memoria_principal_segmentacion(void* args, uint32_t inicio_logico, uint
     return EXIT_SUCCESS;
 }
 
-
-// AGREGAR POLIMORFISMO??
+/*
 void leer_tarea_memoria_principal(tabla_segmentos_t* tabla, uint32_t dir_log_tareas, char** tarea, int id_prox_tarea){
     fila_tabla_segmentos_t* fila = obtener_fila(tabla, numero_de_segmento(dir_log_tareas));
     int tamanio = fila->tamanio;
@@ -146,6 +145,56 @@ void leer_tarea_memoria_principal(tabla_segmentos_t* tabla, uint32_t dir_log_tar
 		free(array_tareas[i]);
 	}
 	free(array_tareas);
+}*/
+
+// VERSION MAS PIOLA
+int leer_tarea_memoria_principal(tabla_segmentos_t* tabla, char** tarea, uint32_t* id_prox_tarea){
+
+    // Obtenemos el tamanio de la lista de tareas
+    int tamanio = tabla->tamanio_tareas;
+
+    // El id de la proxima tarea es el desplazamiento inicial
+
+    // CASO 1: Si esta apuntando afuera del codigo, devuelvo NULL
+    if(*id_prox_tarea > tamanio){
+        *tarea = NULL;
+        log_error(logger,"ERROR. No existe la instruccion con el identificador solicitado");
+        return EXIT_FAILURE;
+    }
+
+    // CASO 2: Si esta apuntando al final del codigo, devuelvo la tarea "FIN"
+    if(*id_prox_tarea == tamanio){
+        *tarea = string_duplicate("FIN");
+        return EXIT_SUCCESS;
+    }
+
+    // CASO 3: Si apunta dentro del codigo, debo obtener la tarea
+
+    // Leemos la direccion logica de las tareas
+    uint32_t dir_log_tareas;
+    leer_memoria_principal(tabla, DIR_LOG_PCB, DESPL_TAREAS, &dir_log_tareas, sizeof(uint32_t));
+    
+    // Leemos la lista de tareas completa
+    char buffer[tamanio];
+    leer_memoria_principal(tabla, dir_log_tareas, 0, buffer, tamanio);
+
+    // Calculamos el desplazamiento para la tarea siguiente a la que vamos a leer
+    uint32_t desplazamiento = *id_prox_tarea;
+    while((buffer[desplazamiento] != '\n') && (desplazamiento < tamanio))
+        desplazamiento++;
+
+    // Calculamos el tamanio de la tarea a leer
+    int tamanio_tarea = desplazamiento - *id_prox_tarea + 1;
+
+    // Guardamos la tarea en el puntero
+    *tarea = malloc(tamanio_tarea);
+    memcpy(tarea, buffer + *id_prox_tarea, tamanio_tarea);
+    *tarea[tamanio_tarea] = '\0';
+
+    // Guardamos el id de la proxima tarea
+    *id_prox_tarea = desplazamiento;
+
+    return EXIT_SUCCESS;
 }
 
 int cantidad_tareas(char** array_tareas){
@@ -184,9 +233,8 @@ void quitar_y_destruir_fila(tabla_segmentos_t* tabla, int numero_seg){
     }
     list_remove_and_destroy_by_condition(tabla->filas, tiene_numero_de_segmento, destruir_fila);
 }
- 
 
-tabla_segmentos_t* obtener_tabla_patota(int PID_buscado){
+tabla_segmentos_t* obtener_tabla_patota_segmentacion(int PID_buscado){
     bool tienePID(void* args){
         tabla_segmentos_t* tabla = (tabla_segmentos_t*) args;
         int PID_tabla;
@@ -231,6 +279,9 @@ int crear_patota_segmentacion(uint32_t PID, uint32_t longitud_tareas, char* tare
         destruir_tabla_segmentos(tabla_patota);
         return EXIT_FAILURE;
     }
+
+    // Guardo en la tabla el tamanio de la lista de tareas
+    tabla_patota->tamanio_tareas = longitud_tareas;
 
     //log_info(logger,"La cantidad de filas es: %d",cantidad_filas(tabla_patota));
     //log_info(logger,"El nro de segmento es: %d",fila_tareas->numero_segmento);

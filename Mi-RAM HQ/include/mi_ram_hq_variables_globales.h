@@ -13,6 +13,9 @@
 #include "commons/string.h"
 #include "commons/temporal.h"
 
+// La direccion logica del PCB es siempre la misma
+#define DIR_LOG_PCB     0x00000000
+
 // DESPLAZAMIENTOS LOGICOS
 // Para el PCB
 #define DESPL_PID       0
@@ -45,6 +48,7 @@ int (*crear_patota)(uint32_t, uint32_t, char*);
 int (*crear_tripulante)(void**, uint32_t*, uint32_t, uint32_t, uint32_t, uint32_t);
 int (*escribir_memoria_principal)(void*, uint32_t, uint32_t, void*, int);
 int (*leer_memoria_principal)(void*, uint32_t, uint32_t, void*, int);
+void* (*obtener_tabla_patota)(int);
 //  uint32_t (*direccion_logica)(uint32_t, uint32_t);   // Hace falta??
 
 
