@@ -8,13 +8,13 @@ int iniciar_planificador(){
 
         // TODO: crear hilo dispatcher
         hilo_dispatcher = malloc(sizeof(pthread_t));
-        pthread_create(hilo_dispatcher, NULL, (void*) dispatcher,&algoritmo_Planificador);
-        pthread_detach(*hilo_dispatcher);
-        free(hilo_dispatcher);
+        pthread_create(&hilo_dispatcher, NULL, (void*) dispatcher,&algoritmo_Planificador);
+        pthread_detach(hilo_dispatcher);
     }
     else {
         estado_planificador = PLANIFICADOR_RUNNING;
     }
+    free(hilo_dispatcher);
     return EXIT_SUCCESS;
 }
 
