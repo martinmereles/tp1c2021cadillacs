@@ -10,9 +10,15 @@ int iniciar_planificador(){
         hilo_dispatcher = malloc(sizeof(pthread_t));
         pthread_create(&hilo_dispatcher, NULL, (void*) dispatcher,&algoritmo_Planificador);
         pthread_detach(hilo_dispatcher);
+
+        estado_planificador = PLANIFICADOR_RUNNING;
     }
     else {
-        estado_planificador = PLANIFICADOR_RUNNING;
+        if (estado_planificador == PLANIFICADOR_RUNNING)
+            estado_planificador == PLANIFICADOR_BLOCKED;
+        else
+            // TODO: Estando pausado, aplicar procedimientos para reanudar PLANIFICADOR.
+            estado_planificador == PLANIFICADOR_RUNNING;
     }
     free(hilo_dispatcher);
     return EXIT_SUCCESS;
