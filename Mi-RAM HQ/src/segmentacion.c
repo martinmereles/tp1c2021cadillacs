@@ -92,7 +92,6 @@ uint32_t direccion_logica_segmentacion(uint32_t inicio_logico, uint32_t desplaza
 }
 
 int escribir_memoria_principal_segmentacion(void* args, uint32_t inicio_logico, uint32_t desplazamiento_logico, void* dato, int tamanio){
-    //log_info(logger,"Escribiendo en memoria principal");
     tabla_segmentos_t* tabla = (tabla_segmentos_t*) args;
     uint32_t direccion_logica = direccion_logica_segmentacion(inicio_logico, desplazamiento_logico);
     int numero_seg = numero_de_segmento(direccion_logica);
@@ -118,89 +117,6 @@ int leer_memoria_principal_segmentacion(void* args, uint32_t inicio_logico, uint
     }
     memcpy(dato, memoria_principal+direccion_fisica_dato, tamanio);
     return EXIT_SUCCESS;
-}
-
-/*
-void leer_tarea_memoria_principal(tabla_segmentos_t* tabla, uint32_t dir_log_tareas, char** tarea, int id_prox_tarea){
-    fila_tabla_segmentos_t* fila = obtener_fila(tabla, numero_de_segmento(dir_log_tareas));
-    int tamanio = fila->tamanio;
-    char* tareas = malloc(tamanio);
-    leer_memoria_principal(tabla, dir_log_tareas, 0, tareas, tamanio);
-    char** array_tareas = (char**) string_split(tareas, "\n");
-    int cant_tareas = cantidad_tareas(array_tareas); 
-    if(id_prox_tarea < cant_tareas)
-        *tarea = string_duplicate(array_tareas[id_prox_tarea]);
-    else{
-        if(id_prox_tarea == cant_tareas)
-            *tarea = string_duplicate("FIN");
-        else{
-            *tarea = NULL;
-            log_error(logger,"ERROR. No existe la instruccion con el identificador solicitado");
-        }
-    }
-    // Libero el string tareas
-    free(tareas);
-	// Libero el array de tareas
-	for(int i = 0;array_tareas[i]!=NULL;i++){
-		free(array_tareas[i]);
-	}
-	free(array_tareas);
-}*/
-
-// VERSION MAS PIOLA
-int leer_tarea_memoria_principal(tabla_segmentos_t* tabla, char** tarea, uint32_t* id_prox_tarea){
-
-    // Obtenemos el tamanio de la lista de tareas
-    int tamanio = tabla->tamanio_tareas;
-
-    // El id de la proxima tarea es el desplazamiento inicial
-
-    // CASO 1: Si esta apuntando afuera del codigo, devuelvo NULL
-    if(*id_prox_tarea > tamanio){
-        *tarea = NULL;
-        log_error(logger,"ERROR. No existe la instruccion con el identificador solicitado");
-        return EXIT_FAILURE;
-    }
-
-    // CASO 2: Si esta apuntando al final del codigo, devuelvo la tarea "FIN"
-    if(*id_prox_tarea == tamanio){
-        *tarea = string_duplicate("FIN");
-        return EXIT_SUCCESS;
-    }
-
-    // CASO 3: Si apunta dentro del codigo, debo obtener la tarea
-
-    // Leemos la direccion logica de las tareas
-    uint32_t dir_log_tareas;
-    leer_memoria_principal(tabla, DIR_LOG_PCB, DESPL_TAREAS, &dir_log_tareas, sizeof(uint32_t));
-    
-    // Leemos la lista de tareas completa
-    char buffer[tamanio];
-    leer_memoria_principal(tabla, dir_log_tareas, 0, buffer, tamanio);
-
-    // Calculamos el desplazamiento para la tarea siguiente a la que vamos a leer
-    uint32_t desplazamiento = *id_prox_tarea;
-    while((buffer[desplazamiento] != '\n') && (desplazamiento < tamanio))
-        desplazamiento++;
-
-    // Calculamos el tamanio de la tarea a leer
-    int tamanio_tarea = desplazamiento - *id_prox_tarea + 1;
-
-    // Guardamos la tarea en el puntero
-    *tarea = malloc(tamanio_tarea);
-    memcpy(tarea, buffer + *id_prox_tarea, tamanio_tarea);
-    *tarea[tamanio_tarea] = '\0';
-
-    // Guardamos el id de la proxima tarea
-    *id_prox_tarea = desplazamiento;
-
-    return EXIT_SUCCESS;
-}
-
-int cantidad_tareas(char** array_tareas){
-	int cantidad = 0;
-	for(;array_tareas[cantidad]!=NULL;cantidad++);
-	return cantidad;
 }
 
 // TABLAS DE SEGMENTOS
@@ -251,6 +167,11 @@ fila_tabla_segmentos_t* obtener_fila(tabla_segmentos_t* tabla, int numero_seg){
     }
 
     return list_find(tabla->filas, tiene_numero_de_segmento);
+}
+
+int tamanio_tareas_segmentacion(void* args){
+    tabla_segmentos_t* tabla = (tabla_segmentos_t*) args;
+    return tabla->tamanio_tareas;
 }
 
 int crear_patota_segmentacion(uint32_t PID, uint32_t longitud_tareas, char* tareas){
@@ -412,8 +333,14 @@ uint32_t numero_de_segmento(uint32_t direccion_logica){
     return (direccion_logica & 0xFFFF0000) >> 16;
 }
 
-uint32_t desplazamiento(uint32_t direccion_logica){
-    return direccion_logica & 0x0000FFFF;
+void eliminar_tripulante_segmentacion(void* tabla, uint32_t direccion_logica_TCB){
+    // Quitamos la fila de la tabla de segmentos (tambien se encarga de liberar la memoria)
+    quitar_y_destruir_fila(tabla, numero_de_segmento(direccion_logica_TCB));
+
+    // Si no quedan tripulantes en la patota, destruimos su tabla y liberamos sus recursos
+    if(cantidad_filas(tabla) <= 2){
+        quitar_y_destruir_tabla(tabla);
+    }
 }
 
 // DUMP MEMORIA

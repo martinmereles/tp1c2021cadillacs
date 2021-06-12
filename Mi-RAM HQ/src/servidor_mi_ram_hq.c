@@ -94,7 +94,7 @@ int enviar_proxima_tarea(int tripulante_fd, char* payload, void** tabla, uint32_
 
     // Leemos la lista de tareas
     leer_memoria_principal(*tabla, *dir_log_tcb, DESPL_PROX_INSTR, &id_prox_tarea, sizeof(uint32_t));
-    leer_tarea_memoria_principal(*tabla, &tarea, &id_prox_tarea);
+    leer_tarea_memoria_principal(*tabla, &tarea, id_prox_tarea);
 
     if(tarea == NULL){
         log_error(logger, "ERROR. No se encontro la proxima instruccion");
@@ -107,6 +107,7 @@ int enviar_proxima_tarea(int tripulante_fd, char* payload, void** tabla, uint32_
     free(tarea);
 
     // Escribimos el identificador de la proxima instruccion
+    id_prox_tarea++;
     escribir_memoria_principal(*tabla, *dir_log_tcb, DESPL_PROX_INSTR, &id_prox_tarea, sizeof(uint32_t));
 
     return EXIT_SUCCESS;
@@ -116,14 +117,7 @@ int expulsar_tripulante(char* payload, void** tabla, uint32_t* direccion_logica_
     
     log_info(logger,"Expulsando tripulante");
 
-    // Quitamos la fila de la tabla de segmentos (tambien se encarga de liberar la memoria)
-    quitar_y_destruir_fila(*tabla, numero_de_segmento(*direccion_logica_TCB));
- 
-    // Si no quedan tripulantes en la patota, destruimos su tabla y liberamos sus recursos
-    if(cantidad_filas(*tabla) <= 2){
-        quitar_y_destruir_tabla(*tabla);
-    }
+    eliminar_tripulante(*tabla, *direccion_logica_TCB);
 
     return EXIT_SUCCESS;
 }
-

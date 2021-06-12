@@ -37,7 +37,6 @@ int cantidad_filas(tabla_segmentos_t* tabla);
 // Direccionamiento
 uint32_t direccion_logica_segmentacion(uint32_t inicio_logico, uint32_t desplazamiento_logico);
 uint32_t direccion_logica_segmento(fila_tabla_segmentos_t* fila);
-uint32_t desplazamiento(uint32_t direccion_logica);
 uint32_t numero_de_segmento(uint32_t direccion_logica);
 
 // Escritura/Lectura
@@ -47,11 +46,11 @@ int leer_memoria_principal_segmentacion(void* args, uint32_t inicio_logico, uint
 // Patotas y Tripulantes
 int crear_patota_segmentacion(uint32_t PID, uint32_t longitud_tareas, char* tareas);
 int crear_tripulante_segmentacion(void**, uint32_t*, uint32_t, uint32_t, uint32_t, uint32_t);
+void eliminar_tripulante_segmentacion(void* tabla, uint32_t direccion_logica_TCB);
+int tamanio_tareas_segmentacion(void* args);
 
 // Tablas de segmentos
 void destruir_tabla_segmentos(void* tabla_de_segmentos);
-int leer_tarea_memoria_principal(tabla_segmentos_t* tabla, char** tarea, uint32_t* id_prox_tarea);
-int cantidad_tareas(char** array_tareas);
 int generar_nuevo_numero_segmento(tabla_segmentos_t* tabla);
 void destruir_fila(void* fila);
 void quitar_y_destruir_fila(tabla_segmentos_t* tabla, int numero_seg);

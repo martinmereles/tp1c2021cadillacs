@@ -36,25 +36,28 @@ typedef struct{
 // Patotas y Tripulantes
 int crear_patota_paginacion(uint32_t PID, uint32_t longitud_tareas, char* tareas);
 int crear_tripulante_paginacion(tabla_paginas_t**, uint32_t*, uint32_t, uint32_t, uint32_t, uint32_t);
+void eliminar_tripulante_paginacion(void* args, uint32_t direccion_logica_TCB);
+int tamanio_tareas_paginacion(void* args);
 
 // Escritura/Lectura
+int liberar_memoria(tabla_paginas_t* tabla_patota, int tamanio_total, uint32_t direccion_logica);
+int reservar_memoria(tabla_paginas_t* tabla_patota, int tamanio, uint32_t* direccion_logica);
 int escribir_memoria_principal_paginacion(void* args, uint32_t inicio_logico, uint32_t desplazamiento_logico, void* dato, int tamanio_total);
 int leer_memoria_principal_paginacion(void* args, uint32_t inicio_logico, uint32_t desplazamiento_logico, void* dato, int tamanio);
 
 // Direccionamiento
 uint32_t direccion_logica_paginacion(uint32_t inicio_logico, uint32_t desplazamiento_logico);
-int direccion_fisica_paginacion(tabla_paginas_t* tabla_patota, uint32_t direccion_logica, int* direccion_fisica);
+int direccion_fisica_paginacion(tabla_paginas_t* tabla_patota, uint32_t direccion_logica, uint32_t* direccion_fisica);
 int numero_pagina(uint32_t direccion_logica);
 int desplazamiento_paginacion(uint32_t direccion_logica);
 
 // Paginas
 tabla_paginas_t* obtener_tabla_patota_paginacion(int PID_buscado);
-int reservar_memoria(tabla_paginas_t* tabla_patota, int tamanio, uint32_t* direccion_logica);
 int crear_pagina(tabla_paginas_t* tabla_patota);
 marco_t* ultima_pagina(tabla_paginas_t* tabla_patota);
 marco_t* get_pagina(tabla_paginas_t* tabla_patota, int numero_pagina_buscada);
 int cantidad_paginas(tabla_paginas_t* tabla_patota);
-void destruir_tabla_paginas(tabla_paginas_t* tabla_patota);
+void eliminar_patota(tabla_paginas_t* tabla_patota);
 void liberar_marco(void*);
 
 

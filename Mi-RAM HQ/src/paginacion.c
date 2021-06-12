@@ -2,11 +2,27 @@
 
 // PATOTAS Y TRIPULANTES
  
-void destruir_tabla_paginas(tabla_paginas_t* tabla_patota){
+void eliminar_patota(tabla_paginas_t* tabla_a_eliminar){
+    
+    bool tiene_PID(void* args){
+        tabla_paginas_t* tabla = (tabla_paginas_t*) args;
+        uint32_t PID_tabla;
+        leer_memoria_principal(tabla, DIR_LOG_PCB, DESPL_PID, &PID_tabla, sizeof(uint32_t));
+        return PID_tabla == tabla_a_eliminar->PID;
+    }
+
     // DESTRUIMOS LA TABLA DE PAGINAS Y LIBERAMOS LOS MARCOS (Los marcos no se destruyen)
-    list_destroy_and_destroy_elements(tabla_patota->paginas, liberar_marco);
-    free(tabla_patota);
+    void destruir_tabla_patota(void* args){
+        tabla_paginas_t* tabla = (tabla_paginas_t*) args;
+        list_destroy_and_destroy_elements(tabla->paginas, liberar_marco);
+        free(tabla);
+    }
+
+    // QUITAMOS LA PATOTA DE LA LISTA DE PATOTAS Y LA DESTRUIMOS
+    list_remove_and_destroy_by_condition(tablas_de_patotas, tiene_PID, destruir_tabla_patota);
 }
+
+
 
 void liberar_marco(void* args){
     marco_t* marco = (marco_t*) args;
@@ -27,7 +43,7 @@ int crear_patota_paginacion(uint32_t PID, uint32_t longitud_tareas, char* tareas
     uint32_t direccion_logica_PCB;
     if(reservar_memoria(tabla_patota, TAMANIO_PCB, &direccion_logica_PCB) == EXIT_FAILURE){
         log_error(logger, "ERROR. No hay espacio para guardar el PCB de la patota. %d",TAMANIO_PCB);
-        destruir_tabla_paginas(tabla_patota);
+        eliminar_patota(tabla_patota);
         return EXIT_FAILURE;
     }
 
@@ -38,7 +54,7 @@ int crear_patota_paginacion(uint32_t PID, uint32_t longitud_tareas, char* tareas
     uint32_t direccion_logica_tareas;
     if(reservar_memoria(tabla_patota, longitud_tareas, &direccion_logica_tareas) == EXIT_FAILURE){
         log_error(logger, "ERROR. No hay espacio para guardar las tareas de la patota.");
-        destruir_tabla_paginas(tabla_patota);
+        eliminar_patota(tabla_patota);
         return EXIT_FAILURE;
     }
 
@@ -76,8 +92,10 @@ int crear_patota_paginacion(uint32_t PID, uint32_t longitud_tareas, char* tareas
     return EXIT_SUCCESS;
 }
 
-int crear_tripulante_paginacion(tabla_paginas_t** tabla_patota, uint32_t* dir_log_tcb, 
+int crear_tripulante_paginacion(tabla_paginas_t** tabla_patota, uint32_t* direccion_logica_TCB, 
     uint32_t PID, uint32_t TID, uint32_t posicion_X, uint32_t posicion_Y){
+
+    log_info(logger, "CREANDO TRIPULANTE");
 
     // Buscar la tabla que coincide con el PID
     *tabla_patota = obtener_tabla_patota(PID);
@@ -87,30 +105,90 @@ int crear_tripulante_paginacion(tabla_paginas_t** tabla_patota, uint32_t* dir_lo
     }
 
     // Buscamos un espacio en memoria para el TCB y lo reservamos
-    uint32_t direccion_logica_TCB;
-    if(reservar_memoria(*tabla_patota, TAMANIO_TCB, &direccion_logica_TCB) == EXIT_FAILURE){
+    if(reservar_memoria(*tabla_patota, TAMANIO_TCB, direccion_logica_TCB) == EXIT_FAILURE){
         log_error(logger, "ERROR. No hay espacio para guardar el TCB del tripulante. %d",TAMANIO_TCB);
-        destruir_tabla_paginas(*tabla_patota);
+        eliminar_patota(*tabla_patota);
         return EXIT_FAILURE;
     }
 
     (*tabla_patota)->cantidad_tripulantes++;
 
     // Guardo el TID, el estado, la posicion, el identificador de la proxima instruccion y la direccion logica del PCB
+   
     char estado = 'N';
     uint32_t id_proxima_instruccion = 0;
     uint32_t dir_log_pcb = DIR_LOG_PCB;
-    escribir_memoria_principal(*tabla_patota, direccion_logica_TCB, DESPL_TID, &TID, sizeof(uint32_t));
-    escribir_memoria_principal(*tabla_patota, direccion_logica_TCB, DESPL_ESTADO, &estado, sizeof(char));
-    escribir_memoria_principal(*tabla_patota, direccion_logica_TCB, DESPL_POS_X, &posicion_X, sizeof(uint32_t));
-    escribir_memoria_principal(*tabla_patota, direccion_logica_TCB, DESPL_POS_Y, &posicion_Y, sizeof(uint32_t));
-    escribir_memoria_principal(*tabla_patota, direccion_logica_TCB, DESPL_PROX_INSTR, &id_proxima_instruccion, sizeof(uint32_t));
-    escribir_memoria_principal(*tabla_patota, direccion_logica_TCB, DESPL_DIR_PCB, &dir_log_pcb, sizeof(uint32_t));
+    escribir_memoria_principal(*tabla_patota, *direccion_logica_TCB, DESPL_TID, &TID, sizeof(uint32_t));
+    escribir_memoria_principal(*tabla_patota, *direccion_logica_TCB, DESPL_ESTADO, &estado, sizeof(char));
+    escribir_memoria_principal(*tabla_patota, *direccion_logica_TCB, DESPL_POS_X, &posicion_X, sizeof(uint32_t));
+    escribir_memoria_principal(*tabla_patota, *direccion_logica_TCB, DESPL_POS_Y, &posicion_Y, sizeof(uint32_t));
+    escribir_memoria_principal(*tabla_patota, *direccion_logica_TCB, DESPL_PROX_INSTR, &id_proxima_instruccion, sizeof(uint32_t));
+    escribir_memoria_principal(*tabla_patota, *direccion_logica_TCB, DESPL_DIR_PCB, &dir_log_pcb, sizeof(uint32_t));
 
     return EXIT_SUCCESS;
 }
 
-// Reservar/Leer/Escribir memoria
+void eliminar_tripulante_paginacion(void* args, uint32_t direccion_logica_TCB){
+    tabla_paginas_t* tabla_patota = (tabla_paginas_t*) args; 
+
+    // Liberamos memoria a partir de la direccion logica del TCB
+    if(liberar_memoria(tabla_patota, TAMANIO_TCB, direccion_logica_TCB) == EXIT_FAILURE)
+        log_error(logger, "ERROR: eliminar_tripulante_paginacion. Direccionamiento invalido");
+
+    // Descontamos el tripulante expulsado
+    tabla_patota->cantidad_tripulantes--;
+
+    // Si no quedan tripulantes en la patota, la destruimos y liberamos sus recursos
+    if(tabla_patota->cantidad_tripulantes <= 0)
+        eliminar_patota(tabla_patota);
+}
+
+// Liberar/Reservar/Leer/Escribir memoria
+
+int liberar_memoria(tabla_paginas_t* tabla_patota, int tamanio_total, uint32_t direccion_logica){
+
+    int desplazamiento = desplazamiento_paginacion(direccion_logica);
+
+    /* Voy a empezar a liberar memoria en la pagina actual:
+        1) Hasta que libere la cantidad de memoria pedida
+        2) Hasta que llegue al final de la pagina: en ese caso, 
+            debo continuar en la pagina siguiente
+    */
+
+    // Calculo el tamanio de memoria a liberar en la pagina actual
+    int tamanio_memoria_pagina_actual = tamanio_pagina - desplazamiento;
+    if(tamanio_memoria_pagina_actual > tamanio_total)
+        tamanio_memoria_pagina_actual = tamanio_total;
+
+    // Libero memoria
+    marco_t* pagina_actual = get_pagina(tabla_patota, numero_pagina(direccion_logica));
+    if(pagina_actual == NULL)
+        return EXIT_FAILURE;
+    pagina_actual->fragmentacion_interna += tamanio_memoria_pagina_actual;
+
+    // Si el marco ya no guarda nada, lo liberamos para que lo pueda usar otra patota
+    if(pagina_actual->fragmentacion_interna == tamanio_pagina){
+
+        // Quitamos el marco de la lista de paginas de la tabla de la patota y lo liberamos
+        bool tiene_numero_de_pagina(void* args){
+            marco_t* pagina_encontrada = (marco_t*) args;
+            return pagina_encontrada->numero_pagina == pagina_actual->numero_pagina; 
+        }
+        list_remove_and_destroy_by_condition(tabla_patota->paginas, tiene_numero_de_pagina, liberar_marco);
+    }
+
+    // Calculo el tamanio de lo que me falto liberar
+    tamanio_total -= tamanio_memoria_pagina_actual;
+    
+    // Si no termine de liberar memoria, continuo al principio de la siguiente pagina
+    if(tamanio_total != 0){
+        int numero_proxima_pagina = numero_pagina(direccion_logica) + 1;
+        int direccion_logica_proxima_pagina = (numero_proxima_pagina << 16) & 0xFFFF0000;
+        liberar_memoria(tabla_patota, tamanio_total, direccion_logica_proxima_pagina);
+    }
+
+    return EXIT_SUCCESS;
+}
 
 int reservar_memoria(tabla_paginas_t* tabla_patota, int tamanio, uint32_t* direccion_logica){   
 
@@ -143,9 +221,11 @@ int reservar_memoria(tabla_paginas_t* tabla_patota, int tamanio, uint32_t* direc
 }
 
 int escribir_memoria_principal_paginacion(void* args, uint32_t inicio_logico, uint32_t desplazamiento_logico, void* dato, int tamanio_total){
-    log_info(logger,"Escribiendo en memoria principal");
+    //log_info(logger,"Escribiendo en memoria principal");
     tabla_paginas_t* tabla = (tabla_paginas_t*) args;
     uint32_t direccion_logica = direccion_logica_paginacion(inicio_logico, desplazamiento_logico);
+
+    //log_info(logger,"DIRECCION LOGICA A ESCRIBIR: %x",direccion_logica);
 
     int direccion_fisica_dato; 
     if(direccion_fisica_paginacion(tabla, direccion_logica, &direccion_fisica_dato) == EXIT_FAILURE){
@@ -183,9 +263,11 @@ int escribir_memoria_principal_paginacion(void* args, uint32_t inicio_logico, ui
 
 int leer_memoria_principal_paginacion(void* args, uint32_t inicio_logico, uint32_t desplazamiento_logico, void* dato, int tamanio_total){
     
-    log_info(logger,"Leyendo en memoria principal");
+    //log_info(logger,"Leyendo en memoria principal");
+
     tabla_paginas_t* tabla = (tabla_paginas_t*) args;
     uint32_t direccion_logica = direccion_logica_paginacion(inicio_logico, desplazamiento_logico);
+    //log_info(logger,"DIRECCION LOGICA A LEER: %x",direccion_logica);
 
     int direccion_fisica_dato; 
     if(direccion_fisica_paginacion(tabla, direccion_logica, &direccion_fisica_dato) == EXIT_FAILURE){
@@ -224,13 +306,13 @@ int leer_memoria_principal_paginacion(void* args, uint32_t inicio_logico, uint32
 // TABLAS DE PAGINACION
 
 tabla_paginas_t* obtener_tabla_patota_paginacion(int PID_buscado){
-    bool tienePID(void* args){
+    bool tiene_PID(void* args){
         tabla_paginas_t* tabla = (tabla_paginas_t*) args;
         uint32_t PID_tabla;
         leer_memoria_principal(tabla, DIR_LOG_PCB, DESPL_PID, &PID_tabla, sizeof(uint32_t));
         return PID_tabla == PID_buscado;
     }
-    return list_find(tablas_de_patotas, tienePID);
+    return list_find(tablas_de_patotas, tiene_PID);
 }
 
 marco_t* ultima_pagina(tabla_paginas_t* tabla_patota){
@@ -268,8 +350,6 @@ int crear_pagina(tabla_paginas_t* tabla_patota){
     tabla_patota->proximo_numero_pagina++;
     list_add(tabla_patota->paginas,pagina);
 
-    log_info(logger,"PAGINA CREADA MAI FREND");
-
     return EXIT_SUCCESS;
 }
 
@@ -285,6 +365,11 @@ int cantidad_paginas(tabla_paginas_t* tabla_patota){
     return list_size(tabla_patota->paginas);
 }
 
+int tamanio_tareas_paginacion(void* args){
+    tabla_paginas_t* tabla = (tabla_paginas_t*) args;
+    return tabla->tamanio_tareas;
+}
+
 // DIRECCIONAMIENTO
 
 uint32_t direccion_logica_paginacion(uint32_t inicio_logico, uint32_t desplazamiento_logico){
@@ -298,7 +383,7 @@ uint32_t direccion_logica_paginacion(uint32_t inicio_logico, uint32_t desplazami
         desplazamiento_total -= tamanio_pagina;     // Descontamos el tamanio de pagina al desplazamiento
     }
     // Armamos la direccion logica final
-    direccion_logica = nro_pagina << 16;
+    direccion_logica = (nro_pagina << 16) & 0xFFFF0000;
     direccion_logica += desplazamiento_total;
     return direccion_logica;
 }
@@ -311,12 +396,13 @@ int desplazamiento_paginacion(uint32_t direccion_logica){
     return direccion_logica & 0x0000FFFF;
 }
 
-int direccion_fisica_paginacion(tabla_paginas_t* tabla_patota, uint32_t direccion_logica, int* direccion_fisica){
+int direccion_fisica_paginacion(tabla_paginas_t* tabla_patota, uint32_t direccion_logica, uint32_t* direccion_fisica){
     marco_t* pagina = get_pagina(tabla_patota, numero_pagina(direccion_logica));
     if(pagina == NULL)
         return EXIT_FAILURE;
-    *direccion_fisica = (pagina->numero_marco) << 16;
+    *direccion_fisica = ((pagina->numero_marco) << 16) & 0xFFFF0000;
     *direccion_fisica += desplazamiento_paginacion(direccion_logica);
+    // log_info(logger, "LA DIRECCION FISICA ES %x",direccion_fisica);
     return EXIT_SUCCESS;
 }
 

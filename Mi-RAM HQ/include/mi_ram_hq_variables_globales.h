@@ -49,7 +49,12 @@ int (*crear_tripulante)(void**, uint32_t*, uint32_t, uint32_t, uint32_t, uint32_
 int (*escribir_memoria_principal)(void*, uint32_t, uint32_t, void*, int);
 int (*leer_memoria_principal)(void*, uint32_t, uint32_t, void*, int);
 void* (*obtener_tabla_patota)(int);
+int (*tamanio_tareas)(void*);
+void (*eliminar_tripulante)(void*, uint32_t);
 //  uint32_t (*direccion_logica)(uint32_t, uint32_t);   // Hace falta??
 
+// Funciones comunes a paginacion y segmentacion
+int cantidad_tareas(char** array_tareas);
+uint32_t desplazamiento(uint32_t direccion_logica);
 
 #endif

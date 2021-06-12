@@ -11,4 +11,7 @@ void liberar_estructuras_memoria();
 // ESQUEMA DE MEMORIA
 int inicializar_esquema_memoria(t_config* config);
 
+// FUNCIONES COMUNES PARA SEGMENTACION Y PAGINACION
+void leer_tarea_memoria_principal(void* tabla, char** tarea, uint32_t id_prox_tarea);
+
 #endif

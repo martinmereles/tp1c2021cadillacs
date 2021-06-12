@@ -48,6 +48,8 @@ int inicializar_esquema_memoria(t_config* config){
         escribir_memoria_principal = &escribir_memoria_principal_segmentacion;
         leer_memoria_principal = &leer_memoria_principal_segmentacion;
         obtener_tabla_patota = &obtener_tabla_patota_segmentacion;
+        tamanio_tareas = &tamanio_tareas_segmentacion;
+        eliminar_tripulante = &eliminar_tripulante_segmentacion;
 
         log_info(logger, "El tamanio del mapa de memoria disponible es: %d",bitarray_get_max_bit(mapa_memoria_disponible));
 
@@ -94,6 +96,8 @@ int inicializar_esquema_memoria(t_config* config){
         escribir_memoria_principal = &escribir_memoria_principal_paginacion;
         leer_memoria_principal = &leer_memoria_principal_paginacion;
         obtener_tabla_patota = &obtener_tabla_patota_paginacion;
+        tamanio_tareas = &tamanio_tareas_paginacion;
+        eliminar_tripulante = &eliminar_tripulante_paginacion;
 
         return EXIT_SUCCESS;
     }
@@ -108,4 +112,41 @@ void liberar_estructuras_memoria(){
     free(bitarray_mapa_memoria_disponible);
     bitarray_destroy(mapa_memoria_disponible);
     free(memoria_principal);
+}
+
+void leer_tarea_memoria_principal(void* tabla, char** tarea, uint32_t id_prox_tarea){    
+    
+    // Obtenemos el tamanio de la lista de tareas
+    int tamanio = tamanio_tareas(tabla);
+
+     // Leemos la direccion logica de las tareas
+    uint32_t dir_log_tareas;
+    leer_memoria_principal(tabla, DIR_LOG_PCB, DESPL_TAREAS, &dir_log_tareas, sizeof(uint32_t));
+    
+    // Leemos la lista de tareas completa
+    char* tareas = malloc(tamanio);
+    leer_memoria_principal(tabla, dir_log_tareas, 0, tareas, tamanio);
+
+    // Obtenemos el array de tareas
+    char** array_tareas = (char**) string_split(tareas, "\n");
+    int cant_tareas = cantidad_tareas(array_tareas);
+    if(id_prox_tarea < cant_tareas)
+        *tarea = string_duplicate(array_tareas[id_prox_tarea]);
+    else{
+        if(id_prox_tarea == cant_tareas)
+            *tarea = string_duplicate("FIN");
+        else{
+            *tarea = NULL;
+            log_error(logger,"ERROR. No existe la instruccion con el identificador solicitado");
+        }
+    }
+
+    // Libero el string tareas
+    free(tareas);
+	
+    // Libero el array de tareas
+	for(int i = 0;array_tareas[i]!=NULL;i++){
+		free(array_tareas[i]);
+	}
+	free(array_tareas);
 }
