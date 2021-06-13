@@ -47,9 +47,6 @@ int crear_patota_paginacion(uint32_t PID, uint32_t longitud_tareas, char* tareas
         return EXIT_FAILURE;
     }
 
-    log_info(logger,"La cantidad de paginas es: %d",cantidad_paginas(tabla_patota));
-    log_info(logger,"El nro de pagina es: %d",ultima_pagina(tabla_patota)->numero_pagina);
-
     // Buscamos un espacio en memoria para las tareas y lo reservamos
     uint32_t direccion_logica_tareas;
     if(reservar_memoria(tabla_patota, longitud_tareas, &direccion_logica_tareas) == EXIT_FAILURE){
@@ -61,12 +58,6 @@ int crear_patota_paginacion(uint32_t PID, uint32_t longitud_tareas, char* tareas
     // Guardo en la tabla el tamanio de la lista de tareas
     tabla_patota->tamanio_tareas = longitud_tareas;
 
-    log_info(logger,"La cantidad de paginas es: %d",cantidad_paginas(tabla_patota));
-    log_info(logger,"El nro de pagina es: %d",ultima_pagina(tabla_patota)->numero_pagina);
-
-    log_info(logger, "Direccion logica PCB: %x", direccion_logica_PCB);
-    log_info(logger, "Direccion logica tareas: %x",direccion_logica_tareas);
-
     // Agregar la tabla a la lista de tablas
     list_add(tablas_de_patotas, tabla_patota);
 
@@ -77,28 +68,23 @@ int crear_patota_paginacion(uint32_t PID, uint32_t longitud_tareas, char* tareas
     // Guardo las tareas
     escribir_memoria_principal(tabla_patota, direccion_logica_tareas, 0, tareas, longitud_tareas);
 
-    /*
-    // TEST
-    // Leo el PID y la direccion logica de las tareas en el PCB
-    escribir_memoria_principal(tabla_patota, direccion_logica_PCB, DESPL_PID, &PID, sizeof(uint32_t));
-    escribir_memoria_principal(tabla_patota, direccion_logica_PCB, DESPL_TAREAS, &direccion_logica_tareas, sizeof(uint32_t));  
-
-    // Leo las tareas
-    escribir_memoria_principal(tabla_patota, direccion_logica_tareas, 0, tareas, longitud_tareas);
-    */
-
     log_info(logger, "Estructuras de la patota inicializadas exitosamente");
+
+    dump_memoria();
 
     return EXIT_SUCCESS;
 }
 
-int crear_tripulante_paginacion(tabla_paginas_t** tabla_patota, uint32_t* direccion_logica_TCB, 
+int crear_tripulante_paginacion(void** args, uint32_t* direccion_logica_TCB, 
     uint32_t PID, uint32_t TID, uint32_t posicion_X, uint32_t posicion_Y){
+
+    tabla_paginas_t** tabla_patota = (tabla_paginas_t**) args;
 
     log_info(logger, "CREANDO TRIPULANTE");
 
     // Buscar la tabla que coincide con el PID
     *tabla_patota = obtener_tabla_patota(PID);
+
     if(*tabla_patota == NULL){
         log_error(logger,"ERROR. No se encontro la tabla de paginas de la patota");
         return EXIT_FAILURE;
@@ -114,7 +100,6 @@ int crear_tripulante_paginacion(tabla_paginas_t** tabla_patota, uint32_t* direcc
     (*tabla_patota)->cantidad_tripulantes++;
 
     // Guardo el TID, el estado, la posicion, el identificador de la proxima instruccion y la direccion logica del PCB
-   
     char estado = 'N';
     uint32_t id_proxima_instruccion = 0;
     uint32_t dir_log_pcb = DIR_LOG_PCB;
@@ -124,6 +109,8 @@ int crear_tripulante_paginacion(tabla_paginas_t** tabla_patota, uint32_t* direcc
     escribir_memoria_principal(*tabla_patota, *direccion_logica_TCB, DESPL_POS_Y, &posicion_Y, sizeof(uint32_t));
     escribir_memoria_principal(*tabla_patota, *direccion_logica_TCB, DESPL_PROX_INSTR, &id_proxima_instruccion, sizeof(uint32_t));
     escribir_memoria_principal(*tabla_patota, *direccion_logica_TCB, DESPL_DIR_PCB, &dir_log_pcb, sizeof(uint32_t));
+
+    dump_memoria();
 
     return EXIT_SUCCESS;
 }
@@ -147,7 +134,7 @@ void eliminar_tripulante_paginacion(void* args, uint32_t direccion_logica_TCB){
 
 int liberar_memoria(tabla_paginas_t* tabla_patota, int tamanio_total, uint32_t direccion_logica){
 
-    int desplazamiento = desplazamiento_paginacion(direccion_logica);
+    int desplazamiento = get_desplazamiento(direccion_logica);
 
     /* Voy a empezar a liberar memoria en la pagina actual:
         1) Hasta que libere la cantidad de memoria pedida
@@ -217,22 +204,25 @@ int reservar_memoria(tabla_paginas_t* tabla_patota, int tamanio, uint32_t* direc
     // Contamos la fragmentacion interna (espacio que sobro)
     tabla_patota->fragmentacion_interna = -tamanio;         
     ultima_pagina(tabla_patota)->fragmentacion_interna = -tamanio;
+
+    // PARA TESTEAR
+    dump_memoria();
+
     return EXIT_SUCCESS;
 }
 
 int escribir_memoria_principal_paginacion(void* args, uint32_t inicio_logico, uint32_t desplazamiento_logico, void* dato, int tamanio_total){
-    //log_info(logger,"Escribiendo en memoria principal");
+    
     tabla_paginas_t* tabla = (tabla_paginas_t*) args;
     uint32_t direccion_logica = direccion_logica_paginacion(inicio_logico, desplazamiento_logico);
 
-    //log_info(logger,"DIRECCION LOGICA A ESCRIBIR: %x",direccion_logica);
-
-    int direccion_fisica_dato; 
+    uint32_t direccion_fisica_dato; 
     if(direccion_fisica_paginacion(tabla, direccion_logica, &direccion_fisica_dato) == EXIT_FAILURE){
         log_error(logger,"ERROR: escribir_memoria_principal. Direccionamiento invalido.");
         return EXIT_FAILURE;
     }
-    int desplazamiento = desplazamiento_paginacion(direccion_logica);
+
+    int desplazamiento = get_desplazamiento(direccion_logica);
 
     /* Voy a empezar a escribir el dato en la pagina actual:
         1) Hasta que recorra el dato completo
@@ -262,19 +252,16 @@ int escribir_memoria_principal_paginacion(void* args, uint32_t inicio_logico, ui
 }
 
 int leer_memoria_principal_paginacion(void* args, uint32_t inicio_logico, uint32_t desplazamiento_logico, void* dato, int tamanio_total){
-    
-    //log_info(logger,"Leyendo en memoria principal");
 
     tabla_paginas_t* tabla = (tabla_paginas_t*) args;
     uint32_t direccion_logica = direccion_logica_paginacion(inicio_logico, desplazamiento_logico);
-    //log_info(logger,"DIRECCION LOGICA A LEER: %x",direccion_logica);
 
-    int direccion_fisica_dato; 
+    uint32_t direccion_fisica_dato; 
     if(direccion_fisica_paginacion(tabla, direccion_logica, &direccion_fisica_dato) == EXIT_FAILURE){
         log_error(logger,"ERROR: leer_memoria_principal. Direccionamiento invalido.");
         return EXIT_FAILURE;
     }
-    int desplazamiento = desplazamiento_paginacion(direccion_logica);
+    int desplazamiento = get_desplazamiento(direccion_logica);
 
     /* Voy a empezar a leer el dato en la pagina actual:
         1) Hasta que recorra el dato completo
@@ -337,8 +324,6 @@ int crear_pagina(tabla_paginas_t* tabla_patota){
         return EXIT_FAILURE;
     }
 
-    log_info(logger,"Creamos pagina");
-
     // 2do paso: Si hay un marco disponible, lo reservamos y lo agregamos a la tabla de la patota como pagina
     
     pagina->PID = tabla_patota->PID;
@@ -375,7 +360,7 @@ int tamanio_tareas_paginacion(void* args){
 uint32_t direccion_logica_paginacion(uint32_t inicio_logico, uint32_t desplazamiento_logico){
     uint32_t direccion_logica;
     int nro_pagina = numero_pagina(inicio_logico);               // Obtenemos el numero pagina inicial     
-    int desplazamiento_inicial = desplazamiento_paginacion(inicio_logico);     // Obtenemos el desplazamiento inicial
+    int desplazamiento_inicial = get_desplazamiento(inicio_logico);     // Obtenemos el desplazamiento inicial
     int desplazamiento_total = desplazamiento_inicial + desplazamiento_logico;  // Obtenemos el desplazamiento total
     // Si el desplazamiento es mas grande que el tamanio de pagina, pasamos a la siguiente
     while(desplazamiento_total > tamanio_pagina){
@@ -392,79 +377,33 @@ int numero_pagina(uint32_t direccion_logica){
     return (direccion_logica >> 16) & 0x0000FFFF;
 }
 
-int desplazamiento_paginacion(uint32_t direccion_logica){
-    return direccion_logica & 0x0000FFFF;
-}
-
 int direccion_fisica_paginacion(tabla_paginas_t* tabla_patota, uint32_t direccion_logica, uint32_t* direccion_fisica){
     marco_t* pagina = get_pagina(tabla_patota, numero_pagina(direccion_logica));
     if(pagina == NULL)
         return EXIT_FAILURE;
-    *direccion_fisica = ((pagina->numero_marco) << 16) & 0xFFFF0000;
-    *direccion_fisica += desplazamiento_paginacion(direccion_logica);
-    // log_info(logger, "LA DIRECCION FISICA ES %x",direccion_fisica);
+    *direccion_fisica = (pagina->numero_marco) * tamanio_pagina;
+    *direccion_fisica += get_desplazamiento(direccion_logica);
     return EXIT_SUCCESS;
 }
 
 // DUMP MEMORIA
-
-// ES MUY PARECIDO A LA VERSION DE SEGMENTACION
 void dump_memoria_paginacion(){
-    // Dump real
-    log_info(logger,"INICIANDO DUMP");
-
-    // Obtenemos la fecha
-    char* fecha = temporal_get_string_time("%d_%m_%y_%H_%M_%S");
-    
-    // Creamos el archivo
-    char* nombre_archivo = string_from_format("./dump/Dump_%s.dmp", fecha);
-    FILE* archivo_dump = fopen(nombre_archivo, "w");
-    free(nombre_archivo);
-    free(fecha);
-
-    // Obtenemos la fecha
-    fecha = temporal_get_string_time("%d/%m/%y %H:%M:%S");
-
-    // Escribimos info general del dump
-    char* info_dump = string_from_format("Dump: %s", fecha);
-    fwrite(info_dump, sizeof(char), strlen(info_dump), archivo_dump);
-    free(info_dump);
-    free(fecha);    // Liberamos el string fecha
-
-    // Por cada marco, escribimos la informacion correspondiente
-    t_list_iterator* iterador = list_iterator_create(lista_de_marcos);    // Creamos el iterador
-    marco_t* marco;
-
-    log_info(logger,"LA CANTIDAD DE MARCOS ES: %d", list_size(lista_de_marcos));
-
-    while(list_iterator_has_next(iterador)){
-        marco = list_iterator_next(iterador);
-        dump_marco(marco, archivo_dump);
-    }
-
-    list_iterator_destroy(iterador);    // Liberamos el iterador
-
-    // Cerramos el archivo
-    fclose(archivo_dump);
+    crear_archivo_dump(lista_de_marcos, dump_marco);
 }
 
-void dump_marco(marco_t* marco, FILE* archivo_dump){
+void dump_marco(void* args, FILE* archivo_dump){
+    marco_t* marco = (marco_t*) args;
+
     // Marco:0	Estado:Ocupado	Proceso: 1	Pagina: 2
-    char* info_marco = string_new();                                                         
-    string_append(&info_marco, "\n");                                                        
-    string_append(&info_marco, string_from_format("Marco: %3d ", marco->numero_marco));    
-    if(marco->estado == MARCO_OCUPADO){
-        string_append(&info_marco, "Estado: Ocupado ");
-        string_append(&info_marco, string_from_format("Proceso: %3d ", marco->PID));         
-        string_append(&info_marco, string_from_format("Pagina: %3d", marco->numero_pagina)); 
-    }
-    else{
-        string_append(&info_marco, "Estado: Libre   ");
-        string_append(&info_marco, "Proceso:   - ");         
-        string_append(&info_marco, "Pagina:   -"); 
-    }         
+    char* info_marco;                                    
+    if(marco->estado == MARCO_OCUPADO)
+        info_marco = string_from_format("\nMarco: %3d Estado: Ocupado Proceso: %3d Pagina: %3d",
+                                         marco->numero_marco,marco->PID,marco->numero_pagina);
+    else
+        info_marco = string_from_format("\nMarco: %3d Estado: Libre   Proceso:  -  Pagina:  - ",
+                                         marco->numero_marco);       
     
     fwrite(info_marco, sizeof(char), strlen(info_marco), archivo_dump);
-    
+
     free(info_marco);
 }

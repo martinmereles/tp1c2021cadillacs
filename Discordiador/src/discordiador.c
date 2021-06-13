@@ -228,7 +228,6 @@ int iniciar_patota(char** argumentos, int mi_ram_hq_fd){
 
 	// Le pedimos a Mi-RAM HQ que inicie la patota
 	enviar_op_iniciar_patota(mi_ram_hq_fd, PID, lista_de_tareas);
-	sleep(1);
 
 	for(int i = 0;i < cantidad_tripulantes;i++){
 		if( 3 + i < cantidad_args){

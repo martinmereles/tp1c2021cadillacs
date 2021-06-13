@@ -58,8 +58,8 @@ void quitar_y_destruir_tabla(tabla_segmentos_t* tabla_a_destruir);
 
 // Dump
 void dump_memoria_segmentacion();
-void dump_patota_segmentacion(tabla_segmentos_t* tabla_patota, FILE* archivo_dump);
-void dump_segmento(FILE* archivo_dump, tabla_segmentos_t* tabla, int PID, int nro_segmento);
+void dump_patota_segmentacion(void* args, FILE* archivo_dump);
+void dump_segmento(fila_tabla_segmentos_t* segmento, int PID, FILE* archivo_dump);
 void dump_patota_segmentacion_pruebas(void* args);
 void dump_tripulante_segmentacion_pruebas(tabla_segmentos_t* tabla, int nro_fila);
 

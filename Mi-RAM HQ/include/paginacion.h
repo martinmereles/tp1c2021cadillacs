@@ -35,7 +35,7 @@ typedef struct{
 
 // Patotas y Tripulantes
 int crear_patota_paginacion(uint32_t PID, uint32_t longitud_tareas, char* tareas);
-int crear_tripulante_paginacion(tabla_paginas_t**, uint32_t*, uint32_t, uint32_t, uint32_t, uint32_t);
+int crear_tripulante_paginacion(void**, uint32_t*, uint32_t, uint32_t, uint32_t, uint32_t);
 void eliminar_tripulante_paginacion(void* args, uint32_t direccion_logica_TCB);
 int tamanio_tareas_paginacion(void* args);
 
@@ -49,7 +49,6 @@ int leer_memoria_principal_paginacion(void* args, uint32_t inicio_logico, uint32
 uint32_t direccion_logica_paginacion(uint32_t inicio_logico, uint32_t desplazamiento_logico);
 int direccion_fisica_paginacion(tabla_paginas_t* tabla_patota, uint32_t direccion_logica, uint32_t* direccion_fisica);
 int numero_pagina(uint32_t direccion_logica);
-int desplazamiento_paginacion(uint32_t direccion_logica);
 
 // Paginas
 tabla_paginas_t* obtener_tabla_patota_paginacion(int PID_buscado);
@@ -63,7 +62,7 @@ void liberar_marco(void*);
 
 // Dump
 void dump_memoria_paginacion();
-void dump_marco(marco_t* marco, FILE* archivo_dump);
+void dump_marco(void* args, FILE* archivo_dump);
 
 // VARIABLES GLOBALES
 int tamanio_pagina;
