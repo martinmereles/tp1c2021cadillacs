@@ -1,24 +1,31 @@
+#ifndef IFILESYSTEM_H_
+#define IFILESYSTEM_H_
+
+#include <commons/bitarray.h>
 #include <commons/collections/list.h>
 #include <commons/config.h>
-#include <commons/string.h>
-#include <commons/bitarray.h>
 #include <commons/log.h>
+#include <commons/string.h>
+#include <dirent.h>
+#include <errno.h>
+#include <fcntl.h>
+#include<netdb.h>
+#include <limits.h>
+#include<signal.h>
 #include <stdio.h>
 #include <stdint.h>
-#include <fcntl.h>
 #include <stdlib.h>
+#include <string.h>
+#include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <string.h>
 
-#include <fcntl.h>
-#include <dirent.h>
-#include <limits.h>
-#include <string.h>
-#include <sys/mman.h>
-#include <errno.h>
-#include <"i-filesystem.c>
+#include "i-mongostore.h"
+
+//funciones del blockes
+#include <commons/string.h>
+#include <time.h>
 
 
 #define DIRECTORIO "DIRECTORY=Y\n"
@@ -44,12 +51,13 @@ typedef struct {
 
 //estructura superbloque 
 typedef struct {
-	uint32_t block_size;
-	uint32_t block_count;
-	char* mount;
-	t_bitarray* bitmap;
-	t_log* log_tallgrass;
+	uint32_t blocksize;
+	uint32_t blocks;
+	char * bitarray;
 } t_superbloque;
+
+t_superbloque super_bloque;
+struct stat superblock_stat;
 
 //estructura file
 typedef struct {
@@ -58,22 +66,18 @@ typedef struct {
 	t_list*  blocks;
 	char* caracter_llenado;
 	char* valor_md5;
-} t_file
+} t_file;
 
 //estructura bitacora
 
 typedef struct {
-	uint32_t size
-	t_list* blocks
-} t_bitacora
+	uint32_t size;
+	t_list* blocks;
+} t_bitacora;
 
-typedef struct {
-	char* mount;
-	t_log* logger;
-	t_superbloque* blocks;
-} t_filesystem;
+void iniciar_filesystem();
+char* crearPathAbsoluto(char * pathRelativo);
+int existeArchivo(char *nombreArchivo);
+int existe_filesystem();
 
-
-// FUNCIONES TALL-GRASS
-t_filesystem* iniciar_filesystem(char* mount, int blocks,
-		int block_size, t_log* logger);
+#endif

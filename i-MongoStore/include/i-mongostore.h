@@ -12,6 +12,15 @@
 #include "sockets_shared.h"
 #include <semaphore.h>
 #include "servidor_i_mongo_store.h"
+#include "i-filesystem.h"
+
+//estructura archivo config
+typedef struct {
+	char * puerto;
+	char * punto_montaje;
+	int tiempo_sincro;
+    char* posiciones_sabotaje;
+}filesystem_config;
 
 enum server_status{
     RUNNING,
@@ -26,5 +35,9 @@ bool leer_mensaje_cliente_y_procesar(int);
 
 int status_servidor;
 sem_t semaforo_aceptar_conexiones;
+t_config *config;
+filesystem_config fs_config;
+void* superbloquemap;
+t_bitarray bitmap;
 
 #endif

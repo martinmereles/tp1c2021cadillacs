@@ -1,5 +1,7 @@
 #include "i-mongostore.h"
 
+
+
 int main(void)
 {
 	// inicializo semaforos
@@ -8,9 +10,13 @@ int main(void)
 	logger = log_create("./cfg/i-mongostore.log", "I-MongoStore", 1, LOG_LEVEL_DEBUG);
 
 	// Leo IP y PUERTO del config
-	t_config *config = config_create("./cfg/i-mongo-store.config");
+	config = config_create("./cfg/i-mongo-store.config");
+	
 	char* puerto_escucha = config_get_string_value(config, "PUERTO");
 	char* ip = "127.0.0.1";
+	leer_config();
+	//Levanto/Creo el Filesystem
+	iniciar_filesystem();
 
 	int server_fd = iniciar_servidor(ip, puerto_escucha);
 	log_info(logger, "I-MongoStore listo para recibir al Discordiador");
@@ -22,6 +28,14 @@ int main(void)
 	log_destroy(logger);
 
 	return EXIT_SUCCESS;
+}
+
+void leer_config(){
+	config = config_create("./cfg/i-mongo-store.config");
+	fs_config.puerto = config_get_string_value(config,"PUERTO");
+	fs_config.punto_montaje = config_get_string_value(config,"PUNTO_MONTAJE");
+	fs_config.tiempo_sincro = config_get_int_value(config, "TIEMPO_SINCRONIZACION");
+	fs_config.posiciones_sabotaje = config_get_int_value(config, "TIEMPO_SINCRONIZACION");
 }
 
 void i_mongo_store(int servidor_fd) {

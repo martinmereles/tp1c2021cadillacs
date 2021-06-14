@@ -1,35 +1,127 @@
 #include "i-filesystem.h"
 
-//funciones del blockes
-
-#include <commons/string.h>
-#include <time.h>
-
 //funcion inicial del filesystem
-t_filesystem* iniciar_filesystem(char* mount, int block, int block_size,
-		t_log* logger) {
-	crear_directorios(mount, logger);
-	crear_bloques(mount, block, logger);
-	t_bitarray* bitmap = crear_bitmap(mount, (block / 8), logger);
+void iniciar_filesystem() {
 
-	t_superbloque* superbloque = malloc(sizeof(t_superbloque));
-	t_filesystem* fs = malloc(sizeof(t_filesystem));
+	if(!existe_filesystem()){
+		printf("no existe fs\n");
+	};
+	printf("existe fs\n");
+	crear_directorios();
 
-	fs->logger = logger;
-	fs->mount = strdup(mount);
-	fs->blocks = blocks;
-
-	superbloque->mount = strdup(mount);
-	superbloque->block_count = block;
-	superbloque->block_size = block_size;
-	superbloque->bitmap = bitmap;
-	superbloque->log_tallgrass = logger;
-
-	crear_metadata_tallgrass(fs, block, block_size);
-	banner_inicio(block, block_size);
-
-	return fs;
 }
+
+void crear_directorios(){
+	char * pathFiles = string_new();
+	string_append(&pathFiles,fs_config.punto_montaje);
+	string_append(&pathFiles, "/Files");
+	mkdir(pathFiles, 0777);
+	string_append(&pathFiles, "/Bitacoras");
+	mkdir(pathFiles, 0777);
+}
+
+char* crearPathAbsoluto(char * pathRelativo){
+	char * pathAbsoluto = string_new();
+	string_append(&pathAbsoluto, fs_config.punto_montaje);
+	string_append(&pathAbsoluto, pathRelativo);
+	return pathAbsoluto;
+}
+
+int existeArchivo(char *nombreArchivo){
+	FILE* ftry;
+	if(ftry = fopen(nombreArchivo, "r")){
+		fclose(ftry);
+		return 1;
+	}
+	return 0;
+}
+
+//checkea la existencia del filesystem.
+int existe_filesystem(){
+	FILE* btry;
+	FILE* bcreate;
+	char * sb_path = crearPathAbsoluto("/SuperBloque.ims");
+	char * block_path = crearPathAbsoluto("/Blocks.ims");
+	if (existeArchivo(sb_path)){
+		//intenta abrir el archivo, para confirmar su existencia
+		int sbfile = open(sb_path, O_RDWR, S_IRUSR | S_IWUSR);
+		if(fstat(sbfile,&superblock_stat) == -1)
+		{
+			perror("no se pudo obtener los datos del archivo.\n");
+		}
+		printf("el tamaño del archivo es de %d\n", superblock_stat.st_size);
+
+		//mapeo SuperBloque.ims en un *void
+		superbloquemap = mmap (NULL, superblock_stat.st_size, PROT_READ | PROT_WRITE ,MAP_SHARED, sbfile, 0 );
+
+		int offset=0;
+		//parseo los datos del SuperBloque en la estructura super_bloque
+		memcpy(&super_bloque.blocksize,superbloquemap,sizeof(super_bloque.blocksize));
+		printf("blocksize = %d\n", super_bloque.blocksize);
+		offset = offset + sizeof(super_bloque.blocksize);
+		memcpy(&super_bloque.blocks,superbloquemap+offset,sizeof(super_bloque.blocks));
+		printf("blocks = %d\n", super_bloque.blocks);
+		offset = offset + sizeof(super_bloque.blocks);
+		super_bloque.bitarray = calloc(super_bloque.blocks/8+1, sizeof(char*));
+		printf("tamaño bitarray %d\n", strlen(super_bloque.bitarray));
+		printf("realizo malloc de : %d\n", super_bloque.blocks/8+1);
+		memcpy(super_bloque.bitarray,superbloquemap+offset,super_bloque.blocks/8+1);
+		printf("tamaño bitarray = %d\n", strlen(super_bloque.bitarray));
+
+		//creo un t_bittarray para manipularlo con las commons
+		bitmap = *bitarray_create_with_mode(super_bloque.bitarray,super_bloque.blocks/8,LSB_FIRST);
+
+		//test sobre el bitarray
+		int sizeBitarray = bitarray_get_max_bit(&bitmap);
+		printf("size of bitarray = %d\n", sizeBitarray);
+		printf("test de bitarray:");
+		for(int i = 0; i<super_bloque.blocks; i++){
+			int test = bitarray_test_bit(&bitmap, i);
+			printf("%d",test);
+		}
+		printf("\n");
+		int num = 25;
+		int prueba = bitarray_test_bit(&bitmap, num);
+		printf("test bit 1: %d\n", prueba);
+		bitarray_set_bit(&bitmap, num);
+		bitarray_set_bit(&bitmap, num+1);
+		prueba = bitarray_test_bit(&bitmap, num);
+		printf("set bit 1: %d\n", prueba);
+		printf("test de bitarray:");
+		for(int i = 0; i<super_bloque.blocks; i++){
+			int test = bitarray_test_bit(&bitmap, i);
+			printf("%d",test);
+		}
+		printf("\n");
+
+		// copio al void* mapeado el contenido del bitarray para actualizar el bitmap
+		memcpy(superbloquemap+offset,super_bloque.bitarray,strlen(super_bloque.bitarray)+1);
+		// fuerzo un sync para que el mapeo se refleje en SuperBloque.ims
+		int sync = msync(superbloquemap, superblock_stat.st_size, MS_SYNC);
+		printf("se sincronizo:%d\n", sync);
+
+		//compruebo la existencia de Blocks.ims
+		if(existeArchivo(block_path)){
+			btry = fopen(block_path, "r");
+			fclose(btry);
+			printf("Se encontro el archivo Blocks.ims\n");
+			return 1;
+		}else{
+			bcreate = fopen (block_path, "w");
+			uint32_t size = super_bloque.blocks * super_bloque.blocksize;
+			ftruncate(fileno(bcreate), size);
+			fclose(bcreate);
+			printf("No se encontro el archivo Blocks.ims y se creo uno basado en SuperBlocks.ims\n");
+			return 1;
+		}
+	}else{
+		printf("No se encontro el archivo SuperBloque.ims\n");
+	}
+	return 0;
+}
+
+
+/*
 //crear metadata
 void crear_metadata_tallgrass(t_filesystem* fs, int blocks, int block_size) {
 
@@ -40,7 +132,7 @@ void crear_metadata_tallgrass(t_filesystem* fs, int blocks, int block_size) {
 
 	int fd = crear_archivo(path, fs->logger);
 
-	/* copio la informacion del metadata */
+
 	dprintf(fd, TAMANIO_BLOQUE, block_size);
 	dprintf(fd, BLOQUES_METADATA_FS, blocks);
 	dprintf(fd, NUMERO_MAGICO);
@@ -65,13 +157,6 @@ void crear_un_bloque(char* pto_montaje, uint32_t indice, t_log* logger) {
 	free(path);
 }
 
-// crear bloques de datos
-void crear_bloques(char* pto_montaje, uint32_t cantidad, t_log* logger) {
-	for (int i = 0; i < cantidad; i++) {
-		crear_un_bloque(pto_montaje, i, logger);
-	}
-	log_info(logger, "Se crean %d bloques de datos", cantidad);
-}
 
 // crear bitmap
 t_bitarray* crear_bitmap(char* pto_montaje, uint32_t size, t_log* logger) {
@@ -103,11 +188,11 @@ t_bitarray* crear_bitmap(char* pto_montaje, uint32_t size, t_log* logger) {
 //DIRECTORIOS
 void crear_directorios(char* pto_montaje, t_log* logger) {
 
-	/* Se crea tall-grass/ */
+
 	crear_directorio(pto_montaje, logger);
 	log_info(logger, "se crea directorio %s", pto_montaje);
 
-	/* se crea tall-grass/metadata/ */
+
 	char* path = string_new();
 	string_append(&path, pto_montaje);
 	string_append(&path, "metadata/");
@@ -116,7 +201,7 @@ void crear_directorios(char* pto_montaje, t_log* logger) {
 
 	strcpy(path, pto_montaje);
 
-	/* se crea tall-grass/blocks/ */
+
 	string_append(&path, "blocks/");
 	crear_directorio(path, logger);
 	log_info(logger, "se crea directorio %s", path);
@@ -134,3 +219,4 @@ void crear_directorio(char* path_directorio, t_log* logger) {
 		exit(1);
 	}
 }
+*/
