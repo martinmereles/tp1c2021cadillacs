@@ -41,6 +41,9 @@ char* bitarray_mapa_memoria_disponible;
 // Tablas de patotas
 t_list* tablas_de_patotas;
 
+// COMPACTACION
+t_list* lista_sem_puede_atender_peticion;
+
 // PUNTEROS A FUNCIONES GLOBALES
 // Sirven para apuntar a las funciones que implementan segmentacion o paginacion, segun la configuracion
 void (*dump_memoria)(void);

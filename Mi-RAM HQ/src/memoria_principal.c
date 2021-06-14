@@ -11,11 +11,14 @@ int inicializar_estructuras_memoria(t_config* config){
     if(inicializar_esquema_memoria(config) == EXIT_FAILURE)
         return EXIT_FAILURE;
     
-    // Inicializo la lista de tablas de segmentos
+    // Inicializo la lista de tablas de patotas
     tablas_de_patotas = list_create();
 
 	// Configuramos signal de dump
 	signal(SIGUSR1, signal_handler);
+
+    // Inicializo lista de semaforos para compactacion
+    lista_sem_puede_atender_peticion = list_create();
 
     return EXIT_SUCCESS;
 }
@@ -115,6 +118,7 @@ int inicializar_esquema_memoria(t_config* config){
 void liberar_estructuras_memoria(){
     log_info(logger, "Liberando estructuras administrativas de la memoria principal");
     list_destroy_and_destroy_elements(tablas_de_patotas, destruir_tabla_segmentos);
+    list_destroy_and_destroy_elements(lista_sem_puede_atender_peticion, free);
     free(bitarray_mapa_memoria_disponible);
     bitarray_destroy(mapa_memoria_disponible);
     free(memoria_principal);
@@ -158,6 +162,8 @@ void leer_tarea_memoria_principal(void* tabla, char** tarea, uint32_t id_prox_ta
 }
 
 void signal_handler(int senial){
+    log_info(logger,"Signal atendida por el hilo %d",syscall(__NR_gettid));
+
 	switch(senial){
 		case SIGUSR1:
 			dump_memoria();

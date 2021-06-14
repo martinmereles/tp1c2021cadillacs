@@ -96,7 +96,7 @@ int escribir_memoria_principal_segmentacion(void* args, uint32_t inicio_logico, 
     uint32_t direccion_logica = direccion_logica_segmentacion(inicio_logico, desplazamiento_logico);
     int numero_seg = numero_de_segmento(direccion_logica);
     int direccion_fisica_dato = calcular_direccion_fisica(tabla, direccion_logica);
-    fila_tabla_segmentos_t* fila = obtener_fila(tabla, numero_seg);
+    segmento_t* fila = obtener_fila(tabla, numero_seg);
     if(fila->inicio + fila->tamanio < direccion_fisica_dato + tamanio){
         log_error(logger,"ERROR. Segmentation fault. Direccionamiento invalido en escritura");
         return EXIT_FAILURE;
@@ -110,7 +110,7 @@ int leer_memoria_principal_segmentacion(void* args, uint32_t inicio_logico, uint
     uint32_t direccion_logica = direccion_logica_segmentacion(inicio_logico, desplazamiento_logico);
     int numero_seg = numero_de_segmento(direccion_logica);
     int direccion_fisica_dato = calcular_direccion_fisica(tabla, direccion_logica);
-    fila_tabla_segmentos_t* fila = obtener_fila(tabla,numero_seg);
+    segmento_t* fila = obtener_fila(tabla,numero_seg);
     if(fila->inicio + fila->tamanio < direccion_fisica_dato + tamanio){
         log_error(logger,"ERROR. Segmentation fault. Direccionamiento invalido en lectura");
         return EXIT_FAILURE;
@@ -144,7 +144,7 @@ void destruir_tabla_segmentos(void* args){
 
 void quitar_y_destruir_fila(tabla_segmentos_t* tabla, int numero_seg){
     bool tiene_numero_de_segmento(void* args){
-        fila_tabla_segmentos_t* fila = (fila_tabla_segmentos_t*) args;
+        segmento_t* fila = (segmento_t*) args;
         return fila->numero_segmento == numero_seg; 
     }
     list_remove_and_destroy_by_condition(tabla->filas, tiene_numero_de_segmento, destruir_fila);
@@ -160,9 +160,9 @@ tabla_segmentos_t* obtener_tabla_patota_segmentacion(int PID_buscado){
     return list_find(tablas_de_patotas, tienePID);
 }
 
-fila_tabla_segmentos_t* obtener_fila(tabla_segmentos_t* tabla, int numero_seg){
+segmento_t* obtener_fila(tabla_segmentos_t* tabla, int numero_seg){
     bool tiene_numero_de_segmento(void* args){
-        fila_tabla_segmentos_t* fila = (fila_tabla_segmentos_t*) args;
+        segmento_t* fila = (segmento_t*) args;
         return fila->numero_segmento == numero_seg; 
     }
 
@@ -182,7 +182,7 @@ int crear_patota_segmentacion(uint32_t PID, uint32_t longitud_tareas, char* tare
     tabla_patota->proximo_numero_segmento = 0;
 
     // Buscamos un espacio en memoria para el PCB y creamos su fila en la tabla de segmentos
-    fila_tabla_segmentos_t* fila_PCB = crear_fila(tabla_patota, TAMANIO_PCB);
+    segmento_t* fila_PCB = crear_fila(tabla_patota, TAMANIO_PCB);
     if(fila_PCB == NULL) {
         log_error(logger, "ERROR. No hay espacio para guardar el PCB de la patota. %d",TAMANIO_PCB);
         destruir_tabla_segmentos(tabla_patota);
@@ -191,7 +191,7 @@ int crear_patota_segmentacion(uint32_t PID, uint32_t longitud_tareas, char* tare
     
     // Buscamos un espacio en memoria para las tareas y creamos su fila en la tabla de segmentos
 
-    fila_tabla_segmentos_t* fila_tareas = crear_fila(tabla_patota, longitud_tareas);
+    segmento_t* fila_tareas = crear_fila(tabla_patota, longitud_tareas);
     if(fila_tareas == NULL) {
         log_error(logger, "ERROR. No hay espacio para guardar las tareas de la patota.");
         destruir_tabla_segmentos(tabla_patota);
@@ -230,7 +230,7 @@ int crear_tripulante_segmentacion(void** tabla, uint32_t* dir_log_tcb,
 
     // Buscamos un espacio en memoria para el TCB
     // Agregamos la fila para el segmento del TCB a la tabla de la patota
-    fila_tabla_segmentos_t* fila_TCB = crear_fila(*tabla, TAMANIO_TCB);
+    segmento_t* fila_TCB = crear_fila(*tabla, TAMANIO_TCB);
 
     if(fila_TCB == NULL) {
         log_error(logger, "ERROR. No hay espacio para guardar el TCB del tripulante. %d",TAMANIO_TCB);
@@ -259,20 +259,60 @@ int cantidad_filas(tabla_segmentos_t* tabla){
 }
 
 void destruir_fila(void* args){
-    fila_tabla_segmentos_t* fila = (fila_tabla_segmentos_t*) args;
-    liberar_segmento(fila);
-    free(fila);
+    segmento_t* segmento = (segmento_t*) args;
+
+    // Liberamos el espacio en el mapa de memoria disponible
+    liberar_memoria_segmentacion(segmento->inicio, segmento->tamanio);
+
+    free(segmento);
 }
 
-fila_tabla_segmentos_t* crear_fila(tabla_segmentos_t* tabla, int tamanio){
-    fila_tabla_segmentos_t* fila = reservar_segmento(tamanio);
-    agregar_fila(tabla,fila);
-    return fila;
+segmento_t* crear_fila(tabla_segmentos_t* tabla, int tamanio){
+    
+    // Buscamos un espacio de memoria por algoritmo
+    int inicio = algoritmo_de_ubicacion(tamanio);
+
+    // Si no se encontro espacio
+    if(inicio < 0){
+        // Ejecutamos la compactacion
+        compactacion();
+
+        // Probamos una segunda vez 
+        inicio = algoritmo_de_ubicacion(tamanio);
+        
+        // Si tampoco se encontro espacio
+        if(inicio < 0){
+            log_error(logger,"ERROR: crear_fila. No hay espacio en memoria disponible.");
+            return NULL;
+        }
+    }
+
+    // Si se encontro espacio
+    // Creamos el segmento
+    segmento_t* segmento = malloc(sizeof(segmento_t));
+    segmento->inicio = inicio;
+    segmento->tamanio = tamanio;
+    segmento->mutex_tripulante = NULL;
+
+    // Reservamos el espacio en el mapa de memoria disponible
+    reservar_memoria_segmentacion(inicio, tamanio);    
+
+    // Agregamos el segmento a la tabla
+    list_add(tabla->filas,segmento);
+    segmento->numero_segmento = generar_nuevo_numero_segmento(tabla);
+    return segmento;
 }
 
-void agregar_fila(tabla_segmentos_t* tabla, fila_tabla_segmentos_t* fila){
-    list_add(tabla->filas,fila);
-    fila->numero_segmento = generar_nuevo_numero_segmento(tabla);
+void reservar_memoria_segmentacion(uint32_t inicio, uint32_t tamanio){
+    for(int pos = inicio;pos < inicio + tamanio;pos++){
+        bitarray_set_bit(mapa_memoria_disponible, pos);
+    }
+}
+
+void liberar_memoria_segmentacion(uint32_t inicio, uint32_t tamanio){
+    for(int pos = inicio;pos < inicio + tamanio;pos++){
+        bitarray_clean_bit(mapa_memoria_disponible, pos);
+    }
 }
 
 int generar_nuevo_numero_segmento(tabla_segmentos_t* tabla){
@@ -282,38 +322,14 @@ int generar_nuevo_numero_segmento(tabla_segmentos_t* tabla){
     return nuevo;
 }
 
-// SEGMENTOS
-
-fila_tabla_segmentos_t* reservar_segmento(int tamanio){
-    int inicio = algoritmo_de_ubicacion(tamanio);
-    fila_tabla_segmentos_t* fila = NULL;
-    if(inicio >= 0){
-        fila = malloc(sizeof(fila_tabla_segmentos_t));
-        fila->inicio = inicio;
-        fila->tamanio = tamanio;
-        for(int pos = inicio;pos < inicio + tamanio;pos++){
-            bitarray_set_bit(mapa_memoria_disponible, pos);
-        }
-    }
-    return fila;
-}
-
-void liberar_segmento(fila_tabla_segmentos_t* fila){
-    int inicio = fila->inicio;
-    int tamanio = fila->tamanio;
-    for(int pos = inicio;pos < inicio + tamanio;pos++){
-        bitarray_clean_bit(mapa_memoria_disponible, pos);
-    }
-}
-
 // DIRECCIONAMIENTO
 
-uint32_t direccion_logica_segmento(fila_tabla_segmentos_t* fila){
+uint32_t direccion_logica_segmento(segmento_t* fila){
     return fila->numero_segmento << 16;
 }
 
 int calcular_direccion_fisica(tabla_segmentos_t* tabla, uint32_t direccion_logica){
-    fila_tabla_segmentos_t* fila = obtener_fila(tabla, numero_de_segmento(direccion_logica));
+    segmento_t* fila = obtener_fila(tabla, numero_de_segmento(direccion_logica));
     if(fila == NULL){
         log_error(logger,"NO EXISTE LA FILA");
     }
@@ -355,7 +371,7 @@ void dump_patota_segmentacion(void* args, FILE* archivo_dump){
 
     // Por cada segmento, hacemos un dump de su informacion
     t_list_iterator* iterador = list_iterator_create(tabla_patota->filas);    // Creamos el iterador
-    fila_tabla_segmentos_t* segmento;
+    segmento_t* segmento;
 
     while(list_iterator_has_next(iterador)){
         segmento = list_iterator_next(iterador);
@@ -365,7 +381,7 @@ void dump_patota_segmentacion(void* args, FILE* archivo_dump){
     list_iterator_destroy(iterador);    // Liberamos el iterador
 }
 
-void dump_segmento(fila_tabla_segmentos_t* segmento, int PID, FILE* archivo_dump){
+void dump_segmento(segmento_t* segmento, int PID, FILE* archivo_dump){
     // Proceso: 1	Segmento: 1	Inicio: 0x0000	Tam: 20b
     char* info_segmento = string_from_format("\nProceso: %3d Segmento: %3d Inicio: %8d Tam: %db", 
                                                 PID, segmento->numero_segmento, segmento->inicio, segmento->tamanio);
@@ -433,7 +449,77 @@ void dump_tripulante_segmentacion_pruebas(tabla_segmentos_t* tabla, int nro_fila
 }
 
 void compactacion(){
+
+    // Esperamos que finalicen las peticiones en ejecucion y bloqueamos las nuevas
+    log_info(logger,"ESPERANDO FINALIZACION DE PETICIONES PENDIENTES");
+    list_iterate(lista_sem_puede_atender_peticion, sem_wait);
+
     log_info(logger,"INICIANDO COMPACTACION");
-    sleep(20);
-    log_info(logger,"COMPACTACION FINALIZADA");
+    
+    // Generamos la lista de segmentos ordenada
+    t_list* lista_segmentos_memoria = lista_segmentos_en_memoria();
+    // Compactamos los segmentos por orden
+    list_iterate(lista_segmentos_memoria, compactar_segmento);
+    // Destruimos la lista (sin destruir los segmentos)    
+    list_destroy(lista_segmentos_memoria);
+
+    log_info(logger,"COMPACTACION COMPLETADA");
+
+    // Permitimos que se vuelvan a aceptar nuevas peticiones
+    list_iterate(lista_sem_puede_atender_peticion, sem_post);
+}
+
+void compactar_segmento(void* args){
+    segmento_t* segmento = (segmento_t*) args;
+
+    // Copiar contenido de la RAM en un buffer
+    void* buffer = malloc(segmento->tamanio);
+    memcpy(buffer, memoria_principal + segmento->inicio, segmento->tamanio);
+
+    // Liberar memoria en el mapa
+    liberar_memoria_segmentacion(segmento->inicio, segmento->tamanio);
+    
+    // Buscar el primer espacio disponible en RAM para ocupar (usar criterio first fit)
+    int ini = first_fit(segmento->tamanio);
+    if(ini < 0){
+        log_error(logger,"ERROR: compactar_segmento. Error de compactacion. Programame bien prro");
+    }
+
+    // Actualizo informacion segmento
+    segmento->inicio = ini;
+
+    // Reservar el espacio de memoria encontrado en el mapa 
+    reservar_memoria_segmentacion(segmento->inicio, segmento->tamanio);
+
+    // Guardar la informacion del buffer en la RAM
+    memcpy(memoria_principal + segmento->inicio, buffer, segmento->tamanio);
+    free(buffer);
+}
+    
+
+t_list* lista_segmentos_en_memoria(){
+    t_list* lista_segmentos_memoria = list_create();
+
+    bool segmento_inicia_antes(void* arg1, void* arg2){
+        segmento_t* segmento_menor = (segmento_t*) arg1;
+        segmento_t* segmento_mayor = (segmento_t*) arg2;
+        return segmento_menor->inicio < segmento_mayor->inicio;
+    }
+
+    // Agrega al segmento a la lista, ordenandolos por su direccion fisica inicial
+    void agregar_segmento(void* args){
+        segmento_t* segmento = (segmento_t*) args;
+        list_add_sorted(lista_segmentos_memoria, segmento, segmento_inicia_antes);
+    }
+
+    // Agregamos cada segmento de la tabla a la lista de segmentos
+    void agregar_segmentos_de_tabla(void* args){
+        tabla_segmentos_t* tabla_patota = (tabla_segmentos_t*) args;
+        list_iterate(tabla_patota->filas, agregar_segmento);
+    }
+
+    // Por cada tabla de patota, agregamos sus segmentos a la lista de segmentos
+    list_iterate(tablas_de_patotas, agregar_segmentos_de_tabla);
+
+    return lista_segmentos_memoria;
 }

@@ -4,6 +4,9 @@
 #include "segmentacion.h"
 #include "paginacion.h"
 #include <signal.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <sys/syscall.h>
 
 // NO DEBE DEPENDER DEL ESQUEMA DE MEMORIA (SEGMENTACION O PAGINACION)
 int inicializar_estructuras_memoria(t_config* config);
