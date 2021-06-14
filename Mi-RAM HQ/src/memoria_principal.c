@@ -14,6 +14,9 @@ int inicializar_estructuras_memoria(t_config* config){
     // Inicializo la lista de tablas de segmentos
     tablas_de_patotas = list_create();
 
+	// Configuramos signal de dump
+	signal(SIGUSR1, signal_handler);
+
     return EXIT_SUCCESS;
 }
 
@@ -50,6 +53,9 @@ int inicializar_esquema_memoria(t_config* config){
         obtener_tabla_patota = &obtener_tabla_patota_segmentacion;
         tamanio_tareas = &tamanio_tareas_segmentacion;
         eliminar_tripulante = &eliminar_tripulante_segmentacion;
+
+        // Configuramos signal de compactacion
+	    signal(SIGINT, signal_handler);
 
         log_info(logger, "El tamanio del mapa de memoria disponible es: %d",bitarray_get_max_bit(mapa_memoria_disponible));
 
@@ -149,4 +155,15 @@ void leer_tarea_memoria_principal(void* tabla, char** tarea, uint32_t id_prox_ta
 		free(array_tareas[i]);
 	}
 	free(array_tareas);
+}
+
+void signal_handler(int senial){
+	switch(senial){
+		case SIGUSR1:
+			dump_memoria();
+			break;
+		case SIGINT:
+			compactacion();
+			break;
+	}
 }

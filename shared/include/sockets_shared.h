@@ -10,8 +10,6 @@
 #include "variables_globales_shared.h"
 #include <commons/collections/list.h>
 
-
-
 // PROTOCOLO: CODIGOS DE OPERACION 
 enum op_code{
 	COD_MENSAJE,

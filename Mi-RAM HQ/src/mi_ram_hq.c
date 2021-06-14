@@ -17,7 +17,9 @@ int main(void)
 		return EXIT_FAILURE;
 
 	int server_fd = iniciar_servidor(ip, puerto_escucha);
+
 	log_info(logger, "Mi-RAM HQ listo para recibir al Discordiador");
+	log_info(logger, "PID de Mi-RAM-HQ: %d",getpid());
 
 	mi_ram_hq(server_fd);
 
@@ -70,8 +72,10 @@ void mi_ram_hq(int servidor_fd) {
 				}
 				// Si ocurrio un evento inesperado
 				else{
-					log_error(logger, "Evento inesperado en los file descriptor: %s", strerror(pfds[0].revents));
-					log_error(logger, "Evento inesperado en los file descriptor: %s", strerror(pfds[1].revents));
+					if(strcmp(strerror(pfds[0].revents),"Success")!=0)
+						log_error(logger, "Evento inesperado en los file descriptor: %s", strerror(pfds[0].revents));
+					if(strcmp(strerror(pfds[1].revents),"Success")!=0)
+						log_error(logger, "Evento inesperado en los file descriptor: %s", strerror(pfds[1].revents));
 				}
 			}
 		}

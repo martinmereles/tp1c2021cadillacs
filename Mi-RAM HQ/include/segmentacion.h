@@ -33,6 +33,7 @@ void quitar_fila(tabla_segmentos_t* tabla, int numero_fila);
 void agregar_fila(tabla_segmentos_t* tabla, fila_tabla_segmentos_t* fila);
 fila_tabla_segmentos_t* obtener_fila(tabla_segmentos_t* tabla, int numero_fila);
 int cantidad_filas(tabla_segmentos_t* tabla);
+void compactacion();
 
 // Direccionamiento
 uint32_t direccion_logica_segmentacion(uint32_t inicio_logico, uint32_t desplazamiento_logico);

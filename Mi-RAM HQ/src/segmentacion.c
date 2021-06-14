@@ -431,3 +431,9 @@ void dump_tripulante_segmentacion_pruebas(tabla_segmentos_t* tabla, int nro_fila
     log_info(logger, "Tripulante: %d Proceso: %d Inicio: %d Tam: %db",TID,PID,inicio,tamanio);
     log_info(logger, "Posicion: (%d,%d) Proxima instruccion: %d",posicion_X,posicion_Y,id_proxima_instruccion);
 }
+
+void compactacion(){
+    log_info(logger,"INICIANDO COMPACTACION");
+    sleep(20);
+    log_info(logger,"COMPACTACION FINALIZADA");
+}
