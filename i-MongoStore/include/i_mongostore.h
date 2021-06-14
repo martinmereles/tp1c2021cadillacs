@@ -1,5 +1,5 @@
-#ifndef IMONGOSTORE_H_
-#define IMONGOSTORE_H_
+#ifndef I_MONGOSTORE_H_
+#define I_MONGOSTORE_H_
 
 #include <commons/log.h>
 #include <sys/time.h>
@@ -12,7 +12,7 @@
 #include "sockets_shared.h"
 #include <semaphore.h>
 #include "servidor_i_mongo_store.h"
-#include "i-filesystem.h"
+#include "i_filesystem.h"
 
 //estructura archivo config
 typedef struct {
@@ -32,12 +32,14 @@ void i_mongo_store(int);
 int comunicacion_cliente(int cliente_fd);
 void atender_cliente(void *args);
 bool leer_mensaje_cliente_y_procesar(int);
+void leer_config();
 
 int status_servidor;
 sem_t semaforo_aceptar_conexiones;
 t_config *config;
 filesystem_config fs_config;
-void* superbloquemap;
 t_bitarray bitmap;
+void* superbloquemap;
+char * blocksmap;
 
 #endif

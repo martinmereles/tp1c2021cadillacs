@@ -1,5 +1,5 @@
-#ifndef IFILESYSTEM_H_
-#define IFILESYSTEM_H_
+#ifndef I_FILESYSTEM_H_
+#define I_FILESYSTEM_H_
 
 #include <commons/bitarray.h>
 #include <commons/collections/list.h>
@@ -21,7 +21,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include "i-mongostore.h"
+#include "i_mongostore.h"
 
 //funciones del blockes
 #include <commons/string.h>
@@ -56,8 +56,7 @@ typedef struct {
 	char * bitarray;
 } t_superbloque;
 
-t_superbloque super_bloque;
-struct stat superblock_stat;
+
 
 //estructura file
 typedef struct {
@@ -76,8 +75,16 @@ typedef struct {
 } t_bitacora;
 
 void iniciar_filesystem();
-char* crearPathAbsoluto(char * pathRelativo);
-int existeArchivo(char *nombreArchivo);
+char* crear_path_absoluto(char * pathRelativo);
+int existe_archivo(char *nombreArchivo);
 int existe_filesystem();
+char * mapear_blocks();
+void crear_directorios();
+void crear_filesystem();
+
+
+t_superbloque super_bloque;
+struct stat superbloque_stat;
+struct stat blocks_stat;
 
 #endif

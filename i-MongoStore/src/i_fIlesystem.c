@@ -1,14 +1,82 @@
-#include "i-filesystem.h"
+#include "i_filesystem.h"
 
 //funcion inicial del filesystem
 void iniciar_filesystem() {
 
 	if(!existe_filesystem()){
-		printf("no existe fs\n");
-	};
-	printf("existe fs\n");
-	crear_directorios();
+		crear_filesystem();
+		crear_directorios();
+		printf("no existe fss\n");
+	}
+	blocksmap = mapear_blocks();
+	
 
+}
+
+char * mapear_blocks(){
+	char * pathBlocks = crear_path_absoluto("/Blocks.ims");
+	int blocks = open(pathBlocks, O_RDWR, S_IRUSR | S_IWUSR);
+	if(fstat(blocks,&blocks_stat) == -1)
+	{
+		perror("no se pudo obtener los datos del archivo.\n");
+	}
+	//printf("el tamaño del archivo es de %d\n", (int)blocks_stat.st_size);
+
+	char * archivo_en_memoria = mmap (NULL, blocks_stat.st_size, PROT_READ | PROT_WRITE ,MAP_SHARED, blocks, 0 );
+
+	//test de grabado en mapeo
+	/*char * test = "se inicializo el tripulante 10";
+	memcpy(archivo_en_memoria, test, strlen(test));
+	memcpy(archivo_en_memoria+super_bloque.blocksize,test,strlen(test));
+	char * pointer = archivo_en_memoria+super_bloque.blocksize;
+	printf("pointer = %s\n", pointer);
+	msync(archivo_en_memoria, blocks_stat.st_size, MS_SYNC);
+	*/
+
+	//test de lectura (lee hasta un espacio vacio)
+	/*for (int i = 0; i<blocks_stat.st_size ; i++){
+		printf("%c", archivo_en_memoria[i]);
+	}
+	printf("\n");
+	*/
+
+	//test de lectura de un bloque usando indice
+	//(en practica hay que tener en cuenta el tamaño del archivo para el ultimo bloque en vez de blocksize)
+	/*int indicetest = 0;
+	char * contenidotest = calloc(1,super_bloque.blocksize);
+	memcpy(contenidotest, archivo_en_memoria+(super_bloque.blocksize * indicetest), super_bloque.blocksize);
+	printf("se leyo el bloque %d, con el contenido : %s\n",indicetest,contenidotest);
+	*/
+	return archivo_en_memoria;
+}
+
+void crear_filesystem(){
+	char * puntomontaje = crear_path_absoluto("/SuperBloque.ims");
+	super_bloque.blocksize = 50;
+	super_bloque.blocks = 56;
+	super_bloque.bitarray = calloc(super_bloque.blocks/8, sizeof(char));
+	int sizeStruct = sizeof(super_bloque.blocksize)+sizeof(super_bloque.blocks)+super_bloque.blocks/8+1;
+	int sbfile = open(puntomontaje, O_RDWR | O_CREAT , S_IRUSR | S_IWUSR);
+	if(fstat(sbfile,&superbloque_stat) == -1)
+	{
+		perror("no se pudo obtener los datos del archivo.\n");
+	}
+	ftruncate(sbfile, sizeStruct);
+	fstat(sbfile,&superbloque_stat);
+	printf("el tamaño del archivo es de %d\n", (int)superbloque_stat.st_size);
+	void * archivo = mmap (NULL, superbloque_stat.st_size, PROT_READ | PROT_WRITE ,MAP_SHARED, sbfile, 0 );
+	int offset = 0;
+	memcpy(archivo, &super_bloque.blocksize, sizeof(super_bloque.blocksize));
+	offset += sizeof(super_bloque.blocksize);
+	printf("el tamaño del archivo es de %d\n", (int)superbloque_stat.st_size);
+	memcpy(archivo+offset, &super_bloque.blocks, sizeof(super_bloque.blocks));
+	offset += sizeof(super_bloque.blocks);
+	memcpy(archivo+offset, super_bloque.bitarray, super_bloque.blocks/8+1);
+	printf("el tamaño del archivo es de %d\n", (int)superbloque_stat.st_size);
+	msync(archivo, superbloque_stat.st_size, MS_SYNC);
+	munmap(archivo, superbloque_stat.st_size);
+	close(sbfile);
+	log_info(logger, "Se creo el archivo SuperBloque.ims con exito");
 }
 
 void crear_directorios(){
@@ -20,16 +88,16 @@ void crear_directorios(){
 	mkdir(pathFiles, 0777);
 }
 
-char* crearPathAbsoluto(char * pathRelativo){
+char* crear_path_absoluto(char * pathRelativo){
 	char * pathAbsoluto = string_new();
 	string_append(&pathAbsoluto, fs_config.punto_montaje);
 	string_append(&pathAbsoluto, pathRelativo);
 	return pathAbsoluto;
 }
 
-int existeArchivo(char *nombreArchivo){
+int existe_archivo(char *nombreArchivo){
 	FILE* ftry;
-	if(ftry = fopen(nombreArchivo, "r")){
+	if((ftry = fopen(nombreArchivo, "r"))){
 		fclose(ftry);
 		return 1;
 	}
@@ -38,41 +106,40 @@ int existeArchivo(char *nombreArchivo){
 
 //checkea la existencia del filesystem.
 int existe_filesystem(){
-	FILE* btry;
-	FILE* bcreate;
-	char * sb_path = crearPathAbsoluto("/SuperBloque.ims");
-	char * block_path = crearPathAbsoluto("/Blocks.ims");
-	if (existeArchivo(sb_path)){
+	FILE* blocks_create;
+	char * sb_path = crear_path_absoluto("/SuperBloque.ims");
+	char * block_path = crear_path_absoluto("/Blocks.ims");
+	if (existe_archivo(sb_path)){
 		//intenta abrir el archivo, para confirmar su existencia
 		int sbfile = open(sb_path, O_RDWR, S_IRUSR | S_IWUSR);
-		if(fstat(sbfile,&superblock_stat) == -1)
+		if(fstat(sbfile,&superbloque_stat) == -1)
 		{
 			perror("no se pudo obtener los datos del archivo.\n");
 		}
-		printf("el tamaño del archivo es de %d\n", superblock_stat.st_size);
+		log_info(logger, "Se encontro un archivo SuperBloque.ims existente");
 
 		//mapeo SuperBloque.ims en un *void
-		superbloquemap = mmap (NULL, superblock_stat.st_size, PROT_READ | PROT_WRITE ,MAP_SHARED, sbfile, 0 );
+		superbloquemap = mmap (NULL, superbloque_stat.st_size, PROT_READ | PROT_WRITE ,MAP_SHARED, sbfile, 0 );
 
 		int offset=0;
 		//parseo los datos del SuperBloque en la estructura super_bloque
 		memcpy(&super_bloque.blocksize,superbloquemap,sizeof(super_bloque.blocksize));
-		printf("blocksize = %d\n", super_bloque.blocksize);
+		//printf("blocksize = %d\n", super_bloque.blocksize);
 		offset = offset + sizeof(super_bloque.blocksize);
 		memcpy(&super_bloque.blocks,superbloquemap+offset,sizeof(super_bloque.blocks));
-		printf("blocks = %d\n", super_bloque.blocks);
+		//printf("blocks = %d\n", super_bloque.blocks);
 		offset = offset + sizeof(super_bloque.blocks);
 		super_bloque.bitarray = calloc(super_bloque.blocks/8+1, sizeof(char*));
-		printf("tamaño bitarray %d\n", strlen(super_bloque.bitarray));
-		printf("realizo malloc de : %d\n", super_bloque.blocks/8+1);
+		//printf("tamaño bitarray %d\n", strlen(super_bloque.bitarray));
+		//printf("realizo malloc de : %d\n", super_bloque.blocks/8+1);
 		memcpy(super_bloque.bitarray,superbloquemap+offset,super_bloque.blocks/8+1);
-		printf("tamaño bitarray = %d\n", strlen(super_bloque.bitarray));
+		//printf("tamaño bitarray = %d\n", strlen(super_bloque.bitarray));
 
 		//creo un t_bittarray para manipularlo con las commons
 		bitmap = *bitarray_create_with_mode(super_bloque.bitarray,super_bloque.blocks/8,LSB_FIRST);
 
 		//test sobre el bitarray
-		int sizeBitarray = bitarray_get_max_bit(&bitmap);
+		/*int sizeBitarray = bitarray_get_max_bit(&bitmap);
 		printf("size of bitarray = %d\n", sizeBitarray);
 		printf("test de bitarray:");
 		for(int i = 0; i<super_bloque.blocks; i++){
@@ -93,29 +160,28 @@ int existe_filesystem(){
 			printf("%d",test);
 		}
 		printf("\n");
+		*/
 
 		// copio al void* mapeado el contenido del bitarray para actualizar el bitmap
 		memcpy(superbloquemap+offset,super_bloque.bitarray,strlen(super_bloque.bitarray)+1);
 		// fuerzo un sync para que el mapeo se refleje en SuperBloque.ims
-		int sync = msync(superbloquemap, superblock_stat.st_size, MS_SYNC);
-		printf("se sincronizo:%d\n", sync);
+		int sync = msync(superbloquemap, superbloque_stat.st_size, MS_SYNC);
+		//printf("se sincronizo:%d\n", sync);
 
 		//compruebo la existencia de Blocks.ims
-		if(existeArchivo(block_path)){
-			btry = fopen(block_path, "r");
-			fclose(btry);
-			printf("Se encontro el archivo Blocks.ims\n");
+		if(existe_archivo(block_path)){
+			log_info(logger, "Se encontro un archivo Blocks.ims existente");
 			return 1;
 		}else{
-			bcreate = fopen (block_path, "w");
+			blocks_create = fopen (block_path, "w");
 			uint32_t size = super_bloque.blocks * super_bloque.blocksize;
-			ftruncate(fileno(bcreate), size);
-			fclose(bcreate);
-			printf("No se encontro el archivo Blocks.ims y se creo uno basado en SuperBlocks.ims\n");
+			ftruncate(fileno(blocks_create), size);
+			fclose(blocks_create);
+			log_info(logger, "No se encontro un archivo Blocks.ims existente y se creo uno en base a SuperBloque.ims");
 			return 1;
 		}
 	}else{
-		printf("No se encontro el archivo SuperBloque.ims\n");
+		log_info(logger, "No se encontro un archivo SuperBloque.ims existente");
 	}
 	return 0;
 }

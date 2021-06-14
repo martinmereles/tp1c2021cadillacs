@@ -1,4 +1,4 @@
-#include "i-mongostore.h"
+#include "i_mongostore.h"
 
 
 
@@ -6,9 +6,9 @@ int main(void)
 {
 	// inicializo semaforos
 	sem_init(&semaforo_aceptar_conexiones, 0, 0);
-
+	
 	logger = log_create("./cfg/i-mongostore.log", "I-MongoStore", 1, LOG_LEVEL_DEBUG);
-
+	
 	// Leo IP y PUERTO del config
 	config = config_create("./cfg/i-mongo-store.config");
 	
@@ -35,7 +35,7 @@ void leer_config(){
 	fs_config.puerto = config_get_string_value(config,"PUERTO");
 	fs_config.punto_montaje = config_get_string_value(config,"PUNTO_MONTAJE");
 	fs_config.tiempo_sincro = config_get_int_value(config, "TIEMPO_SINCRONIZACION");
-	fs_config.posiciones_sabotaje = config_get_int_value(config, "TIEMPO_SINCRONIZACION");
+	fs_config.posiciones_sabotaje = config_get_string_value(config, "TIEMPO_SINCRONIZACION");
 }
 
 void i_mongo_store(int servidor_fd) {
