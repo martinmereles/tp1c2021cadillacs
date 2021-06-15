@@ -141,6 +141,7 @@ void destruir_tabla_segmentos(void* args){
     tabla_segmentos_t* tabla = (tabla_segmentos_t*) args;
     // Destruir todas las filas y liberar segmentos;
     list_destroy_and_destroy_elements(tabla->filas, destruir_fila);
+    free(tabla->semaforo);
     free(tabla);
 }
 
@@ -182,6 +183,8 @@ int crear_patota_segmentacion(uint32_t PID, uint32_t longitud_tareas, char* tare
     tabla_segmentos_t* tabla_patota = malloc(sizeof(tabla_segmentos_t));
     tabla_patota->filas = list_create();
     tabla_patota->proximo_numero_segmento = 0;
+    tabla_patota->semaforo = malloc(sizeof(sem_t));
+    sem_init(tabla_patota->semaforo, 0, 1);
 
     // Buscamos un espacio en memoria para el PCB y creamos su fila en la tabla de segmentos
     segmento_t* fila_PCB = crear_fila(tabla_patota, TAMANIO_PCB);
@@ -262,15 +265,19 @@ int cantidad_filas(tabla_segmentos_t* tabla){
 
 void destruir_fila(void* args){
     segmento_t* segmento = (segmento_t*) args;
-
+    
+    sem_wait(&reservar_liberar_memoria_mutex);
     // Liberamos el espacio en el mapa de memoria disponible
     liberar_memoria_segmentacion(segmento->inicio, segmento->tamanio);
+    sem_post(&reservar_liberar_memoria_mutex);
 
     free(segmento);
 }
 
 segmento_t* crear_fila(tabla_segmentos_t* tabla, int tamanio){
-    
+
+    sem_wait(&reservar_liberar_memoria_mutex);
+
     // Buscamos un espacio de memoria por algoritmo
     int inicio = algoritmo_de_ubicacion(tamanio);
 
@@ -285,18 +292,21 @@ segmento_t* crear_fila(tabla_segmentos_t* tabla, int tamanio){
         // Si tampoco se encontro espacio
         if(inicio < 0){
             log_error(logger,"ERROR: crear_fila. No hay espacio en memoria disponible.");
+            sem_post(&reservar_liberar_memoria_mutex);
             return NULL;
         }
     }
 
     // Si se encontro espacio
+    // Reservamos el espacio en el mapa de memoria disponible
+    reservar_memoria_segmentacion(inicio, tamanio);   
+
+    sem_post(&reservar_liberar_memoria_mutex);
+
     // Creamos el segmento
     segmento_t* segmento = malloc(sizeof(segmento_t));
     segmento->inicio = inicio;
     segmento->tamanio = tamanio;
-
-    // Reservamos el espacio en el mapa de memoria disponible
-    reservar_memoria_segmentacion(inicio, tamanio);    
 
     // Agregamos el segmento a la tabla
     list_add(tabla->filas,segmento);
@@ -317,9 +327,10 @@ void liberar_memoria_segmentacion(uint32_t inicio, uint32_t tamanio){
 }
 
 int generar_nuevo_numero_segmento(tabla_segmentos_t* tabla){
-    // AGREGAR SEMAFORO?
+    sem_wait(tabla->semaforo);
     int nuevo = tabla->proximo_numero_segmento;
     tabla->proximo_numero_segmento++;
+    sem_post(tabla->semaforo);
     return nuevo;
 }
 
@@ -451,6 +462,9 @@ void dump_tripulante_segmentacion_pruebas(tabla_segmentos_t* tabla, int nro_fila
 
 void compactacion(){
 
+    log_info(logger,"ESPERANDO QUE FINALICEN LAS OPERACIONES PENDIENTES");
+    //list_iterate(lista_semaforos, sem_wait);
+
     log_info(logger,"INICIANDO COMPACTACION");
     
     // Generamos la lista de segmentos ordenada
@@ -461,6 +475,7 @@ void compactacion(){
     list_destroy(lista_segmentos_memoria);
 
     log_info(logger,"COMPACTACION COMPLETADA");
+    //list_iterate(lista_semaforos, sem_post);
 
     // PARA PRUEBAS
     dump_memoria();
@@ -474,6 +489,8 @@ void compactar_segmento(void* args){
     // Copiar contenido de la RAM en un buffer
     void* buffer = malloc(segmento->tamanio);
     memcpy(buffer, memoria_principal + segmento->inicio, segmento->tamanio);
+
+    sem_wait(&reservar_liberar_memoria_mutex);
 
     // Liberar memoria en el mapa
     liberar_memoria_segmentacion(segmento->inicio, segmento->tamanio);
@@ -489,6 +506,8 @@ void compactar_segmento(void* args){
 
     // Reservar el espacio de memoria encontrado en el mapa 
     reservar_memoria_segmentacion(segmento->inicio, segmento->tamanio);
+
+    sem_post(&reservar_liberar_memoria_mutex);
 
     // Guardar la informacion del buffer en la RAM
     memcpy(memoria_principal + segmento->inicio, buffer, segmento->tamanio);

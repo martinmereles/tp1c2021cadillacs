@@ -31,10 +31,11 @@ int iniciar_patota(char* payload){
 
     // Creamos la patota
     if(crear_patota(PID, longitud_tareas, tareas) == EXIT_FAILURE){
-        log_error(logger, "NO SE PUDO CREAR LA PATOTA. AVISAR AL DISCORDIADOR???");
+        log_error(logger, "NO SE PUDO CREAR LA PATOTA.");
+        return COD_INICIAR_PATOTA_ERROR;
     }
 
-    return EXIT_SUCCESS;  
+    return COD_INICIAR_PATOTA_OK; 
 }   
 
 int iniciar_tripulante(char* payload, void** tabla, uint32_t* dir_log_tcb){

@@ -12,6 +12,8 @@
 #include <string.h>
 #include "commons/string.h"
 #include "commons/temporal.h"
+#include <pthread.h>
+#include <semaphore.h>
 
 // La direccion logica del PCB es siempre la misma
 #define DIR_LOG_PCB     0x00000000
@@ -40,6 +42,9 @@ char* bitarray_mapa_memoria_disponible;
 
 // Tablas de patotas
 t_list* tablas_de_patotas;
+
+// Semaforos
+sem_t reservar_liberar_memoria_mutex;
 
 // PUNTEROS A FUNCIONES GLOBALES
 // Sirven para apuntar a las funciones que implementan segmentacion o paginacion, segun la configuracion

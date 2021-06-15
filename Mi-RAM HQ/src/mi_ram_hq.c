@@ -155,6 +155,7 @@ bool leer_mensaje_cliente_y_procesar(int cliente_fd, void** tabla_patota, uint32
 	bool cliente_conectado = true;
 	// Leo codigo de operacion
 	int cod_op = recibir_operacion(cliente_fd);
+	int resultado_op;
 	char* payload;
 
 	switch(cod_op) {
@@ -162,7 +163,8 @@ bool leer_mensaje_cliente_y_procesar(int cliente_fd, void** tabla_patota, uint32
 			recibir_payload_y_ejecutar(cliente_fd, loguear_mensaje);
 			break;
 		case COD_INICIAR_PATOTA:
-			recibir_payload_y_ejecutar(cliente_fd, iniciar_patota);
+			resultado_op = recibir_payload_y_ejecutar(cliente_fd, iniciar_patota);
+        	enviar_operacion(cliente_fd, resultado_op, NULL, 0); 
 			break;
 		case COD_INICIAR_TRIPULANTE:
 			payload = recibir_payload(cliente_fd);

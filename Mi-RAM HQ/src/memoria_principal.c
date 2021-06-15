@@ -14,6 +14,9 @@ int inicializar_estructuras_memoria(t_config* config){
     // Inicializo la lista de tablas de patotas
     tablas_de_patotas = list_create();
 
+    // Inicializo semaforos
+    sem_init(&reservar_liberar_memoria_mutex, 0, 1);
+
 	// Configuramos signal de dump
 	signal(SIGUSR1, signal_handler);
 
@@ -163,12 +166,16 @@ void leer_tarea_memoria_principal(void* tabla, char** tarea, uint32_t id_prox_ta
 void signal_handler(int senial){
     log_info(logger,"Signal atendida por el hilo %d",syscall(__NR_gettid));
 
+    // Creamos un nuevo hilo que se encarga de atender la signal
+    // El hilo finaliza una vez ejecutada la rutina
+	pthread_t hilo_atender_signal;
 	switch(senial){
 		case SIGUSR1:
-			dump_memoria();
+            pthread_create(&hilo_atender_signal, NULL, (void*) dump_memoria, NULL);
 			break;
 		case SIGINT:
-			compactacion();
+            pthread_create(&hilo_atender_signal, NULL, (void*) compactacion, NULL);
 			break;
 	}
+    pthread_detach(hilo_atender_signal);
 }

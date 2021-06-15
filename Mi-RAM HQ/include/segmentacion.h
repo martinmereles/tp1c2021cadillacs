@@ -21,6 +21,7 @@ typedef struct{
     t_list *filas;
     uint32_t proximo_numero_segmento;
     uint32_t tamanio_tareas;
+    sem_t *semaforo;
 } tabla_segmentos_t;
 
 // FUNCIONES SEGMENTACION

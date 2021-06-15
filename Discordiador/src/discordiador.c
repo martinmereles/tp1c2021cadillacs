@@ -229,6 +229,14 @@ int iniciar_patota(char** argumentos, int mi_ram_hq_fd){
 	// Le pedimos a Mi-RAM HQ que inicie la patota
 	enviar_op_iniciar_patota(mi_ram_hq_fd, PID, lista_de_tareas);
 
+	// Esperamos a la confirmacion de que fue creada con exito
+	if(recibir_operacion(mi_ram_hq_fd) != COD_INICIAR_PATOTA_OK){
+		log_error(logger,"Mi RAM HQ denego la creacion de la patota");
+		return EXIT_FAILURE;
+	}
+
+	log_info(logger,"Mi RAM HQ creo la patota con exito");
+
 	for(int i = 0;i < cantidad_tripulantes;i++){
 		if( 3 + i < cantidad_args){
 			posicion = string_split(argumentos[3 + i],"|");
