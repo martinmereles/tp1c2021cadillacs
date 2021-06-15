@@ -2,7 +2,6 @@
 #define SEGMENTACION_H_
 
 #include "mi_ram_hq_variables_globales.h"
-#include <semaphore.h>
 
 #define DIR_LOG_TAREAS  0x00010000
 
@@ -16,11 +15,7 @@ typedef struct{
     uint32_t numero_segmento;
     uint32_t inicio;
     uint32_t tamanio;
-    sem_t* mutex_tripulante;
 } segmento_t;
-
-
-//sem_init(&mutex_tripulante, 0, 1);
 
 typedef struct{
     t_list *filas;

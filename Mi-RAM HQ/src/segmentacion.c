@@ -132,7 +132,9 @@ void quitar_y_destruir_tabla(tabla_segmentos_t* tabla_a_destruir){
         return PID_una_tabla == PID_tabla_a_destruir;
     }
 
-    list_remove_and_destroy_by_condition(tablas_de_patotas, tienePID, destruir_tabla_segmentos);    
+    list_remove_and_destroy_by_condition(tablas_de_patotas, tienePID, destruir_tabla_segmentos); 
+    // PARA PRUEBAS
+    dump_memoria();
 }
 
 void destruir_tabla_segmentos(void* args){
@@ -292,7 +294,6 @@ segmento_t* crear_fila(tabla_segmentos_t* tabla, int tamanio){
     segmento_t* segmento = malloc(sizeof(segmento_t));
     segmento->inicio = inicio;
     segmento->tamanio = tamanio;
-    segmento->mutex_tripulante = NULL;
 
     // Reservamos el espacio en el mapa de memoria disponible
     reservar_memoria_segmentacion(inicio, tamanio);    
@@ -450,10 +451,6 @@ void dump_tripulante_segmentacion_pruebas(tabla_segmentos_t* tabla, int nro_fila
 
 void compactacion(){
 
-    // Esperamos que finalicen las peticiones en ejecucion y bloqueamos las nuevas
-    log_info(logger,"ESPERANDO FINALIZACION DE PETICIONES PENDIENTES");
-    list_iterate(lista_sem_puede_atender_peticion, sem_wait);
-
     log_info(logger,"INICIANDO COMPACTACION");
     
     // Generamos la lista de segmentos ordenada
@@ -465,9 +462,11 @@ void compactacion(){
 
     log_info(logger,"COMPACTACION COMPLETADA");
 
-    // Permitimos que se vuelvan a aceptar nuevas peticiones
-    list_iterate(lista_sem_puede_atender_peticion, sem_post);
+    // PARA PRUEBAS
+    dump_memoria();
 }
+
+
 
 void compactar_segmento(void* args){
     segmento_t* segmento = (segmento_t*) args;

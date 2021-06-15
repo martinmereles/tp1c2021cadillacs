@@ -47,6 +47,8 @@ int crear_patota_paginacion(uint32_t PID, uint32_t longitud_tareas, char* tareas
         return EXIT_FAILURE;
     }
 
+    //log_info(logger,"La direccion logica del PCB es: %x",direccion_logica_PCB);
+
     // Buscamos un espacio en memoria para las tareas y lo reservamos
     uint32_t direccion_logica_tareas;
     if(reservar_memoria(tabla_patota, longitud_tareas, &direccion_logica_tareas) == EXIT_FAILURE){
@@ -54,6 +56,8 @@ int crear_patota_paginacion(uint32_t PID, uint32_t longitud_tareas, char* tareas
         eliminar_patota(tabla_patota);
         return EXIT_FAILURE;
     }
+
+    //log_info(logger,"La direccion logica de las tareas es: %x",direccion_logica_tareas);
 
     // Guardo en la tabla el tamanio de la lista de tareas
     tabla_patota->tamanio_tareas = longitud_tareas;
@@ -179,8 +183,8 @@ int liberar_memoria(tabla_paginas_t* tabla_patota, int tamanio_total, uint32_t d
 
 int reservar_memoria(tabla_paginas_t* tabla_patota, int tamanio, uint32_t* direccion_logica){   
 
-    // Revisamos si tiene paginas
-    if(cantidad_paginas(tabla_patota) == 0){
+    // Revisamos si no tiene fragmentacion interna
+    if(tabla_patota->fragmentacion_interna == 0){
         if(crear_pagina(tabla_patota) == EXIT_FAILURE)
             return EXIT_FAILURE;
         tabla_patota->fragmentacion_interna += tamanio_pagina;
@@ -221,6 +225,8 @@ int escribir_memoria_principal_paginacion(void* args, uint32_t inicio_logico, ui
         log_error(logger,"ERROR: escribir_memoria_principal. Direccionamiento invalido.");
         return EXIT_FAILURE;
     }
+
+    log_info(logger,"DIRECCION FISICA A ESCRIBIR: %x",direccion_fisica_dato);
 
     int desplazamiento = get_desplazamiento(direccion_logica);
 
@@ -263,6 +269,7 @@ int leer_memoria_principal_paginacion(void* args, uint32_t inicio_logico, uint32
     }
     int desplazamiento = get_desplazamiento(direccion_logica);
 
+    log_info(logger,"DIRECCION FISICA A LEER: %x",direccion_fisica_dato);
     /* Voy a empezar a leer el dato en la pagina actual:
         1) Hasta que recorra el dato completo
         2) Hasta que llegue al final de la pagina: en ese caso, 
@@ -284,7 +291,7 @@ int leer_memoria_principal_paginacion(void* args, uint32_t inicio_logico, uint32
         int numero_proxima_pagina = numero_pagina(direccion_logica) + 1;
         int inicio_logico_proxima_pagina = (numero_proxima_pagina << 16) & 0xFFFF0000;
         void* dato_proxima_pagina = dato + tamanio_lectura_pagina_actual;
-        escribir_memoria_principal_paginacion(args, inicio_logico_proxima_pagina, 0, dato_proxima_pagina, tamanio_total);
+        leer_memoria_principal_paginacion(args, inicio_logico_proxima_pagina, 0, dato_proxima_pagina, tamanio_total);
     }
 
     return EXIT_SUCCESS;
@@ -297,6 +304,7 @@ tabla_paginas_t* obtener_tabla_patota_paginacion(int PID_buscado){
         tabla_paginas_t* tabla = (tabla_paginas_t*) args;
         uint32_t PID_tabla;
         leer_memoria_principal(tabla, DIR_LOG_PCB, DESPL_PID, &PID_tabla, sizeof(uint32_t));
+        log_info(logger,"EL PID ENCONTRADO ES: %d",PID_tabla);
         return PID_tabla == PID_buscado;
     }
     return list_find(tablas_de_patotas, tiene_PID);
@@ -329,8 +337,9 @@ int crear_pagina(tabla_paginas_t* tabla_patota){
     pagina->PID = tabla_patota->PID;
     pagina->estado = MARCO_OCUPADO;
     pagina->bit_presencia = true;
-    pagina->bit_modificado = false;
+    pagina->bit_uso = true;
     pagina->numero_pagina = tabla_patota->proximo_numero_pagina;
+    pagina->timestamp = temporal_get_string_time("%y_%m_%d_%H_%M_%S");
 
     tabla_patota->proximo_numero_pagina++;
     list_add(tabla_patota->paginas,pagina);
@@ -363,7 +372,7 @@ uint32_t direccion_logica_paginacion(uint32_t inicio_logico, uint32_t desplazami
     int desplazamiento_inicial = get_desplazamiento(inicio_logico);     // Obtenemos el desplazamiento inicial
     int desplazamiento_total = desplazamiento_inicial + desplazamiento_logico;  // Obtenemos el desplazamiento total
     // Si el desplazamiento es mas grande que el tamanio de pagina, pasamos a la siguiente
-    while(desplazamiento_total > tamanio_pagina){
+    while(desplazamiento_total >= tamanio_pagina){
         nro_pagina++;                            // Pasamos a la siguiente pagina
         desplazamiento_total -= tamanio_pagina;     // Descontamos el tamanio de pagina al desplazamiento
     }
@@ -406,4 +415,10 @@ void dump_marco(void* args, FILE* archivo_dump){
     fwrite(info_marco, sizeof(char), strlen(info_marco), archivo_dump);
 
     free(info_marco);
+}
+
+// LRU
+void actualizar_timestamp(marco_t* pagina){
+    free(pagina->timestamp);
+    pagina->timestamp = temporal_get_string_time("%y_%m_%d_%H_%M_%S");
 }

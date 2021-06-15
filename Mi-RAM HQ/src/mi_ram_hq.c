@@ -122,8 +122,6 @@ void leer_consola_y_procesar() {
 	}
 }
 
-// Funcion que ejecutan los hilos una vez establecida la conexion con un tripulante
-// Deberian ser dos versiones? una para segmentacion y otra para paginacion?
 int comunicacion_cliente(int cliente_fd) {
 	void* tabla_patota = NULL;
 	uint32_t dir_log = -1;
@@ -134,11 +132,6 @@ int comunicacion_cliente(int cliente_fd) {
 	pfds[0].events = POLLIN;	// Avisa cuando hay alguna operacion para leer en el buffer
 	int num_events;
 
-	// Inicializamos semaforo (para compactacion)
-	sem_t* puede_atender_peticion = malloc(sizeof(sem_t));
-	sem_init(puede_atender_peticion, 0, 1);
-	int indice_sem = list_add(lista_sem_puede_atender_peticion, puede_atender_peticion);
-
 	while(status_servidor != END && cliente_conectado) {
 		// Revisamos si hay algun evento en el file descriptor del cliente
 		num_events = poll(pfds, 1, 2500);
@@ -146,18 +139,12 @@ int comunicacion_cliente(int cliente_fd) {
 		// Si hay un evento
 		if(num_events != 0){
 			// Si hay un mensaje del cliente
-			if(pfds[0].revents & POLLIN){
-				sem_wait(puede_atender_peticion);	// Atendemos peticion
+			if(pfds[0].revents & POLLIN)
 				cliente_conectado = leer_mensaje_cliente_y_procesar(cliente_fd, &tabla_patota, &dir_log);
-				sem_post(puede_atender_peticion);
-			}
 			else
 				log_error(logger, "Evento inesperado en file descriptor del cliente: %s", strerror(pfds[0].revents));
 		}
 	}
-
-	// Liberamos el semaforo y lo sacamos de la lista
-	list_remove_and_destroy_element(lista_sem_puede_atender_peticion, indice_sem, free);
 
 	return EXIT_SUCCESS;
 }

@@ -18,7 +18,8 @@ typedef struct{
     int numero_pagina;
     int numero_marco;
     bool bit_presencia;
-    bool bit_modificado;
+    char* timestamp;            // LRU
+    bool bit_uso;               // Clock
     int fragmentacion_interna;
     enum estado_marco estado;
     int PID;
@@ -59,10 +60,12 @@ int cantidad_paginas(tabla_paginas_t* tabla_patota);
 void eliminar_patota(tabla_paginas_t* tabla_patota);
 void liberar_marco(void*);
 
-
 // Dump
 void dump_memoria_paginacion();
 void dump_marco(void* args, FILE* archivo_dump);
+
+// Algoritmos de Reemplazo
+void actualizar_timestamp(marco_t* pagina);
 
 // VARIABLES GLOBALES
 int tamanio_pagina;

@@ -12,6 +12,7 @@
 #include "commons/temporal.h"
 #include "servidor_mi_ram_hq.h"
 #include "memoria_principal.h"
+#include <semaphore.h>
 
 enum server_status{
     RUNNING,

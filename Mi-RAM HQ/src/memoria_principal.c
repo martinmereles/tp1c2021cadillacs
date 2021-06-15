@@ -17,9 +17,6 @@ int inicializar_estructuras_memoria(t_config* config){
 	// Configuramos signal de dump
 	signal(SIGUSR1, signal_handler);
 
-    // Inicializo lista de semaforos para compactacion
-    lista_sem_puede_atender_peticion = list_create();
-
     return EXIT_SUCCESS;
 }
 
@@ -118,7 +115,6 @@ int inicializar_esquema_memoria(t_config* config){
 void liberar_estructuras_memoria(){
     log_info(logger, "Liberando estructuras administrativas de la memoria principal");
     list_destroy_and_destroy_elements(tablas_de_patotas, destruir_tabla_segmentos);
-    list_destroy_and_destroy_elements(lista_sem_puede_atender_peticion, free);
     free(bitarray_mapa_memoria_disponible);
     bitarray_destroy(mapa_memoria_disponible);
     free(memoria_principal);
@@ -133,9 +129,12 @@ void leer_tarea_memoria_principal(void* tabla, char** tarea, uint32_t id_prox_ta
     uint32_t dir_log_tareas;
     leer_memoria_principal(tabla, DIR_LOG_PCB, DESPL_TAREAS, &dir_log_tareas, sizeof(uint32_t));
     
+    log_info(logger,"La direccion logica de las tareas es: %x",dir_log_tareas);
+
     // Leemos la lista de tareas completa
     char* tareas = malloc(tamanio);
     leer_memoria_principal(tabla, dir_log_tareas, 0, tareas, tamanio);
+    log_info(logger,"La lista de tareas es:\n %s",tareas);
 
     // Obtenemos el array de tareas
     char** array_tareas = (char**) string_split(tareas, "\n");
