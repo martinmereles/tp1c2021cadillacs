@@ -1,5 +1,24 @@
 #include "planificador.h"
 
+static void crear_colas();
+static void pasar_todos_new_to_ready(enum algoritmo cod_algor);
+static int transicion_new_to_ready(t_tripulante *dato, enum algoritmo cod_algor);
+static void imprimir_info_elemento_fifo(void *data);
+static void imprimir_info_elemento_rr(void *data);
+static void transicion_ready_to_exec(t_tripulante *dato);
+static void transicion_exec_to_blocked_io(t_tripulante *dato, enum algoritmo cod_algor);
+static void transicion_blocked_io_to_ready(t_tripulante *dato, enum algoritmo cod_algor);
+static void transicion_exec_to_ready(t_tripulante *dato); // RR
+static void destructor_elementos_tripulante(void *data_tripulante);
+static void ordenar_lista_tid_ascendente(t_queue *listado);
+static bool tripulante_tid_es_menor_que(void *data1, void *data2);
+static void gestionar_bloqueo_io(t_queue *peticiones_from_exec, t_queue *peticiones_to_ready, enum algoritmo code_algor);
+static void bloquear_tripulantes_por_sabotaje(void);
+static void desbloquear_tripulantes_tras_sabotaje(void);
+static int get_buffer_peticiones_and_swap_exec_blocked_io(t_queue *peticiones_origen, enum algoritmo code_algor);
+static int get_buffer_peticiones_and_swap_blocked_io_ready(t_queue *peticiones_origen, enum algoritmo code_algor);
+static void gestionar_exec(int grado_multiprocesamiento);
+
 int dispatcher(void *algor_planif){
 /*
     int flag_espacio_new = 0;
@@ -348,7 +367,7 @@ int termino_sabotaje(void){
     return 1;
 }
 
-void ordenar_lista_tid_ascendente(t_queue *listado){
+static void ordenar_lista_tid_ascendente(t_queue *listado){
     list_sort(listado->elements,tripulante_tid_es_menor_que);
 }
 
@@ -387,7 +406,7 @@ static void desbloquear_tripulantes_tras_sabotaje(void){
     }
 }
 
-static enum algoritmo string_to_code_algor(char *string_code){
+enum algoritmo string_to_code_algor(char *string_code){
     if (strcmp("RR",string_code) == 0)
         return RR;
     else
@@ -435,7 +454,7 @@ static int get_buffer_peticiones_and_swap_blocked_io_ready(t_queue *peticiones_o
 
 static void gestionar_exec(int grado_multiprocesamiento){
     t_tripulante *temp;
-    while( queue_size(cola_running)%grado_multiprocesamiento != 0 ){
+    while( queue_size(cola_running)%grado_multiprocesamiento > 0 ){
         temp = queue_pop(cola_ready);
         transicion_ready_to_exec(temp);
     }
