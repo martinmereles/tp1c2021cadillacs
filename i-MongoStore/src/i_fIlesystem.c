@@ -2,18 +2,43 @@
 
 //funcion inicial del filesystem
 void iniciar_filesystem() {
-
+	verificar_punto_montaje();
 	if(!existe_filesystem()){
 		crear_filesystem();
 		crear_directorios();
 		printf("no existe fss\n");
 	}
-	blocksmap = mapear_blocks();
+	mapear_blocks();
 	
 
 }
 
-char * mapear_blocks(){
+void existe_directorio(char * path){
+	DIR* dir = opendir(path);
+	if (dir) {
+		//existe directorio
+		closedir(dir);
+		printf("existe directorio: %s\n",path);
+	}else{
+		//no existe y lo creo
+		mkdir(path, 0777);
+		printf("no existia y cree el directorio: %s\n",path);
+	}
+}
+
+void verificar_punto_montaje(){
+	char* punto_montaje = string_new();
+	char** directorios = string_split(fs_config.punto_montaje,"/");
+	printf("primer directorio : %s\n",directorios[1]);
+	string_append(&punto_montaje,"/");
+	for(int i = 1; directorios[i]!=NULL;i++){
+		string_append(&punto_montaje,directorios[i]);
+		existe_directorio(punto_montaje);
+		string_append(&punto_montaje,"/");
+	}
+}
+
+void mapear_blocks(){
 	char * pathBlocks = crear_path_absoluto("/Blocks.ims");
 	int blocks = open(pathBlocks, O_RDWR, S_IRUSR | S_IWUSR);
 	if(fstat(blocks,&blocks_stat) == -1)
@@ -22,7 +47,7 @@ char * mapear_blocks(){
 	}
 	//printf("el tamaño del archivo es de %d\n", (int)blocks_stat.st_size);
 
-	char * archivo_en_memoria = mmap (NULL, blocks_stat.st_size, PROT_READ | PROT_WRITE ,MAP_SHARED, blocks, 0 );
+	blocksmap = mmap (NULL, blocks_stat.st_size, PROT_READ | PROT_WRITE ,MAP_SHARED, blocks, 0 );
 
 	//test de grabado en mapeo
 	/*char * test = "se inicializo el tripulante 10";
@@ -34,11 +59,11 @@ char * mapear_blocks(){
 	*/
 
 	//test de lectura (lee hasta un espacio vacio)
-	/*for (int i = 0; i<blocks_stat.st_size ; i++){
-		printf("%c", archivo_en_memoria[i]);
+	for (int i = 0; i<blocks_stat.st_size ; i++){
+		printf("%c", blocksmap[i]);
 	}
 	printf("\n");
-	*/
+	
 
 	//test de lectura de un bloque usando indice
 	//(en practica hay que tener en cuenta el tamaño del archivo para el ultimo bloque en vez de blocksize)
@@ -47,7 +72,6 @@ char * mapear_blocks(){
 	memcpy(contenidotest, archivo_en_memoria+(super_bloque.blocksize * indicetest), super_bloque.blocksize);
 	printf("se leyo el bloque %d, con el contenido : %s\n",indicetest,contenidotest);
 	*/
-	return archivo_en_memoria;
 }
 
 void crear_filesystem(){
@@ -77,6 +101,16 @@ void crear_filesystem(){
 	munmap(archivo, superbloque_stat.st_size);
 	close(sbfile);
 	log_info(logger, "Se creo el archivo SuperBloque.ims con exito");
+
+	//creo el blocks.
+	FILE* blocks_create;
+	char * block_path = crear_path_absoluto("/Blocks.ims");
+	blocks_create = fopen (block_path, "w");
+	uint32_t size = super_bloque.blocks * super_bloque.blocksize;
+	ftruncate(fileno(blocks_create), size);
+	fclose(blocks_create);
+	log_info(logger, "No se encontro un archivo Blocks.ims existente y se creo uno en base a SuperBloque.ims");
+			
 }
 
 void crear_directorios(){
@@ -147,7 +181,7 @@ int existe_filesystem(){
 			printf("%d",test);
 		}
 		printf("\n");
-		int num = 25;
+		int num = 0;
 		int prueba = bitarray_test_bit(&bitmap, num);
 		printf("test bit 1: %d\n", prueba);
 		bitarray_set_bit(&bitmap, num);

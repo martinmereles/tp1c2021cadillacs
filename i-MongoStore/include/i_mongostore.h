@@ -8,7 +8,8 @@
 #include <pthread.h>
 #include <sys/fcntl.h>
 #include <poll.h>
-#include "commons/config.h"
+#include <commons/config.h>
+#include <commons/string.h>
 #include "sockets_shared.h"
 #include <semaphore.h>
 #include "servidor_i_mongo_store.h"
@@ -21,6 +22,8 @@ typedef struct {
 	int tiempo_sincro;
     char* posiciones_sabotaje;
 }filesystem_config;
+
+
 
 enum server_status{
     RUNNING,
@@ -41,5 +44,6 @@ filesystem_config fs_config;
 t_bitarray bitmap;
 void* superbloquemap;
 char * blocksmap;
+extern int bitoffset;
 
 #endif

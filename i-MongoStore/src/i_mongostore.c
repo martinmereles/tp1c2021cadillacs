@@ -1,6 +1,6 @@
 #include "i_mongostore.h"
 
-
+int bitoffset= 0;
 
 int main(void)
 {
@@ -26,6 +26,8 @@ int main(void)
 	log_info(logger, "Cerrando socket servidor");
 	close(server_fd);
 	log_destroy(logger);
+	munmap(superbloquemap, superbloque_stat.st_size);
+	munmap(blocksmap, blocks_stat.st_size);
 
 	return EXIT_SUCCESS;
 }
@@ -150,7 +152,8 @@ bool leer_mensaje_cliente_y_procesar(int cliente_fd){
 	int cod_op = recibir_operacion(cliente_fd);
 	switch(cod_op) {
 		case COD_MENSAJE:
-			recibir_payload_y_ejecutar(cliente_fd, loguear_mensaje);
+		//prueba COD_RECIBIR_TAREA
+			recibir_payload_y_ejecutar(cliente_fd, recibir_tarea);
 			break;
 		case -1:
 			log_error(logger, "El cliente se desconecto.");

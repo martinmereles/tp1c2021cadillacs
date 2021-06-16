@@ -3,7 +3,7 @@
 
 #include <commons/bitarray.h>
 #include <commons/collections/list.h>
-#include <commons/config.h>
+//#include <commons/config.h>
 #include <commons/log.h>
 #include <commons/string.h>
 #include <dirent.h>
@@ -74,11 +74,12 @@ typedef struct {
 	t_list* blocks;
 } t_bitacora;
 
+void verificar_punto_montaje();
 void iniciar_filesystem();
 char* crear_path_absoluto(char * pathRelativo);
 int existe_archivo(char *nombreArchivo);
 int existe_filesystem();
-char * mapear_blocks();
+void mapear_blocks();
 void crear_directorios();
 void crear_filesystem();
 
