@@ -15,6 +15,7 @@ typedef struct{
     uint32_t numero_segmento;
     uint32_t inicio;
     uint32_t tamanio;
+    sem_t semaforo;
 } segmento_t;
 
 typedef struct{

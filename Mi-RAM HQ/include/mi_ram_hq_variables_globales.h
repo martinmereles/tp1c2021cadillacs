@@ -62,5 +62,6 @@ void (*eliminar_tripulante)(void*, uint32_t);
 int cantidad_tareas(char** array_tareas);
 uint32_t get_desplazamiento(uint32_t direccion_logica);
 void crear_archivo_dump(t_list* lista_dump, void (*funcion_dump)(void*,FILE*));
+void ejecutar_rutina(void (*rutina)(void));
 
 #endif

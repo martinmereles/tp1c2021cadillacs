@@ -145,12 +145,10 @@ int comunicacion_cliente(int cliente_fd) {
 				log_error(logger, "Evento inesperado en file descriptor del cliente: %s", strerror(pfds[0].revents));
 		}
 	}
-
 	return EXIT_SUCCESS;
 }
 
 // Cada tripulante sabe a que segmento pertenece y a que proceso pertenece
-
 bool leer_mensaje_cliente_y_procesar(int cliente_fd, void** tabla_patota, uint32_t* dir_log){
 	bool cliente_conectado = true;
 	// Leo codigo de operacion
@@ -168,8 +166,9 @@ bool leer_mensaje_cliente_y_procesar(int cliente_fd, void** tabla_patota, uint32
 			break;
 		case COD_INICIAR_TRIPULANTE:
 			payload = recibir_payload(cliente_fd);
-			iniciar_tripulante(payload, tabla_patota, dir_log);
+			resultado_op = iniciar_tripulante(payload, tabla_patota, dir_log);
 			free(payload);
+        	enviar_operacion(cliente_fd, resultado_op, NULL, 0); 
 			break;
 		case COD_RECIBIR_UBICACION_TRIPULANTE:
 			payload = recibir_payload(cliente_fd);

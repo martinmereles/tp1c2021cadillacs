@@ -74,7 +74,7 @@ int crear_patota_paginacion(uint32_t PID, uint32_t longitud_tareas, char* tareas
 
     log_info(logger, "Estructuras de la patota inicializadas exitosamente");
 
-    dump_memoria();
+    ejecutar_rutina(dump_memoria);
 
     return EXIT_SUCCESS;
 }
@@ -97,7 +97,6 @@ int crear_tripulante_paginacion(void** args, uint32_t* direccion_logica_TCB,
     // Buscamos un espacio en memoria para el TCB y lo reservamos
     if(reservar_memoria(*tabla_patota, TAMANIO_TCB, direccion_logica_TCB) == EXIT_FAILURE){
         log_error(logger, "ERROR. No hay espacio para guardar el TCB del tripulante. %d",TAMANIO_TCB);
-        eliminar_patota(*tabla_patota);
         return EXIT_FAILURE;
     }
 
@@ -114,7 +113,7 @@ int crear_tripulante_paginacion(void** args, uint32_t* direccion_logica_TCB,
     escribir_memoria_principal(*tabla_patota, *direccion_logica_TCB, DESPL_PROX_INSTR, &id_proxima_instruccion, sizeof(uint32_t));
     escribir_memoria_principal(*tabla_patota, *direccion_logica_TCB, DESPL_DIR_PCB, &dir_log_pcb, sizeof(uint32_t));
 
-    dump_memoria();
+    ejecutar_rutina(dump_memoria);
 
     return EXIT_SUCCESS;
 }
@@ -178,10 +177,13 @@ int liberar_memoria(tabla_paginas_t* tabla_patota, int tamanio_total, uint32_t d
         liberar_memoria(tabla_patota, tamanio_total, direccion_logica_proxima_pagina);
     }
 
+    ejecutar_rutina(dump_memoria);
+
     return EXIT_SUCCESS;
 }
 
 int reservar_memoria(tabla_paginas_t* tabla_patota, int tamanio, uint32_t* direccion_logica){   
+    int memoria_reservada = tamanio;
 
     // Revisamos si no tiene fragmentacion interna
     if(tabla_patota->fragmentacion_interna == 0){
@@ -200,8 +202,12 @@ int reservar_memoria(tabla_paginas_t* tabla_patota, int tamanio, uint32_t* direc
     // Si necesitamos mas memoria, reservamos paginas hasta que podamos cubrir el tamanio pedido
     while(tamanio > 0){
         ultima_pagina(tabla_patota)->fragmentacion_interna = 0;     // La ultima pagina no tiene fragm. pues se va a llenar
-        if(crear_pagina(tabla_patota) == EXIT_FAILURE)
+        if(crear_pagina(tabla_patota) == EXIT_FAILURE){
+            // Si no alcanzo la memoria, liberamos lo que se reservo
+            memoria_reservada -= tamanio;
+            liberar_memoria(tabla_patota, memoria_reservada,*direccion_logica);
             return EXIT_FAILURE;
+        }
         tamanio -= tamanio_pagina;
     }
     
@@ -210,7 +216,7 @@ int reservar_memoria(tabla_paginas_t* tabla_patota, int tamanio, uint32_t* direc
     ultima_pagina(tabla_patota)->fragmentacion_interna = -tamanio;
 
     // PARA TESTEAR
-    dump_memoria();
+    ejecutar_rutina(dump_memoria);
 
     return EXIT_SUCCESS;
 }

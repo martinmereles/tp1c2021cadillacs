@@ -166,16 +166,12 @@ void leer_tarea_memoria_principal(void* tabla, char** tarea, uint32_t id_prox_ta
 void signal_handler(int senial){
     log_info(logger,"Signal atendida por el hilo %d",syscall(__NR_gettid));
 
-    // Creamos un nuevo hilo que se encarga de atender la signal
-    // El hilo finaliza una vez ejecutada la rutina
-	pthread_t hilo_atender_signal;
 	switch(senial){
 		case SIGUSR1:
-            pthread_create(&hilo_atender_signal, NULL, (void*) dump_memoria, NULL);
+            ejecutar_rutina(dump_memoria);
 			break;
 		case SIGINT:
-            pthread_create(&hilo_atender_signal, NULL, (void*) compactacion, NULL);
+            ejecutar_rutina(compactacion);
 			break;
 	}
-    pthread_detach(hilo_atender_signal);
 }

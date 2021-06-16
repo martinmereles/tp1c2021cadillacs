@@ -95,13 +95,22 @@ int escribir_memoria_principal_segmentacion(void* args, uint32_t inicio_logico, 
     tabla_segmentos_t* tabla = (tabla_segmentos_t*) args;
     uint32_t direccion_logica = direccion_logica_segmentacion(inicio_logico, desplazamiento_logico);
     int numero_seg = numero_de_segmento(direccion_logica);
+    segmento_t* segmento = obtener_fila(tabla, numero_seg);
+
+    // Agregar semaforo para el segmento
+    sem_wait(&(segmento->semaforo));
+
     int direccion_fisica_dato = calcular_direccion_fisica(tabla, direccion_logica);
-    segmento_t* fila = obtener_fila(tabla, numero_seg);
-    if(fila->inicio + fila->tamanio < direccion_fisica_dato + tamanio){
+    if(segmento->inicio + segmento->tamanio < direccion_fisica_dato + tamanio){
         log_error(logger,"ERROR. Segmentation fault. Direccionamiento invalido en escritura");
+        // Liberar semaforo del segmento
+        sem_post(&(segmento->semaforo));
         return EXIT_FAILURE;
     }
     memcpy(memoria_principal+direccion_fisica_dato, dato, tamanio);
+    // Liberar semaforo del segmento
+    sem_post(&(segmento->semaforo));
+    
     return EXIT_SUCCESS;
 }
 
@@ -109,13 +118,21 @@ int leer_memoria_principal_segmentacion(void* args, uint32_t inicio_logico, uint
     tabla_segmentos_t* tabla = (tabla_segmentos_t*) args;
     uint32_t direccion_logica = direccion_logica_segmentacion(inicio_logico, desplazamiento_logico);
     int numero_seg = numero_de_segmento(direccion_logica);
+    segmento_t* segmento = obtener_fila(tabla,numero_seg);
+    
+    // Agregar semaforo para el segmento
+    sem_wait(&(segmento->semaforo));
+
     int direccion_fisica_dato = calcular_direccion_fisica(tabla, direccion_logica);
-    segmento_t* fila = obtener_fila(tabla,numero_seg);
-    if(fila->inicio + fila->tamanio < direccion_fisica_dato + tamanio){
+    if(segmento->inicio + segmento->tamanio < direccion_fisica_dato + tamanio){
         log_error(logger,"ERROR. Segmentation fault. Direccionamiento invalido en lectura");
+        // Liberar semaforo del segmento
+        sem_post(&(segmento->semaforo));
         return EXIT_FAILURE;
     }
     memcpy(dato, memoria_principal+direccion_fisica_dato, tamanio);
+    // Liberar semaforo del segmento
+    sem_post(&(segmento->semaforo));
     return EXIT_SUCCESS;
 }
 
@@ -133,8 +150,6 @@ void quitar_y_destruir_tabla(tabla_segmentos_t* tabla_a_destruir){
     }
 
     list_remove_and_destroy_by_condition(tablas_de_patotas, tienePID, destruir_tabla_segmentos); 
-    // PARA PRUEBAS
-    dump_memoria();
 }
 
 void destruir_tabla_segmentos(void* args){
@@ -239,7 +254,6 @@ int crear_tripulante_segmentacion(void** tabla, uint32_t* dir_log_tcb,
 
     if(fila_TCB == NULL) {
         log_error(logger, "ERROR. No hay espacio para guardar el TCB del tripulante. %d",TAMANIO_TCB);
-        quitar_y_destruir_fila(*tabla, fila_TCB->numero_segmento);
         return EXIT_FAILURE;
     }
 
@@ -269,9 +283,8 @@ void destruir_fila(void* args){
     sem_wait(&reservar_liberar_memoria_mutex);
     // Liberamos el espacio en el mapa de memoria disponible
     liberar_memoria_segmentacion(segmento->inicio, segmento->tamanio);
-    sem_post(&reservar_liberar_memoria_mutex);
-
     free(segmento);
+    sem_post(&reservar_liberar_memoria_mutex);
 }
 
 segmento_t* crear_fila(tabla_segmentos_t* tabla, int tamanio){
@@ -284,7 +297,9 @@ segmento_t* crear_fila(tabla_segmentos_t* tabla, int tamanio){
     // Si no se encontro espacio
     if(inicio < 0){
         // Ejecutamos la compactacion
+        sem_post(&reservar_liberar_memoria_mutex);
         compactacion();
+        sem_wait(&reservar_liberar_memoria_mutex);
 
         // Probamos una segunda vez 
         inicio = algoritmo_de_ubicacion(tamanio);
@@ -307,6 +322,7 @@ segmento_t* crear_fila(tabla_segmentos_t* tabla, int tamanio){
     segmento_t* segmento = malloc(sizeof(segmento_t));
     segmento->inicio = inicio;
     segmento->tamanio = tamanio;
+    sem_init(&(segmento->semaforo), 0, 1);
 
     // Agregamos el segmento a la tabla
     list_add(tabla->filas,segmento);
@@ -366,7 +382,6 @@ void eliminar_tripulante_segmentacion(void* tabla, uint32_t direccion_logica_TCB
 
 void dump_memoria_segmentacion(){
     crear_archivo_dump(tablas_de_patotas, dump_patota_segmentacion);
-
     // Para pruebas
     /*
     log_info(logger,"Dump: %s",temporal_get_string_time("%d/%m/%y %H:%M:%S"));
@@ -462,9 +477,7 @@ void dump_tripulante_segmentacion_pruebas(tabla_segmentos_t* tabla, int nro_fila
 
 void compactacion(){
 
-    log_info(logger,"ESPERANDO QUE FINALICEN LAS OPERACIONES PENDIENTES");
-    //list_iterate(lista_semaforos, sem_wait);
-
+    sem_wait(&reservar_liberar_memoria_mutex);
     log_info(logger,"INICIANDO COMPACTACION");
     
     // Generamos la lista de segmentos ordenada
@@ -475,22 +488,20 @@ void compactacion(){
     list_destroy(lista_segmentos_memoria);
 
     log_info(logger,"COMPACTACION COMPLETADA");
-    //list_iterate(lista_semaforos, sem_post);
+    sem_post(&reservar_liberar_memoria_mutex);
 
     // PARA PRUEBAS
-    dump_memoria();
+    ejecutar_rutina(dump_memoria);
 }
-
-
 
 void compactar_segmento(void* args){
     segmento_t* segmento = (segmento_t*) args;
 
+    sem_wait(&(segmento->semaforo));
+
     // Copiar contenido de la RAM en un buffer
     void* buffer = malloc(segmento->tamanio);
     memcpy(buffer, memoria_principal + segmento->inicio, segmento->tamanio);
-
-    sem_wait(&reservar_liberar_memoria_mutex);
 
     // Liberar memoria en el mapa
     liberar_memoria_segmentacion(segmento->inicio, segmento->tamanio);
@@ -507,11 +518,11 @@ void compactar_segmento(void* args){
     // Reservar el espacio de memoria encontrado en el mapa 
     reservar_memoria_segmentacion(segmento->inicio, segmento->tamanio);
 
-    sem_post(&reservar_liberar_memoria_mutex);
-
     // Guardar la informacion del buffer en la RAM
     memcpy(memoria_principal + segmento->inicio, buffer, segmento->tamanio);
     free(buffer);
+
+    sem_post(&(segmento->semaforo));
 }
     
 

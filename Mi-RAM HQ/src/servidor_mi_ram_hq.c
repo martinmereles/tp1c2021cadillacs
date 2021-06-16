@@ -60,10 +60,11 @@ int iniciar_tripulante(char* payload, void** tabla, uint32_t* dir_log_tcb){
     log_info(logger, "La posicion inicial del tripulante es: (%d,%d)",posicion_X,posicion_Y);
 
     if(crear_tripulante(tabla, dir_log_tcb, PID, TID, posicion_X, posicion_Y) == EXIT_FAILURE){
-        log_error(logger,"ERROR. NO SE PUDO CREAR AL TRIPULANTE. AVISAR AL DISCORDIADOR???");
+        log_error(logger, "NO SE PUDO CREAR AL TRIPULANTE.");
+        return COD_INICIAR_TRIPULANTE_ERROR;
     }
 
-    return EXIT_SUCCESS;
+    return COD_INICIAR_TRIPULANTE_OK; 
 }
 
 int recibir_ubicacion_tripulante(char* payload, void** tabla, uint32_t* direccion_logica_TCB){

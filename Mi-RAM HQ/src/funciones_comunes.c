@@ -41,3 +41,11 @@ void crear_archivo_dump(t_list* lista_dump, void (*funcion_dump)(void*,FILE*)){
     // Cerramos el archivo
     fclose(archivo_dump);
 }
+
+void ejecutar_rutina(void (*rutina)(void)){
+    // Creamos un nuevo hilo que se encarga de ejecutar la rutina
+    // El hilo finaliza una vez termina de ejecutar
+    pthread_t hilo_rutina;
+    pthread_create(&hilo_rutina, NULL, (void*) rutina, NULL);
+    pthread_detach(hilo_rutina);
+}
