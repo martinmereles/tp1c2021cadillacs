@@ -78,8 +78,32 @@ int inicializar_esquema_memoria(t_config* config){
             return EXIT_FAILURE;
         }
 
-        cantidad_marcos = tamanio_memoria/tamanio_pagina;
+        // Inicializo TAMANIO SWAP
+        tamanio_swap = atoi(config_get_string_value(config, "TAMANIO_SWAP"));
+        log_info(logger,"El tamanio de swap es: %d", tamanio_swap);
 
+        if(tamanio_swap % tamanio_pagina != 0){
+            log_error(logger,"ERROR. El tamanio de swap no es multiplo del tamanio de pagina.");
+            return EXIT_FAILURE;
+        }
+
+        // Inicializo PATH SWAP
+        path_swap = config_get_string_value(config, "TAMANIO_SWAP");
+        log_info(logger,"El path de swap es: %s", path_swap);
+
+        // Abrimos el archivo
+        memoria_virtual = fopen(path_swap,"rw");
+
+        if(memoria_virtual == NULL){
+            log_error(logger,"ERROR. No se pudo crear el archivo de memoria virtual swap.");
+            return EXIT_FAILURE;
+        }
+
+        // Inicializo ALGORITMO
+        if(inicializar_algoritmo_de_reemplazo(config) == EXIT_FAILURE)
+            return EXIT_FAILURE;
+
+        cantidad_marcos = tamanio_memoria/tamanio_pagina;
         log_info(logger,"La cantidad de marcos es: %d", cantidad_marcos);
 
         // Creamos la lista global de marcos
@@ -93,10 +117,6 @@ int inicializar_esquema_memoria(t_config* config){
             marco->estado = 0;
             list_add(lista_de_marcos, marco); 
         }
-
-        // Inicializo TAMANIO SWAP
-        // Inicializo PATH SWAP
-        // Inicializo ALGORITMO REEMPLAZO
 
         // Inicializo vectores a funciones
         dump_memoria = &dump_memoria_paginacion;
@@ -121,6 +141,8 @@ void liberar_estructuras_memoria(){
     free(bitarray_mapa_memoria_disponible);
     bitarray_destroy(mapa_memoria_disponible);
     free(memoria_principal);
+    fclose(memoria_virtual);
+    remove(path_swap);
 }
 
 void leer_tarea_memoria_principal(void* tabla, char** tarea, uint32_t id_prox_tarea){    

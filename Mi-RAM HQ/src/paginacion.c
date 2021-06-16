@@ -428,3 +428,29 @@ void actualizar_timestamp(marco_t* pagina){
     free(pagina->timestamp);
     pagina->timestamp = temporal_get_string_time("%y_%m_%d_%H_%M_%S");
 }
+
+// MEMORIA VIRTUAL
+// ALGORITMOS DE REEMPLAZO
+int inicializar_algoritmo_de_reemplazo(t_config* config){
+    char* string_algoritmo_reemplazo = config_get_string_value(config, "ALGORITMO_REEMPLAZO");
+    if(strcmp(string_algoritmo_reemplazo,"LRU")==0){
+        log_info(logger,"El algoritmo de reemplazo es: LRU");
+        algoritmo_de_reemplazo = &algoritmo_lru;
+        return EXIT_SUCCESS;
+    }
+    if(strcmp(string_algoritmo_reemplazo,"CLOCK")==0){
+        log_info(logger,"El algoritmo de reemplazo es: Clock");
+        algoritmo_de_reemplazo = &algoritmo_clock;
+        return EXIT_SUCCESS;
+    }
+    log_error(logger,"%s: Algoritmo de reemplazo invalido",string_algoritmo_reemplazo);
+    return EXIT_FAILURE;
+}
+
+void algoritmo_lru(){
+
+}
+
+void algoritmo_clock(){
+
+}

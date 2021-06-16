@@ -65,11 +65,22 @@ void dump_memoria_paginacion();
 void dump_marco(void* args, FILE* archivo_dump);
 
 // Algoritmos de Reemplazo
+int inicializar_algoritmo_de_reemplazo(t_config* config);
+void (*algoritmo_de_reemplazo)(void);
+void algoritmo_lru(void);
+void algoritmo_clock(void);
+
+// LRU
 void actualizar_timestamp(marco_t* pagina);
 
 // VARIABLES GLOBALES
 int tamanio_pagina;
 int cantidad_marcos;
 t_list* lista_de_marcos;
+
+// Para memoria virtual
+int tamanio_swap;
+char* path_swap;
+FILE* memoria_virtual;
 
 #endif
