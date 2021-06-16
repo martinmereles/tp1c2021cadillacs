@@ -3,24 +3,17 @@
 int iniciar_planificador(){
 
     if(estado_planificador == PLANIFICADOR_OFF){
-        // TODO: ejecutar estas instrucciones si se inicio el planificador por 1ra vez, caso contrario actualizar flag pausado.
         pthread_t *hilo_dispatcher;
-
-        // TODO: crear hilo dispatcher
         hilo_dispatcher = malloc(sizeof(pthread_t));
+
         pthread_create(&hilo_dispatcher, NULL, (void*) dispatcher,&algoritmo_Planificador);
         pthread_detach(hilo_dispatcher);
-
+        free(hilo_dispatcher);
         estado_planificador = PLANIFICADOR_RUNNING;
     }
-    else {
-        if (estado_planificador == PLANIFICADOR_RUNNING)
-            estado_planificador == PLANIFICADOR_BLOCKED;
-        else
-            // TODO: Estando pausado, aplicar procedimientos para reanudar PLANIFICADOR.
-            estado_planificador == PLANIFICADOR_RUNNING;
+    else
+        estado_planificador = PLANIFICADOR_RUNNING;
     }
-    free(hilo_dispatcher);
     return EXIT_SUCCESS;
 }
 
@@ -274,7 +267,7 @@ char *code_dispatcher_to_string(enum estado_tripulante code){
     }
 }
 
-void transicion_ready_to_exec(t_tripulante *dato){
+static void transicion_ready_to_exec(t_tripulante *dato){
     t_tripulante *temp;
     //temp = malloc(sizeof(t_tripulante));
     //memcpy(temp, dato, sizeof(t_tripulante));
@@ -283,7 +276,7 @@ void transicion_ready_to_exec(t_tripulante *dato){
     queue_push(cola_running,temp);
 }
 
-void transicion_exec_to_blocked_io(t_tripulante *dato, enum algoritmo cod_algor){
+static void transicion_exec_to_blocked_io(t_tripulante *dato, enum algoritmo cod_algor){
     t_tripulante *temp;
     //temp = malloc(sizeof(t_tripulante));
     //memcpy(temp, dato, sizeof(t_tripulante));
@@ -294,7 +287,7 @@ void transicion_exec_to_blocked_io(t_tripulante *dato, enum algoritmo cod_algor)
     queue_push(cola_bloqueado_io,temp);
 }
 
-void transicion_blocked_io_to_ready(t_tripulante *dato, enum algoritmo cod_algor){
+static void transicion_blocked_io_to_ready(t_tripulante *dato, enum algoritmo cod_algor){
     t_tripulante *temp;
     //temp = malloc(sizeof(t_tripulante));
     //memcpy(temp, dato, sizeof(t_tripulante));
@@ -315,7 +308,7 @@ static void transicion_exec_to_ready(t_tripulante *dato){
     queue_push(cola_ready,temp);
 }
 
-void bloquear_tripulantes_por_sabotaje(void){
+static void bloquear_tripulantes_por_sabotaje(void){
 
     //Pasar todos los tripulantes a blocked_emerg SEGUN ORDEN (1-EXEC -> 2-READY ->3- BLOCKED_IO)
     t_queue *temporal;
@@ -358,33 +351,25 @@ static bool tripulante_tid_es_menor_que(void *data1, void *data2){
     return (temp1->TID <= temp2->TID)? true: false;
 }
 
-void *get_data_tripulante_by_tid(t_queue *src_list, int tid_buscado){
-    t_queue *buffer;
-    buffer = src_list;
-    t_list_iterator *un_iterador;
-    bool encontrado = false;
-    t_tripulante *tripulante_buscado;
-    un_iterador = list_iterator_create(buffer->elements);
-
-    while(list_iterator_has_next(un_iterador) && !encontrado){
-        tripulante_buscado = un_iterador->element->data;
-        if ( tripulante_buscado->TID == tid_buscado){
-            encontrado = true;
-            list_iterator_remove(un_iterador);
+int get_index_from_cola_by_tid(t_queue *src_list, int tid_buscado){
+    t_list_iterator *iterador_nuevo;
+    iterador_nuevo = list_iterator_create(src_list->elements);
+    int index_buscado = -1;
+    while( list_iterator_has_next(iterador_nuevo) ){
+        t_tripulante *tripulante_buscado = list_iterator_next(iterador_nuevo);
+        if(tripulante_buscado->TID == tid_buscado){
+            index_buscado = iterador_nuevo->index;
+            list_iterator_destroy(iterador_nuevo);
+            break;
         }
-        else
-            list_iterator_next(un_iterador);
     }
-    //if(!encontrado){ //printf("\nERROR en busqueda por TID no encontrado.");//list_iterator_remove(un_iterador); //return(EXIT_FAILURE); }
-    //else
-        return tripulante_buscado;
+    return index_buscado;
 }
 
-static void gestionar_bloqueo_io(void){
+static void gestionar_bloqueo_io(t_queue *peticiones_from_exec, t_queue *peticiones_to_ready, enum algoritmo code_algor){
     printf("Gestionando bloqueos_IO...\n");
-    // TODO:
-      // Obtener lista de tripulantes por TID que se encuentran bloqueados. -> ¿Leyendo de una lista buffer?
-	  // Pasar de exec a blocked_io (indicando el TID que se bloqueo correspondiente, SABIENDO QUIEN efectivamente lo está)	
+    get_buffer_peticiones_and_swap_exec_blocked_io(peticiones_from_exec, code_algor);
+    get_buffer_peticiones_and_swap_blocked_io_ready(peticiones_to_ready, code_algor);
 }
 
 static void desbloquear_tripulantes_tras_sabotaje(void){
@@ -396,7 +381,46 @@ static void desbloquear_tripulantes_tras_sabotaje(void){
 static enum algoritmo string_to_code_algor(char *string_code){
     if (strcmp("RR",string_code) == 0)
         return RR;
-    else 
+    else
         if (strcmp("FIFO",string_code) == 0)
             return FIFO;
 }// TODO: evaluar su aplicacion
+
+void agregar_a_buffer_peticiones(t_queue *peticiones_destino, int tid){
+    int *tid_ptr;
+    tid_ptr = malloc(sizeof(int));
+    *tid_ptr = tid;
+    queue_push(peticiones_destino, tid_ptr);
+}
+
+static int get_buffer_peticiones_and_swap_exec_blocked_io(t_queue *peticiones_origen, enum algoritmo code_algor){
+    int *buffer;
+    t_tripulante *trip_transito;
+    if ( queue_size(peticiones_origen) > 0){
+        while( queue_size(peticiones_origen) > 0 ){
+            buffer = queue_pop(peticiones_origen);
+            *buffer = get_index_from_cola_by_tid(cola_running, *buffer);
+            trip_transito = list_remove(cola_running->elements, *buffer);
+            transicion_exec_to_blocked_io(trip_transito, code_algor);
+            free(buffer);
+        }
+        return EXIT_SUCCESS;
+    }else
+        return EXIT_FAILURE;
+}
+
+static int get_buffer_peticiones_and_swap_blocked_io_ready(t_queue *peticiones_origen, enum algoritmo code_algor){
+    int *buffer;
+    t_tripulante *trip_transito;
+    if ( queue_size(peticiones_origen) > 0){
+        while( queue_size(peticiones_origen) > 0 ){
+            buffer = queue_pop(peticiones_origen);
+            *buffer = get_index_from_cola_by_tid(cola_bloqueado_io, *buffer);
+            trip_transito = list_remove(cola_bloqueado_io->elements, *buffer);
+            transicion_blocked_io_to_ready(trip_transito, code_algor);
+            free(buffer);
+        }
+        return EXIT_SUCCESS;
+    }else
+        return EXIT_FAILURE;
+}
