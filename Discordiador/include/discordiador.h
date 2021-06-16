@@ -2,9 +2,9 @@
 #define DISCORDIADOR_H_
 
 #include <pthread.h>
-#include "commons/config.h"
+#include <commons/config.h>
 #include <poll.h>
-#include "commons/string.h"
+#include <commons/string.h>
 #include "sockets_cliente.h"
 #include <semaphore.h>
 #include "planificador.h"

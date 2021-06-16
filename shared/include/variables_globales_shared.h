@@ -8,5 +8,7 @@
 #include "commons/log.h"
 
 t_log* logger;
+int grado_multiproc;
+int quantum;
 
 #endif

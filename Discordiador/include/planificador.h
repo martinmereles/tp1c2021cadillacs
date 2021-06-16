@@ -8,6 +8,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <pthread.h>
 
 // en ESTADO NEW: genera las estructuras administrativas , una vez generado todo --> pasa a READY.
 t_queue *cola_new;
@@ -51,6 +52,7 @@ enum algoritmo {
     RR
 };
 
+int iniciar_planificador(char *algoritmo_planificador);
 static void crear_colas();
 int existe_tripulantes_en_cola(t_queue *cola);
 static void pasar_todos_new_to_ready(enum algoritmo cod_algor);
@@ -64,7 +66,7 @@ char *code_dispatcher_to_string(enum estado_tripulante code);
 static void transicion_ready_to_exec(t_tripulante *dato);
 static void transicion_exec_to_blocked_io(t_tripulante *dato, enum algoritmo cod_algor);
 static void transicion_blocked_io_to_ready(t_tripulante *dato, enum algoritmo cod_algor);
-static void transicion_exec_to_ready(t_tripulante *dato);
+static void transicion_exec_to_ready(t_tripulante *dato); // RR
 
 int hay_espacio_disponible(int grado_multiprocesamiento);
 int hay_tarea_a_realizar(void);
@@ -87,5 +89,6 @@ int get_index_from_cola_by_tid(t_queue *src_list, int tid_buscado);
 void agregar_a_buffer_peticiones(t_queue *buffer, int tid);
 static int get_buffer_peticiones_and_swap_exec_blocked_io(t_queue *peticiones_origen, enum algoritmo code_algor);
 static int get_buffer_peticiones_and_swap_blocked_io_ready(t_queue *peticiones_origen, enum algoritmo code_algor);
+static void gestionar_exec(int grado_multiprocesamiento);
 
 #endif

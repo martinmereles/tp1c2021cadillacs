@@ -8,7 +8,7 @@ int main(void) {
 	generadorPID = 0;
 	generadorTID = 0;
 
-	//cola_new=create_queue();
+	cola_new=queue_create();
 
 	sem_init(&sem_generador_PID,0,1);
 	sem_init(&sem_generador_TID,0,1);
@@ -28,13 +28,17 @@ int main(void) {
 	puerto_i_Mongo_Store = string_new();
 	direccion_IP_Mi_RAM_HQ = string_new();
 	puerto_Mi_RAM_HQ = string_new();
-	//algoritmo_Planificador = string_new();
+	char *algoritmo_planificador = string_new();
+    char *string_quantum = string_new();
 	string_append(&direccion_IP_i_Mongo_Store, config_get_string_value(config, "IP_I_MONGO_STORE"));
 	string_append(&puerto_i_Mongo_Store, config_get_string_value(config, "PUERTO_I_MONGO_STORE"));
 	string_append(&direccion_IP_Mi_RAM_HQ, config_get_string_value(config, "IP_MI_RAM_HQ"));
 	string_append(&puerto_Mi_RAM_HQ, config_get_string_value(config, "PUERTO_MI_RAM_HQ"));
-	//string_append(&algoritmo_Planificador, config_get_string_value(config, "ALGORITMO"));
-	
+	string_append(&algoritmo_planificador, config_get_string_value(config, "ALGORITMO"));
+	string_append(&string_quantum, config_get_string_value(config, "QUANTUM"));
+
+    quantum = atoi(string_quantum);
+
 	log_info(logger, "Configuracion terminada");
 
 	log_info(logger, "Conectando con i-Mongo-Store");
@@ -157,13 +161,13 @@ void leer_consola_y_procesar(int i_mongo_store_fd, int mi_ram_hq_fd) {
 			iniciar_patota(argumentos, mi_ram_hq_fd);
 			break;
 		case LISTAR_TRIPULANTES:
-			log_info(logger, "Listando tripulantes");
+			//listar_tripulantes(string_to_code_algor(algoritmo_planificador));
 			break;
 		case EXPULSAR_TRIPULANTES:
 			log_info(logger, "Expulsando tripulante");
 			break;
 		case INICIAR_PLANIFICACION:
-			log_info(logger, "Iniciando planificacion");
+			//iniciar_planificador(algoritmo_planificador);
 			break;
 		case PAUSAR_PLANIFICACION:
 			log_info(logger, "Pausando planificacion");
@@ -194,7 +198,7 @@ int iniciar_patota(char** argumentos, int mi_ram_hq_fd){
 	iniciar_tripulante_t struct_iniciar_tripulante;
 	char **posicion;
 	int PID;
-	//t_key_tripulante *nuevo = malloc(sizeof(t_key_tripulante));
+	t_tripulante *nuevo;
 
 	FILE* archivo_de_tareas;
 	char* lista_de_tareas = string_new();
@@ -254,9 +258,11 @@ int iniciar_patota(char** argumentos, int mi_ram_hq_fd){
 
 		struct_iniciar_tripulante.TID = generarNuevoTID();
 
-		//nuevo->TID = struct_iniciar_tripulante.TID
-		//nuevo->PID = struct_iniciar_tripulante.PID
-		//queue_push(cola_new,nuevo);
+        // Agregando nuevo tripulante a cola NEW
+        nuevo = malloc(sizeof(t_tripulante));
+		nuevo->TID = struct_iniciar_tripulante.TID;
+		nuevo->PID = struct_iniciar_tripulante.PID;
+		queue_push(cola_new,nuevo);
 
 		// Creamos el hilo para el submodulo tripulante
 		// NOTA: el struct pthread_t de cada hilo tripulante se pierde
