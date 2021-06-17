@@ -22,8 +22,6 @@ void eliminar_patota(tabla_paginas_t* tabla_a_eliminar){
     list_remove_and_destroy_by_condition(tablas_de_patotas, tiene_PID, destruir_tabla_patota);
 }
 
-
-
 void liberar_marco(void* args){
     marco_t* marco = (marco_t*) args;
     marco->estado = MARCO_LIBRE;
@@ -226,13 +224,19 @@ int escribir_memoria_principal_paginacion(void* args, uint32_t inicio_logico, ui
     tabla_paginas_t* tabla = (tabla_paginas_t*) args;
     uint32_t direccion_logica = direccion_logica_paginacion(inicio_logico, desplazamiento_logico);
 
+    // Si la pagina esta en memoria virtual, debo traerla
+    marco_t* pagina = get_pagina(tabla, numero_pagina(direccion_logica)); 
+    if(pagina->bit_presencia)
+        proceso_swap(pagina);
+
+    // Calculo la direccion fisica
     uint32_t direccion_fisica_dato; 
     if(direccion_fisica_paginacion(tabla, direccion_logica, &direccion_fisica_dato) == EXIT_FAILURE){
         log_error(logger,"ERROR: escribir_memoria_principal. Direccionamiento invalido.");
         return EXIT_FAILURE;
     }
 
-    log_info(logger,"DIRECCION FISICA A ESCRIBIR: %x",direccion_fisica_dato);
+    // log_info(logger,"DIRECCION FISICA A ESCRIBIR: %x",direccion_fisica_dato);
 
     int desplazamiento = get_desplazamiento(direccion_logica);
 
@@ -247,7 +251,12 @@ int escribir_memoria_principal_paginacion(void* args, uint32_t inicio_logico, ui
     if(tamanio_escritura_pagina_actual > tamanio_total)
         tamanio_escritura_pagina_actual = tamanio_total;
 
+    // Escribo el dato en memoria principal
     memcpy(memoria_principal + direccion_fisica_dato, dato, tamanio_escritura_pagina_actual);
+
+    // Actualizo informacion de la pagina
+    actualizar_timestamp(pagina);   // LRU
+    pagina->bit_uso = 1;            // Clock
 
     // Calculo el tamanio de lo que me falto escribir
     tamanio_total -= tamanio_escritura_pagina_actual;
@@ -268,14 +277,22 @@ int leer_memoria_principal_paginacion(void* args, uint32_t inicio_logico, uint32
     tabla_paginas_t* tabla = (tabla_paginas_t*) args;
     uint32_t direccion_logica = direccion_logica_paginacion(inicio_logico, desplazamiento_logico);
 
+    // Si la pagina esta en memoria virtual, debo traerla
+    marco_t* pagina = get_pagina(tabla, numero_pagina(direccion_logica)); 
+    if(pagina->bit_presencia)
+        proceso_swap(pagina);
+
+    // Calculo la direccion fisica
     uint32_t direccion_fisica_dato; 
     if(direccion_fisica_paginacion(tabla, direccion_logica, &direccion_fisica_dato) == EXIT_FAILURE){
         log_error(logger,"ERROR: leer_memoria_principal. Direccionamiento invalido.");
         return EXIT_FAILURE;
     }
-    int desplazamiento = get_desplazamiento(direccion_logica);
 
-    log_info(logger,"DIRECCION FISICA A LEER: %x",direccion_fisica_dato);
+    //log_info(logger,"DIRECCION FISICA A LEER: %x",direccion_fisica_dato);
+
+    int desplazamiento = get_desplazamiento(direccion_logica);
+    
     /* Voy a empezar a leer el dato en la pagina actual:
         1) Hasta que recorra el dato completo
         2) Hasta que llegue al final de la pagina: en ese caso, 
@@ -287,7 +304,12 @@ int leer_memoria_principal_paginacion(void* args, uint32_t inicio_logico, uint32
     if(tamanio_lectura_pagina_actual > tamanio_total)
         tamanio_lectura_pagina_actual = tamanio_total;
 
+    // Leo el dato de memoria principal
     memcpy(dato, memoria_principal + direccion_fisica_dato, tamanio_lectura_pagina_actual);
+
+    // Actualizo informacion de la pagina
+    actualizar_timestamp(pagina);   // LRU
+    pagina->bit_uso = 1;            // Clock
 
     // Calculo el tamanio de lo que me falto leer
     tamanio_total -= tamanio_lectura_pagina_actual;
@@ -342,10 +364,9 @@ int crear_pagina(tabla_paginas_t* tabla_patota){
     
     pagina->PID = tabla_patota->PID;
     pagina->estado = MARCO_OCUPADO;
-    pagina->bit_presencia = true;
     pagina->bit_uso = true;
     pagina->numero_pagina = tabla_patota->proximo_numero_pagina;
-    pagina->timestamp = temporal_get_string_time("%y_%m_%d_%H_%M_%S");
+    actualizar_timestamp(pagina);
 
     tabla_patota->proximo_numero_pagina++;
     list_add(tabla_patota->paginas,pagina);
@@ -426,7 +447,7 @@ void dump_marco(void* args, FILE* archivo_dump){
 // LRU
 void actualizar_timestamp(marco_t* pagina){
     free(pagina->timestamp);
-    pagina->timestamp = temporal_get_string_time("%y_%m_%d_%H_%M_%S");
+    pagina->timestamp = temporal_get_string_time("%y%m%d%H%M%S");
 }
 
 // MEMORIA VIRTUAL
@@ -447,10 +468,124 @@ int inicializar_algoritmo_de_reemplazo(t_config* config){
     return EXIT_FAILURE;
 }
 
-void algoritmo_lru(){
+marco_t* algoritmo_lru(){
+    marco_t* pagina_victima;
 
+    void* pagina_menos_recientemente_usada(void* args_1, void* args_2){
+        marco_t* pagina_1 = (marco_t*) args_1;
+        marco_t* pagina_2 = (marco_t*) args_2;
+        char* timestamp_1 = pagina_1->timestamp;
+        char* timestamp_2 = pagina_2->timestamp;
+        int i = 0;
+
+        for(;i < 11 && atoi(timestamp_1 + i) == atoi(timestamp_2 + i);i++);
+        if(atoi(timestamp_1 + i) < atoi(timestamp_2 + i))
+            return (void*) pagina_1;
+        return (void*) pagina_2;
+    }
+
+    bool es_pagina_presente(void* args){
+        marco_t* pagina = (marco_t*) args;
+        return pagina->bit_presencia;
+    }
+
+    t_list* paginas_presentes = list_filter(lista_de_marcos, es_pagina_presente);
+
+    pagina_victima = (marco_t*) list_get_minimum(paginas_presentes, pagina_menos_recientemente_usada);
+    list_destroy(paginas_presentes);
+    return pagina_victima;
 }
 
-void algoritmo_clock(){
+marco_t* algoritmo_clock(){
+    return algoritmo_lru();
+}
 
+void proceso_swap(marco_t* pagina_necesitada){
+
+    // Copiamos en un buffer el contenido de la pagina necesitada
+    char* buffer_necesitado = leer_marco(pagina_necesitada);
+
+    // Buscamos si hay marcos libres en memoria principal
+    bool es_marco_libre_en_memoria_principal(void* args){
+        marco_t* marco = (marco_t*) args;
+        return marco->bit_presencia && (marco->estado == MARCO_LIBRE);
+    }
+
+    marco_t* pagina_victima = list_find(lista_de_marcos, es_marco_libre_en_memoria_principal);
+    
+    // Si no hay marcos libres
+    if(pagina_victima == NULL){
+
+        // Buscamos una pagina victima con algoritmo de reemplazo
+        pagina_victima = algoritmo_de_reemplazo();
+
+        // Movemos la informacion de la pagina victima a donde estaba la pagina necesitada en memoria virtual 
+        char* buffer_victima = leer_marco(pagina_victima);
+        escribir_marco(pagina_necesitada, buffer_victima);
+        free(buffer_victima);
+    }
+
+    // Movemos el contenido de la pagina necesitada a memoria principal
+    escribir_marco(pagina_victima, buffer_necesitado);
+    free(buffer_necesitado);
+        
+    /*
+        typedef struct{
+            int numero_pagina;          // Se mantiene igual
+            int numero_marco;           // Se intercambian
+            bool bit_presencia;         // Se intercambian
+            char* timestamp;            // No hace falta (lo actualiza la funcion de lectura/escritura)
+            bool bit_uso;               // No hace falta (lo actualiza la funcion de lectura/escritura)
+            int fragmentacion_interna;  // Se mantiene igual (la pagina conserva su frag interna)
+            enum estado_marco estado;   // Se mantiene igual (la pagina conserva su estado)
+            int PID;                    // Se mantiene igual (la pagina conserva su PID)
+        } marco_t;
+    */
+    
+    // Intercambiamos numeros de marco (pasan del marco de RAM al marco de M.VIRTUAL y viceversa)
+    int n_marco_auxiliar = pagina_victima->numero_marco;
+    pagina_victima->numero_marco = pagina_necesitada->numero_marco;
+    pagina_necesitada->numero_marco = n_marco_auxiliar;
+
+    pagina_necesitada->bit_presencia = true;    // Se mueve a RAM
+    pagina_victima->bit_presencia = false;       // Se mueve a Memoria Virtual
+}
+
+char* leer_marco(marco_t* marco){
+    char* informacion = malloc(tamanio_pagina);
+    uint32_t direccion_fisica;
+
+    // Si el marco esta en memoria principal
+    if(marco->numero_pagina < cantidad_marcos_memoria_principal){
+        direccion_fisica = (marco->numero_pagina) * tamanio_pagina;
+        memcpy(informacion, memoria_principal + direccion_fisica, tamanio_pagina);
+    }
+
+    /// Si el marco esta en memoria virtual
+    else{
+        direccion_fisica = marco->numero_pagina - cantidad_marcos_memoria_principal;
+        direccion_fisica *= tamanio_pagina;
+        fseek(memoria_virtual, direccion_fisica, SEEK_SET);
+        fread(informacion, sizeof(char), tamanio_pagina, memoria_virtual);
+    }
+        
+    return informacion;
+}
+
+void escribir_marco(marco_t* marco, char* informacion){
+    uint32_t direccion_fisica;
+
+    // Si el marco esta en memoria principal
+    if(marco->numero_pagina < cantidad_marcos_memoria_principal){
+        direccion_fisica = (marco->numero_pagina) * tamanio_pagina;
+        memcpy(memoria_principal + direccion_fisica, informacion, tamanio_pagina);
+    }
+
+    /// Si el marco esta en memoria virtual
+    else{
+        direccion_fisica = marco->numero_pagina - cantidad_marcos_memoria_principal;
+        direccion_fisica *= tamanio_pagina;
+        fseek(memoria_virtual, direccion_fisica, SEEK_SET);
+        fwrite(informacion, sizeof(char), tamanio_pagina, memoria_virtual);
+    }
 }

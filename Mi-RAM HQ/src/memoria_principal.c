@@ -103,18 +103,35 @@ int inicializar_esquema_memoria(t_config* config){
         if(inicializar_algoritmo_de_reemplazo(config) == EXIT_FAILURE)
             return EXIT_FAILURE;
 
-        cantidad_marcos = tamanio_memoria/tamanio_pagina;
-        log_info(logger,"La cantidad de marcos es: %d", cantidad_marcos);
+        cantidad_marcos_memoria_principal = tamanio_memoria/tamanio_pagina;
+        log_info(logger,"La cantidad de marcos en memoria principal es: %d", cantidad_marcos_memoria_principal);
+
+        cantidad_marcos_memoria_virtual = tamanio_swap/tamanio_pagina;
+        log_info(logger,"La cantidad de marcos en memoria principal es: %d", cantidad_marcos_memoria_virtual);
+
+        cantidad_marcos_total = cantidad_marcos_memoria_principal + cantidad_marcos_memoria_virtual;
 
         // Creamos la lista global de marcos
         lista_de_marcos = list_create();
         marco_t* marco;
 
-        // Inicializo todos los marcos
-        for(int i = 0;i < cantidad_marcos;i++){
+        // Inicializo los marcos de memoria principal
+        for(int i = 0;i < cantidad_marcos_memoria_principal;i++){
             marco = malloc(sizeof(marco_t));
             marco->numero_marco = i;
-            marco->estado = 0;
+            marco->estado = MARCO_LIBRE;
+            marco->bit_presencia = 1;
+            marco->timestamp = temporal_get_string_time("%y_%m_%d_%H_%M_%S");
+            list_add(lista_de_marcos, marco); 
+        }
+
+        // Inicializo los marcos de memoria virtual
+        for(int i = cantidad_marcos_memoria_principal;i < cantidad_marcos_total;i++){
+            marco = malloc(sizeof(marco_t));
+            marco->numero_marco = i;
+            marco->estado = MARCO_LIBRE;
+            marco->bit_presencia = 0;
+            marco->timestamp = temporal_get_string_time("%y_%m_%d_%H_%M_%S");
             list_add(lista_de_marcos, marco); 
         }
 

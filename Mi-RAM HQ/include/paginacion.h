@@ -64,23 +64,36 @@ void liberar_marco(void*);
 void dump_memoria_paginacion();
 void dump_marco(void* args, FILE* archivo_dump);
 
+// Proceso SWAP
+void proceso_swap(marco_t* pagina_necesitada);
+char* leer_marco(marco_t* marco);
+void escribir_marco(marco_t* marco, char* informacion);
+
 // Algoritmos de Reemplazo
 int inicializar_algoritmo_de_reemplazo(t_config* config);
-void (*algoritmo_de_reemplazo)(void);
-void algoritmo_lru(void);
-void algoritmo_clock(void);
+marco_t*  (*algoritmo_de_reemplazo)(void);
+marco_t*  algoritmo_lru(void);
+marco_t*  algoritmo_clock(void);
 
 // LRU
 void actualizar_timestamp(marco_t* pagina);
 
 // VARIABLES GLOBALES
 int tamanio_pagina;
-int cantidad_marcos;
+int cantidad_marcos_total;
+int cantidad_marcos_memoria_principal;
+int cantidad_marcos_memoria_virtual;
 t_list* lista_de_marcos;
 
 // Para memoria virtual
 int tamanio_swap;
 char* path_swap;
 FILE* memoria_virtual;
+
+
+
+
+
+
 
 #endif
