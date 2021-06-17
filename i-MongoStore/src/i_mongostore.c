@@ -1,6 +1,6 @@
 #include "i_mongostore.h"
 
-int bitoffset= 0;
+
 
 int main(void)
 {
@@ -28,7 +28,8 @@ int main(void)
 	log_destroy(logger);
 	munmap(superbloquemap, superbloque_stat.st_size);
 	munmap(blocksmap, blocks_stat.st_size);
-
+	close(sbfile);
+	close(bfile);
 	return EXIT_SUCCESS;
 }
 

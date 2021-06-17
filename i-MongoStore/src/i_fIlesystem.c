@@ -6,7 +6,7 @@ void iniciar_filesystem() {
 	if(!existe_filesystem()){
 		crear_filesystem();
 		crear_directorios();
-		printf("no existe fss\n");
+		
 	}
 	mapear_blocks();
 	
@@ -40,14 +40,14 @@ void verificar_punto_montaje(){
 
 void mapear_blocks(){
 	char * pathBlocks = crear_path_absoluto("/Blocks.ims");
-	int blocks = open(pathBlocks, O_RDWR, S_IRUSR | S_IWUSR);
-	if(fstat(blocks,&blocks_stat) == -1)
+	bfile = open(pathBlocks, O_RDWR, S_IRUSR | S_IWUSR);
+	if(fstat(bfile,&blocks_stat) == -1)
 	{
 		perror("no se pudo obtener los datos del archivo.\n");
 	}
 	//printf("el tamaño del archivo es de %d\n", (int)blocks_stat.st_size);
 
-	blocksmap = mmap (NULL, blocks_stat.st_size, PROT_READ | PROT_WRITE ,MAP_SHARED, blocks, 0 );
+	blocksmap = mmap (NULL, blocks_stat.st_size, PROT_READ | PROT_WRITE ,MAP_SHARED, bfile, 0 );
 
 	//test de grabado en mapeo
 	/*char * test = "se inicializo el tripulante 10";
@@ -80,7 +80,7 @@ void crear_filesystem(){
 	super_bloque.blocks = 56;
 	super_bloque.bitarray = calloc(super_bloque.blocks/8, sizeof(char));
 	int sizeStruct = sizeof(super_bloque.blocksize)+sizeof(super_bloque.blocks)+super_bloque.blocks/8+1;
-	int sbfile = open(puntomontaje, O_RDWR | O_CREAT , S_IRUSR | S_IWUSR);
+	sbfile = open(puntomontaje, O_RDWR | O_CREAT , S_IRUSR | S_IWUSR);
 	if(fstat(sbfile,&superbloque_stat) == -1)
 	{
 		perror("no se pudo obtener los datos del archivo.\n");
@@ -99,8 +99,27 @@ void crear_filesystem(){
 	printf("el tamaño del archivo es de %d\n", (int)superbloque_stat.st_size);
 	msync(archivo, superbloque_stat.st_size, MS_SYNC);
 	munmap(archivo, superbloque_stat.st_size);
-	close(sbfile);
 	log_info(logger, "Se creo el archivo SuperBloque.ims con exito");
+
+	//mapeo SuperBloque.ims en un *void
+	superbloquemap = mmap (NULL, superbloque_stat.st_size, PROT_READ | PROT_WRITE ,MAP_SHARED, sbfile, 0 );
+
+	int offsetmapeo=0;
+	//parseo los datos del SuperBloque en la estructura super_bloque
+	memcpy(&super_bloque.blocksize,superbloquemap,sizeof(super_bloque.blocksize));
+	//printf("blocksize = %d\n", super_bloque.blocksize);
+	offsetmapeo = offsetmapeo + sizeof(super_bloque.blocksize);
+	memcpy(&super_bloque.blocks,superbloquemap+offsetmapeo,sizeof(super_bloque.blocks));
+	//printf("blocks = %d\n", super_bloque.blocks);
+	offsetmapeo = offsetmapeo + sizeof(super_bloque.blocks);
+	super_bloque.bitarray = calloc(super_bloque.blocks/8+1, sizeof(char*));
+	//printf("tamaño bitarray %d\n", strlen(super_bloque.bitarray));
+	//printf("realizo malloc de : %d\n", super_bloque.blocks/8+1);
+	memcpy(super_bloque.bitarray,superbloquemap+offsetmapeo,super_bloque.blocks/8+1);
+	//printf("tamaño bitarray = %d\n", strlen(super_bloque.bitarray));
+
+	//creo un t_bittarray para manipularlo con las commons
+	bitmap = *bitarray_create_with_mode(super_bloque.bitarray,super_bloque.blocks/8,LSB_FIRST);
 
 	//creo el blocks.
 	FILE* blocks_create;
@@ -145,7 +164,7 @@ int existe_filesystem(){
 	char * block_path = crear_path_absoluto("/Blocks.ims");
 	if (existe_archivo(sb_path)){
 		//intenta abrir el archivo, para confirmar su existencia
-		int sbfile = open(sb_path, O_RDWR, S_IRUSR | S_IWUSR);
+		sbfile = open(sb_path, O_RDWR, S_IRUSR | S_IWUSR);
 		if(fstat(sbfile,&superbloque_stat) == -1)
 		{
 			perror("no se pudo obtener los datos del archivo.\n");

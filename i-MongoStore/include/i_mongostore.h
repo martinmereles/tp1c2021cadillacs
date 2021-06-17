@@ -44,6 +44,7 @@ filesystem_config fs_config;
 t_bitarray bitmap;
 void* superbloquemap;
 char * blocksmap;
-extern int bitoffset;
+int sbfile;
+int bfile;
 
 #endif
