@@ -4,6 +4,7 @@ int main(void) {
 
 	// Inicializo variables globales
 	status_discordiador = RUNNING;
+    estado_planificador = PLANIFICADOR_OFF;
 
 	generadorPID = 0;
 	generadorTID = 0;
@@ -13,6 +14,10 @@ int main(void) {
 	sem_init(&sem_generador_PID,0,1);
 	sem_init(&sem_generador_TID,0,1);
 	sem_init(&sem_struct_iniciar_tripulante,0,0);
+
+    //Inicializo semaforos del dispatcher
+    sem_init(&sem_mutex_ingreso_tripulantes_new,0,1);
+    sem_init(&sem_puede_ejecutar_planificador,0,1);
 	
 	// Creo logger
 	logger = log_create("./cfg/discordiador.log", "Discordiador", 1, LOG_LEVEL_DEBUG);
@@ -35,9 +40,18 @@ int main(void) {
 	string_append(&direccion_IP_Mi_RAM_HQ, config_get_string_value(config, "IP_MI_RAM_HQ"));
 	string_append(&puerto_Mi_RAM_HQ, config_get_string_value(config, "PUERTO_MI_RAM_HQ"));
 	string_append(&algoritmo_planificador, config_get_string_value(config, "ALGORITMO"));
-	string_append(&string_quantum, config_get_string_value(config, "QUANTUM"));
 
-    quantum = atoi(string_quantum);
+    if(strcmp(algoritmo_planificador,"RR")==0){
+        string_append(&string_quantum, config_get_string_value(config, "QUANTUM"));
+        quantum = atoi(string_quantum); // Variable global
+    }
+    else{
+	if(strcmp(algoritmo_planificador,"FIFO")==0)
+		quantum = 0; // Variable global
+    else
+        return EXIT_FAILURE;
+    }
+    free(string_quantum);
 
 	log_info(logger, "Configuracion terminada");
 
@@ -161,16 +175,22 @@ void leer_consola_y_procesar(int i_mongo_store_fd, int mi_ram_hq_fd) {
 			iniciar_patota(argumentos, mi_ram_hq_fd);
 			break;
 		case LISTAR_TRIPULANTES:
-			//listar_tripulantes(string_to_code_algor(algoritmo_planificador));
+            if (estado_planificador != PLANIFICADOR_OFF){
+                sem_wait(&sem_puede_ejecutar_planificador);
+                //listar_tripulantes(string_to_code_algor(algoritmo_planificador));
+                sem_post(&sem_puede_ejecutar_planificador);
+            }
 			break;
 		case EXPULSAR_TRIPULANTES:
 			log_info(logger, "Expulsando tripulante");
 			break;
 		case INICIAR_PLANIFICACION:
-			//iniciar_planificador(algoritmo_planificador);
+            log_info(logger, "Iniciando planificacion");
+			//iniciar_dispatcher(algoritmo_planificador);
 			break;
 		case PAUSAR_PLANIFICACION:
 			log_info(logger, "Pausando planificacion");
+            //dispatcher_pausar();
 			break;
 		case OBTENER_BITACORA:
 			log_info(logger, "Obteniendo bitacora");
@@ -259,10 +279,13 @@ int iniciar_patota(char** argumentos, int mi_ram_hq_fd){
 		struct_iniciar_tripulante.TID = generarNuevoTID();
 
         // Agregando nuevo tripulante a cola NEW
+        sem_wait(&sem_mutex_ingreso_tripulantes_new);
         nuevo = malloc(sizeof(t_tripulante));
 		nuevo->TID = struct_iniciar_tripulante.TID;
 		nuevo->PID = struct_iniciar_tripulante.PID;
+        nuevo->estado_previo = NEW;
 		queue_push(cola_new,nuevo);
+        sem_post(&sem_mutex_ingreso_tripulantes_new);
 
 		// Creamos el hilo para el submodulo tripulante
 		// NOTA: el struct pthread_t de cada hilo tripulante se pierde

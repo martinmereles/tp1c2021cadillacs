@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <pthread.h>
+#include <semaphore.h>
 
 // en ESTADO NEW: genera las estructuras administrativas , una vez generado todo --> pasa a READY.
 t_queue *cola_new;
@@ -52,24 +53,22 @@ enum algoritmo {
     RR
 };
 
-int iniciar_planificador(char *algoritmo_planificador);
-int existe_tripulantes_en_cola(t_queue *cola);
+sem_t sem_mutex_buffer_blocked_io_to_ready;
+sem_t sem_mutex_buffer_exec_to_ready;
+sem_t sem_mutex_buffer_exec_to_blocked_io;
 
+sem_t sem_mutex_ingreso_tripulantes_new;
+sem_t sem_puede_ejecutar_planificador;
+
+int iniciar_dispatcher(char *algoritmo_planificador);
+int existe_tripulantes_en_cola(t_queue *cola);
 void listar_tripulantes(enum algoritmo cod);
 char *code_dispatcher_to_string(enum estado_tripulante code);
 
-int hay_espacio_disponible(int grado_multiprocesamiento);
 int hay_tarea_a_realizar(void);
-int hay_tripulantes_a_borrar(void);
-void expulsar_tripulante(void);
-int hay_bloqueo_io(void);
-int hay_sabotaje(void);
-int se_solicito_lista_trip(void);
-int termino_sabotaje(void);
-
+int dispatcher_expulsar_tripulante(int tid_tripulante);
+void dispatcher_pausar(void);
 enum algoritmo string_to_code_algor(char *string_algor);
-
-int get_index_from_cola_by_tid(t_queue *src_list, int tid_buscado);
 void agregar_a_buffer_peticiones(t_queue *buffer, int tid);
 
 #endif
