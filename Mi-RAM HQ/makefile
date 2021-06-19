@@ -4,10 +4,10 @@ SHARED_IDIR = ../shared/include
 CC=gcc
 CFLAGS=-I$(IDIR) -I$(SHARED_IDIR) -g -Wall
 
-CFG=./cfg
+DMP =./dump
 ODIR=./obj
 SRCDIR =./src
-LIBS=-lcommons -lpthread -lreadline -lcunit -lrt
+LIBS=-lcommons -lpthread -lreadline -lcunit -lrt -lnivel-gui -lncurses
 
 SHARED_SRCDIR = ../shared/src
 SHARED_ODIR = ../shared/obj
@@ -20,7 +20,7 @@ OBJ = $(patsubst $(SRCDIR)/%.c,$(ODIR)/%.o,$(SRC))
 all: DIRECTORIO_OBJ_CFG $(PROCESS_NAME)
 
 DIRECTORIO_OBJ_CFG:
-	mkdir -p $(ODIR) $(CFG) $(SHARED_ODIR)
+	mkdir -p $(ODIR) $(CFG) $(SHARED_ODIR) $(DMP)
 
 $(ODIR)/%.o: $(SRCDIR)/%.c $(DEPS) $(SHARED_DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)

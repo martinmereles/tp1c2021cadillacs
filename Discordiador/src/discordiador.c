@@ -245,6 +245,14 @@ int iniciar_patota(char** argumentos, int mi_ram_hq_fd){
 	// Le pedimos a Mi-RAM HQ que inicie la patota
 	enviar_op_iniciar_patota(mi_ram_hq_fd, PID, lista_de_tareas);
 
+	// Esperamos a la confirmacion de que fue creada con exito
+	if(recibir_operacion(mi_ram_hq_fd) != COD_INICIAR_PATOTA_OK){
+		log_error(logger,"Mi RAM HQ denego la creacion de la patota");
+		return EXIT_FAILURE;
+	}
+
+	log_info(logger,"Mi RAM HQ creo la patota con exito");
+
 	for(int i = 0;i < cantidad_tripulantes;i++){
 		if( 3 + i < cantidad_args){
 			posicion = string_split(argumentos[3 + i],"|");
@@ -300,6 +308,7 @@ int submodulo_tripulante(void* args) {
 		log_error(logger, "Submodulo Tripulante: No se pudo establecer la conexion con el i-MongoStore");
 		// Libero recursos
 		liberar_conexion(i_mongo_store_fd_tripulante);
+		sem_post(&sem_struct_iniciar_tripulante);
 		return EXIT_FAILURE;
 	}
 
@@ -309,16 +318,34 @@ int submodulo_tripulante(void* args) {
 		// Libero recursos
 		liberar_conexion(i_mongo_store_fd_tripulante);
 		liberar_conexion(mi_ram_hq_fd_tripulante);
+		sem_post(&sem_struct_iniciar_tripulante);
 		return EXIT_FAILURE;
 	}
 
 	// Le pedimos a Mi-RAM HQ que inicie al tripulante
 	estado_envio_mensaje = enviar_op_iniciar_tripulante(mi_ram_hq_fd_tripulante, struct_iniciar_tripulante);
-	if(estado_envio_mensaje != EXIT_SUCCESS)
+	if(estado_envio_mensaje != EXIT_SUCCESS){
 		log_error(logger, "No se pudo mandar el mensaje al Mi-Ram HQ");
-	log_info(logger, "Tripulante inicializado");
-
+		// Libero recursos
+		liberar_conexion(i_mongo_store_fd_tripulante);
+		liberar_conexion(mi_ram_hq_fd_tripulante);
+		sem_post(&sem_struct_iniciar_tripulante);
+		return EXIT_FAILURE;
+	}
+	
+	// Esperamos a la confirmacion de que fue creada con exito
+	if(recibir_operacion(mi_ram_hq_fd_tripulante) != COD_INICIAR_TRIPULANTE_OK){
+		log_error(logger,"Mi RAM HQ denego la creacion del tripulante");
+		// Libero recursos
+		liberar_conexion(i_mongo_store_fd_tripulante);
+		liberar_conexion(mi_ram_hq_fd_tripulante);
+		sem_post(&sem_struct_iniciar_tripulante);
+		return EXIT_FAILURE;
+	}
+	
 	sem_post(&sem_struct_iniciar_tripulante);
+	
+	log_info(logger, "Tripulante inicializado");
 
 	while(status_discordiador != END && estado_tripulante != 'F'){
 		sleep(20);
@@ -330,6 +357,7 @@ int submodulo_tripulante(void* args) {
 			log_error(logger, "No se pudo mandar el mensaje al i-Mongo-Store");
 		
 		// Hay que ver si el servidor esta conectado?
+		
 		estado_envio_mensaje = enviar_op_recibir_ubicacion_tripulante(mi_ram_hq_fd_tripulante, pos_X, pos_Y);
 		if(estado_envio_mensaje != EXIT_SUCCESS)
 			log_error(logger, "No se pudo mandar el mensaje a Mi-Ram HQ");
@@ -345,6 +373,7 @@ int submodulo_tripulante(void* args) {
 		if(strcmp(tarea,"FIN") == 0)
 			estado_tripulante = 'F';
 		free(tarea);
+		
 	}
 
 	estado_envio_mensaje = enviar_op_expulsar_tripulante(mi_ram_hq_fd_tripulante);

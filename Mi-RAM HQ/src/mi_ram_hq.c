@@ -12,10 +12,14 @@ int main(void)
 	char* puerto_escucha = config_get_string_value(config, "PUERTO");
 	char* ip = "127.0.0.1";
 
-	inicializar_estructuras_memoria(config);
+	// Inicializar las estructuras para administrar la memoria
+	if(inicializar_estructuras_memoria(config)==EXIT_FAILURE)
+		return EXIT_FAILURE;
 
 	int server_fd = iniciar_servidor(ip, puerto_escucha);
+
 	log_info(logger, "Mi-RAM HQ listo para recibir al Discordiador");
+	log_info(logger, "PID de Mi-RAM-HQ: %d",getpid());
 
 	mi_ram_hq(server_fd);
 
@@ -68,8 +72,10 @@ void mi_ram_hq(int servidor_fd) {
 				}
 				// Si ocurrio un evento inesperado
 				else{
-					log_error(logger, "Evento inesperado en los file descriptor: %s", strerror(pfds[0].revents));
-					log_error(logger, "Evento inesperado en los file descriptor: %s", strerror(pfds[1].revents));
+					if(strcmp(strerror(pfds[0].revents),"Success")!=0)
+						log_error(logger, "Evento inesperado en los file descriptor: %s", strerror(pfds[0].revents));
+					if(strcmp(strerror(pfds[1].revents),"Success")!=0)
+						log_error(logger, "Evento inesperado en los file descriptor: %s", strerror(pfds[1].revents));
 				}
 			}
 		}
@@ -104,10 +110,11 @@ void leer_consola_y_procesar() {
 	fgets(linea_consola,TAM_CONSOLA,stdin);
 	linea_consola[strlen(linea_consola)-1]='\0';	// Le saco el \n
 
-	if(strcmp(linea_consola,"DUMP") == 0){
-		log_info(logger,"Dump: %s",temporal_get_string_time("%d/%m/%y %H:%M:%S"));
-		list_iterate(tablas_de_segmentos, (void(*)(void*))dump_patota);
-	}
+	if(strcmp(linea_consola,"DUMP") == 0)
+		dump_memoria();
+
+	if(strcmp(linea_consola,"COMP") == 0)
+		compactacion();
 
 	if(strcmp(linea_consola,"FIN") == 0){
 		status_servidor = END;
@@ -116,7 +123,7 @@ void leer_consola_y_procesar() {
 }
 
 int comunicacion_cliente(int cliente_fd) {
-	tabla_segmentos_t* tabla_patota = NULL;
+	void* tabla_patota = NULL;
 	uint32_t dir_log = -1;
 	bool cliente_conectado = true;
 
@@ -128,7 +135,7 @@ int comunicacion_cliente(int cliente_fd) {
 	while(status_servidor != END && cliente_conectado) {
 		// Revisamos si hay algun evento en el file descriptor del cliente
 		num_events = poll(pfds, 1, 2500);
-
+		
 		// Si hay un evento
 		if(num_events != 0){
 			// Si hay un mensaje del cliente
@@ -142,11 +149,11 @@ int comunicacion_cliente(int cliente_fd) {
 }
 
 // Cada tripulante sabe a que segmento pertenece y a que proceso pertenece
-
-bool leer_mensaje_cliente_y_procesar(int cliente_fd, tabla_segmentos_t** tabla_patota, uint32_t* dir_log){
+bool leer_mensaje_cliente_y_procesar(int cliente_fd, void** tabla_patota, uint32_t* dir_log){
 	bool cliente_conectado = true;
 	// Leo codigo de operacion
 	int cod_op = recibir_operacion(cliente_fd);
+	int resultado_op;
 	char* payload;
 
 	switch(cod_op) {
@@ -154,12 +161,14 @@ bool leer_mensaje_cliente_y_procesar(int cliente_fd, tabla_segmentos_t** tabla_p
 			recibir_payload_y_ejecutar(cliente_fd, loguear_mensaje);
 			break;
 		case COD_INICIAR_PATOTA:
-			recibir_payload_y_ejecutar(cliente_fd, iniciar_patota);
+			resultado_op = recibir_payload_y_ejecutar(cliente_fd, iniciar_patota);
+        	enviar_operacion(cliente_fd, resultado_op, NULL, 0); 
 			break;
 		case COD_INICIAR_TRIPULANTE:
 			payload = recibir_payload(cliente_fd);
-			iniciar_tripulante(payload, tabla_patota, dir_log);
+			resultado_op = iniciar_tripulante(payload, tabla_patota, dir_log);
 			free(payload);
+        	enviar_operacion(cliente_fd, resultado_op, NULL, 0); 
 			break;
 		case COD_RECIBIR_UBICACION_TRIPULANTE:
 			payload = recibir_payload(cliente_fd);

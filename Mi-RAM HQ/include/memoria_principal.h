@@ -1,29 +1,24 @@
 #ifndef MEMORIA_PRINCIPAL_H_
 #define MEMORIA_PRINCIPAL_H_
 
-#include "variables_globales_shared.h"
-#include "commons/bitarray.h"
-#include "commons/config.h"
-#include "commons/collections/list.h"
+#include "segmentacion.h"
+#include "paginacion.h"
+#include <signal.h>
 #include <sys/types.h>
-#include <string.h>
-#include "commons/string.h"
+#include <unistd.h>
+#include <sys/syscall.h>
 
-#define TAMANIO_PCB 8
-#define TAMANIO_TCB 21
+// NO DEBE DEPENDER DEL ESQUEMA DE MEMORIA (SEGMENTACION O PAGINACION)
+int inicializar_estructuras_memoria(t_config* config);
+void liberar_estructuras_memoria();
 
-void inicializar_estructuras_memoria(t_config* config);
+// ESQUEMA DE MEMORIA
+int inicializar_esquema_memoria(t_config* config);
 
-void* memoria_principal;
-int tamanio_memoria;
+// FUNCIONES COMUNES PARA SEGMENTACION Y PAGINACION
+void leer_tarea_memoria_principal(void* tabla, char** tarea, uint32_t id_prox_tarea);
 
-// ESTRUCTURAS PARA ADMINISTRAR LA MEMORIA PRINCIPAL
-
-// Tablas de segmentos
-t_list* tablas_de_segmentos;
-
-// Mapa de posiciones de memoria libres
-t_bitarray*	mapa_memoria_disponible;
-char* bitarray_mapa_memoria_disponible;
+// Para manejar signals
+void signal_handler(int senial);
 
 #endif

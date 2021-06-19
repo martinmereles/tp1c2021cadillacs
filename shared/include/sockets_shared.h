@@ -10,8 +10,6 @@
 #include "variables_globales_shared.h"
 #include <commons/collections/list.h>
 
-
-
 // PROTOCOLO: CODIGOS DE OPERACION 
 enum op_code{
 	COD_MENSAJE,
@@ -24,7 +22,14 @@ enum op_code{
     COD_INICIAR_TRIPULANTE,
     COD_RECIBIR_UBICACION_TRIPULANTE,
     COD_ENVIAR_PROXIMA_TAREA,
-    COD_EXPULSAR_TRIPULANTE
+    COD_EXPULSAR_TRIPULANTE,
+
+    // Codigos de respuesta del servidor Mi-RAM HQ
+    COD_INICIAR_PATOTA_ERROR,
+    COD_INICIAR_PATOTA_OK,
+    COD_INICIAR_TRIPULANTE_ERROR,
+    COD_INICIAR_TRIPULANTE_OK
+
     // Codigos para servidor i-Mongo-Store: FALTA
 };
 
