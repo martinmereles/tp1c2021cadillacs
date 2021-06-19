@@ -10,7 +10,7 @@
 #include "commons/config.h"
 #include "commons/temporal.h"
 #include "servidor_mi_ram_hq.h"
-#include "memoria_principal.h"
+#include "segmentacion.h"
 
 enum server_status{
     RUNNING,

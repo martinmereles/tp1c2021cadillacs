@@ -150,8 +150,6 @@ void quitar_y_destruir_tabla(tabla_segmentos_t* tabla_a_destruir){
     }
 
     list_remove_and_destroy_by_condition(tablas_de_patotas, tienePID, destruir_tabla_segmentos); 
-
-    
 }
 
 void destruir_tabla_segmentos(void* args){
@@ -462,12 +460,14 @@ void dump_patota_segmentacion_pruebas(void* args){
 }
 
 void dump_tripulante_segmentacion_pruebas(tabla_segmentos_t* tabla, int nro_fila){
+
     // Proceso: 1	Segmento: 1	Inicio: 0x0000	Tam: 20b
     uint32_t inicio = obtener_fila(tabla,nro_fila)->inicio;
     uint32_t tamanio = obtener_fila(tabla,nro_fila)->tamanio;
     uint32_t TID, posicion_X, posicion_Y, id_proxima_instruccion, dir_log_pcb, PID;
     uint32_t dir_log_tcb = nro_fila << 16;
     char estado;
+    
     leer_memoria_principal(tabla, dir_log_tcb, DESPL_TID, &TID, sizeof(uint32_t));    
     leer_memoria_principal(tabla, dir_log_tcb, DESPL_ESTADO, &estado, sizeof(char));
     leer_memoria_principal(tabla, dir_log_tcb, DESPL_POS_X, &posicion_X, sizeof(uint32_t));

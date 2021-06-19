@@ -1,5 +1,20 @@
 #include "discordiador.h"
 
+// Algoritmo
+/*
+	int algoritmo = string_to_enum_algoritmo(string);
+	if(alogritmo < 0){
+		log_error(logger, "ERROR");
+		return EXIT_FAILURE;
+	}
+
+	string_to_enum_algoritmo(char* string){
+		if(strcmp("FIFO",string)==0)	return FIFO;
+		if(strcmp("FIFO",string)==0)	return RR;
+		return -1;
+	}
+*/
+
 int main(void) {
 
 	// Inicializo variables globales
@@ -34,12 +49,13 @@ int main(void) {
 
 	log_info(logger, "Conectando con i-Mongo-Store");
 	// Intento conectarme con i-Mongo-Store
+
 	if(crear_conexion(direccion_IP_i_Mongo_Store, puerto_i_Mongo_Store, &i_mongo_store_fd) == EXIT_FAILURE){
 		log_error(logger, "No se pudo establecer la conexion con el i-Mongo-Store");
 		// Libero recursos
 		liberar_conexion(i_mongo_store_fd);
 		log_destroy(logger);
-		config_destroy(config);
+		config_destroy(config);SS
 		return EXIT_FAILURE;
 	}
 	log_info(logger, "Conexion con el i-Mongo-Store exitosa");
@@ -332,7 +348,7 @@ int submodulo_tripulante(void* args) {
 	log_info(logger, "Tripulante inicializado");
 
 	while(status_discordiador != END && estado_tripulante != 'F'){
-		sleep(10);
+		sleep(20);
 		// Test: Mando un mensaje al i-Mongo-Store y a Mi-Ram HQ
 		
 		// Hay que ver si el servidor esta conectado?
@@ -359,7 +375,7 @@ int submodulo_tripulante(void* args) {
 		free(tarea);
 		
 	}
-	
+
 	estado_envio_mensaje = enviar_op_expulsar_tripulante(mi_ram_hq_fd_tripulante);
 	if(estado_envio_mensaje != EXIT_SUCCESS)
 		log_error(logger, "No se pudo mandar el mensaje a Mi-Ram HQ");
