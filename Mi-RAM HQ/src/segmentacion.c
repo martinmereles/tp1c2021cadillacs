@@ -150,6 +150,8 @@ void quitar_y_destruir_tabla(tabla_segmentos_t* tabla_a_destruir){
     }
 
     list_remove_and_destroy_by_condition(tablas_de_patotas, tienePID, destruir_tabla_segmentos); 
+
+    
 }
 
 void destruir_tabla_segmentos(void* args){
@@ -158,6 +160,7 @@ void destruir_tabla_segmentos(void* args){
     list_destroy_and_destroy_elements(tabla->filas, destruir_fila);
     free(tabla->semaforo);
     free(tabla);
+    ejecutar_rutina(dump_memoria);  // Para test
 }
 
 void quitar_y_destruir_fila(tabla_segmentos_t* tabla, int numero_seg){
@@ -235,6 +238,7 @@ int crear_patota_segmentacion(uint32_t PID, uint32_t longitud_tareas, char* tare
     escribir_memoria_principal(tabla_patota, direccion_logica_tareas, 0, tareas, longitud_tareas);
     log_info(logger, "Estructuras de la patota inicializadas exitosamente");
 
+    ejecutar_rutina(dump_memoria);
     return EXIT_SUCCESS;
 }
 
@@ -270,6 +274,7 @@ int crear_tripulante_segmentacion(void** tabla, uint32_t* dir_log_tcb,
     escribir_memoria_principal(*tabla, *dir_log_tcb, DESPL_PROX_INSTR, &id_proxima_instruccion, sizeof(uint32_t));
     escribir_memoria_principal(*tabla, *dir_log_tcb, DESPL_DIR_PCB, &dir_log_pcb, sizeof(uint32_t));
 
+    ejecutar_rutina(dump_memoria);
     return EXIT_SUCCESS;
 }
 

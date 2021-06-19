@@ -72,7 +72,7 @@ int crear_patota_paginacion(uint32_t PID, uint32_t longitud_tareas, char* tareas
 
     log_info(logger, "Estructuras de la patota inicializadas exitosamente");
 
-    ejecutar_rutina(dump_memoria);
+    //ejecutar_rutina(dump_memoria);
 
     return EXIT_SUCCESS;
 }
@@ -111,7 +111,7 @@ int crear_tripulante_paginacion(void** args, uint32_t* direccion_logica_TCB,
     escribir_memoria_principal(*tabla_patota, *direccion_logica_TCB, DESPL_PROX_INSTR, &id_proxima_instruccion, sizeof(uint32_t));
     escribir_memoria_principal(*tabla_patota, *direccion_logica_TCB, DESPL_DIR_PCB, &dir_log_pcb, sizeof(uint32_t));
 
-    ejecutar_rutina(dump_memoria);
+    //ejecutar_rutina(dump_memoria);
 
     return EXIT_SUCCESS;
 }
@@ -224,10 +224,14 @@ int escribir_memoria_principal_paginacion(void* args, uint32_t inicio_logico, ui
     tabla_paginas_t* tabla = (tabla_paginas_t*) args;
     uint32_t direccion_logica = direccion_logica_paginacion(inicio_logico, desplazamiento_logico);
 
+
     // Si la pagina esta en memoria virtual, debo traerla
     marco_t* pagina = get_pagina(tabla, numero_pagina(direccion_logica)); 
+
+    /*
     if(pagina->bit_presencia)
         proceso_swap(pagina);
+    */
 
     // Calculo la direccion fisica
     uint32_t direccion_fisica_dato; 
@@ -277,10 +281,13 @@ int leer_memoria_principal_paginacion(void* args, uint32_t inicio_logico, uint32
     tabla_paginas_t* tabla = (tabla_paginas_t*) args;
     uint32_t direccion_logica = direccion_logica_paginacion(inicio_logico, desplazamiento_logico);
 
+    
     // Si la pagina esta en memoria virtual, debo traerla
     marco_t* pagina = get_pagina(tabla, numero_pagina(direccion_logica)); 
+    /*
     if(pagina->bit_presencia)
         proceso_swap(pagina);
+    */
 
     // Calculo la direccion fisica
     uint32_t direccion_fisica_dato; 
@@ -444,13 +451,14 @@ void dump_marco(void* args, FILE* archivo_dump){
     free(info_marco);
 }
 
+// MEMORIA VIRTUAL
+
 // LRU
 void actualizar_timestamp(marco_t* pagina){
     free(pagina->timestamp);
     pagina->timestamp = temporal_get_string_time("%y%m%d%H%M%S");
 }
 
-// MEMORIA VIRTUAL
 // ALGORITMOS DE REEMPLAZO
 int inicializar_algoritmo_de_reemplazo(t_config* config){
     char* string_algoritmo_reemplazo = config_get_string_value(config, "ALGORITMO_REEMPLAZO");
