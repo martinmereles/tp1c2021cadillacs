@@ -268,14 +268,6 @@ int iniciar_patota(char** argumentos, int mi_ram_hq_fd){
 
 	log_info(logger,"Mi RAM HQ creo la patota con exito");
 
-	// Esperamos a la confirmacion de que fue creada con exito
-	if(recibir_operacion(mi_ram_hq_fd) != COD_INICIAR_PATOTA_OK){
-		log_error(logger,"Mi RAM HQ denego la creacion de la patota");
-		return EXIT_FAILURE;
-	}
-
-	log_info(logger,"Mi RAM HQ creo la patota con exito");
-
 	for(int i = 0;i < cantidad_tripulantes;i++){
 		if( 3 + i < cantidad_args){
 			posicion = string_split(argumentos[3 + i],"|");
@@ -384,11 +376,6 @@ int submodulo_tripulante(void* args) {
 		// Test: Mando un mensaje al i-Mongo-Store y a Mi-Ram HQ
 		
 		// Hay que ver si el servidor esta conectado?
-		estado_envio_mensaje = enviar_mensaje(i_mongo_store_fd_tripulante, "Hola, soy un tripulante");
-		if(estado_envio_mensaje != EXIT_SUCCESS)
-			log_error(logger, "No se pudo mandar el mensaje al i-Mongo-Store");
-		
-		// Hay que ver si el servidor esta conectado?
 		
 		estado_envio_mensaje = enviar_op_recibir_ubicacion_tripulante(mi_ram_hq_fd_tripulante, pos_X, pos_Y);
 		if(estado_envio_mensaje != EXIT_SUCCESS)
@@ -404,6 +391,12 @@ int submodulo_tripulante(void* args) {
 		log_info(logger,"La proxima tarea a ejecutar es:\n%s",tarea);
 		if(strcmp(tarea,"FIN") == 0)
 			estado_tripulante = 'F';
+				
+		// Hay que ver si el servidor esta conectado?
+		estado_envio_mensaje = enviar_mensaje(i_mongo_store_fd_tripulante, tarea);
+		if(estado_envio_mensaje != EXIT_SUCCESS)
+			log_error(logger, "No se pudo mandar el mensaje al i-Mongo-Store");
+
 		free(tarea);
 		
 	}

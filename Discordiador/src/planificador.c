@@ -1,31 +1,31 @@
 #include "planificador.h"
 
-static void crear_colas();
-static void pasar_todos_new_to_ready(enum algoritmo cod_algor);
-static int hay_espacio_disponible(int grado_multiprocesamiento);
-static int transicion_new_to_ready(t_tripulante *dato, enum algoritmo cod_algor);
-static void imprimir_info_elemento_fifo(void *data);
-static void imprimir_info_elemento_rr(void *data);
-static void transicion_ready_to_exec(t_tripulante *dato);
-static void transicion_exec_to_blocked_io(t_tripulante *dato, enum algoritmo cod_algor);
-static void transicion_blocked_io_to_ready(t_tripulante *dato, enum algoritmo cod_algor);
-static void transicion_exec_to_ready(t_tripulante *dato); // RR
-static void destructor_elementos_tripulante(void *data_tripulante);
-static void ordenar_lista_tid_ascendente(t_queue *listado);
-static bool tripulante_tid_es_menor_que(void *lower, void *upper);
-static int hay_bloqueo_io(void);
-static void gestionar_bloqueo_io(t_queue *peticiones_from_exec, t_queue *peticiones_to_ready, enum algoritmo code_algor);
-static int hay_sabotaje(void);
-static void bloquear_tripulantes_por_sabotaje(void);
-static int termino_sabotaje(void);
-static void desbloquear_tripulantes_tras_sabotaje(void);
-static int get_buffer_peticiones_and_swap_exec_blocked_io(t_queue *peticiones_origen, enum algoritmo code_algor);
-static int get_buffer_peticiones_and_swap_blocked_io_ready(t_queue *peticiones_origen, enum algoritmo code_algor);
-static void gestionar_exec(int grado_multiprocesamiento);
-static int get_index_from_cola_by_tid(t_queue *src_list, int tid_buscado);
-static t_tripulante *obtener_tripulante_por_tid(t_queue *cola_src, int tid_buscado);
-static int hay_tripulantes_sin_quantum();
-static void gestionar_tripulantes_sin_quantum();
+void crear_colas();
+void pasar_todos_new_to_ready(enum algoritmo cod_algor);
+ int hay_espacio_disponible(int grado_multiprocesamiento);
+ int transicion_new_to_ready(t_tripulante *dato, enum algoritmo cod_algor);
+ void imprimir_info_elemento_fifo(void *data);
+ void imprimir_info_elemento_rr(void *data);
+ void transicion_ready_to_exec(t_tripulante *dato);
+ void transicion_exec_to_blocked_io(t_tripulante *dato, enum algoritmo cod_algor);
+ void transicion_blocked_io_to_ready(t_tripulante *dato, enum algoritmo cod_algor);
+ void transicion_exec_to_ready(t_tripulante *dato); // RR
+ void destructor_elementos_tripulante(void *data_tripulante);
+ void ordenar_lista_tid_ascendente(t_queue *listado);
+ bool tripulante_tid_es_menor_que(void *lower, void *upper);
+ int hay_bloqueo_io(void);
+ void gestionar_bloqueo_io(t_queue *peticiones_from_exec, t_queue *peticiones_to_ready, enum algoritmo code_algor);
+ int hay_sabotaje(void);
+ void bloquear_tripulantes_por_sabotaje(void);
+ int termino_sabotaje(void);
+ void desbloquear_tripulantes_tras_sabotaje(void);
+ int get_buffer_peticiones_and_swap_exec_blocked_io(t_queue *peticiones_origen, enum algoritmo code_algor);
+ int get_buffer_peticiones_and_swap_blocked_io_ready(t_queue *peticiones_origen, enum algoritmo code_algor);
+ void gestionar_exec(int grado_multiprocesamiento);
+ int get_index_from_cola_by_tid(t_queue *src_list, int tid_buscado);
+ t_tripulante *obtener_tripulante_por_tid(t_queue *cola_src, int tid_buscado);
+ int hay_tripulantes_sin_quantum();
+ void gestionar_tripulantes_sin_quantum();
 
 int dispatcher(void *algor_planif){
 /*
@@ -111,7 +111,7 @@ int iniciar_dispatcher(char *algoritmo_planificador){
     return EXIT_SUCCESS;
 }
 
-static void crear_colas(){
+ void crear_colas(){
     cola_ready = queue_create();
     cola_running = queue_create();
     cola_bloqueado_io = queue_create();
@@ -123,7 +123,7 @@ static void crear_colas(){
     buffer_peticiones_exec_to_ready = queue_create();
 }
 
-static void pasar_todos_new_to_ready(enum algoritmo cod_algor){
+ void pasar_todos_new_to_ready(enum algoritmo cod_algor){
     int cant_cola = queue_size(cola_new);
     t_tripulante *transito;
     
@@ -133,7 +133,7 @@ static void pasar_todos_new_to_ready(enum algoritmo cod_algor){
     }
 }
 
-static int transicion_new_to_ready(t_tripulante *dato, enum algoritmo cod_algor){
+ int transicion_new_to_ready(t_tripulante *dato, enum algoritmo cod_algor){
     t_tripulante *nuevo_trip_fifo;
     t_tripulante *nuevo_trip_rr;
 
@@ -161,7 +161,7 @@ int existe_tripulantes_en_cola(t_queue *cola){
     return (queue_size(cola) > 0)? 1: 0;
 }
 
-static int hay_espacio_disponible(int grado_multiprocesamiento){
+ int hay_espacio_disponible(int grado_multiprocesamiento){
     return (queue_size(cola_running) < grado_multiprocesamiento)? 1: 0;
 }
 
@@ -220,11 +220,11 @@ int dispatcher_expulsar_tripulante(int tid_buscado){
     return EXIT_SUCCESS;
 }
 
-static int hay_bloqueo_io(void){
+ int hay_bloqueo_io(void){
     return existe_tripulantes_en_cola(cola_bloqueado_io);
 }
 
-static int hay_sabotaje(void){
+ int hay_sabotaje(void){
     // TODO: verificar cuando reciba el MODULO DISCORDIADOR el aviso de parte de iMongo-Store.
     return 1;
 }
@@ -280,19 +280,19 @@ void listar_tripulantes(enum algoritmo cod_algor){
 
 }
 
-static void imprimir_info_elemento_fifo(void *data){
+ void imprimir_info_elemento_fifo(void *data){
     t_tripulante *tripulante_fifo;
     tripulante_fifo = data;
     printf("Elemento:\nNro TID: %d - Nro PID: %d - Estado: %s\n", tripulante_fifo->TID, tripulante_fifo->PID, code_dispatcher_to_string(tripulante_fifo->estado_previo));
 }
 
-static void imprimir_info_elemento_rr(void *data){
+ void imprimir_info_elemento_rr(void *data){
     t_tripulante *tripulante_rr;     
     tripulante_rr = data;
     printf("Elemento:\nNro TID: %d - Nro PID: %d - Estado: %s\n", tripulante_rr->TID, tripulante_rr->PID, code_dispatcher_to_string(tripulante_rr->estado_previo));
 }
 
-static void destructor_elementos_tripulante(void *data){
+ void destructor_elementos_tripulante(void *data){
     t_tripulante *temp;
     temp = data;
     free(temp);
@@ -315,7 +315,7 @@ char *code_dispatcher_to_string(enum estado_tripulante code){
     }
 }
 
-static void transicion_ready_to_exec(t_tripulante *dato){
+ void transicion_ready_to_exec(t_tripulante *dato){
     t_tripulante *temp;
     //temp = malloc(sizeof(t_tripulante));
     //memcpy(temp, dato, sizeof(t_tripulante));
@@ -324,7 +324,7 @@ static void transicion_ready_to_exec(t_tripulante *dato){
     queue_push(cola_running,temp);
 }
 
-static void transicion_exec_to_blocked_io(t_tripulante *dato, enum algoritmo cod_algor){
+ void transicion_exec_to_blocked_io(t_tripulante *dato, enum algoritmo cod_algor){
     t_tripulante *temp;
     //temp = malloc(sizeof(t_tripulante));
     //memcpy(temp, dato, sizeof(t_tripulante));
@@ -335,7 +335,7 @@ static void transicion_exec_to_blocked_io(t_tripulante *dato, enum algoritmo cod
     queue_push(cola_bloqueado_io,temp);
 }
 
-static void transicion_blocked_io_to_ready(t_tripulante *dato, enum algoritmo cod_algor){
+ void transicion_blocked_io_to_ready(t_tripulante *dato, enum algoritmo cod_algor){
     t_tripulante *temp;
     //temp = malloc(sizeof(t_tripulante));
     //memcpy(temp, dato, sizeof(t_tripulante));
@@ -346,7 +346,7 @@ static void transicion_blocked_io_to_ready(t_tripulante *dato, enum algoritmo co
     queue_push(cola_running,temp);
 }
 
-static void transicion_exec_to_ready(t_tripulante *dato){
+ void transicion_exec_to_ready(t_tripulante *dato){
     t_tripulante *temp;
     //temp = malloc(sizeof(t_tripulante));
     //memcpy(temp, dato, sizeof(t_tripulante));
@@ -356,7 +356,7 @@ static void transicion_exec_to_ready(t_tripulante *dato){
     queue_push(cola_ready,temp);
 }
 
-static void bloquear_tripulantes_por_sabotaje(void){
+ void bloquear_tripulantes_por_sabotaje(void){
 
     //Pasar todos los tripulantes a blocked_emerg SEGUN ORDEN (1-EXEC -> 2-READY ->3- BLOCKED_IO)
     t_queue *temporal;
@@ -382,16 +382,16 @@ static void bloquear_tripulantes_por_sabotaje(void){
     queue_destroy(temporal);		
 }
 
-static int termino_sabotaje(void){
+ int termino_sabotaje(void){
     // TODO: verificar si termina el sabotaje. ¿Implementar con flag?
     return 0;
 }
 
-static void ordenar_lista_tid_ascendente(t_queue *listado){
+ void ordenar_lista_tid_ascendente(t_queue *listado){
     list_sort(listado->elements,tripulante_tid_es_menor_que);
 }
 
-static bool tripulante_tid_es_menor_que(void *data1, void *data2){
+ bool tripulante_tid_es_menor_que(void *data1, void *data2){
     t_tripulante *temp1;
     t_tripulante *temp2;
     temp1 = data1;
@@ -399,7 +399,7 @@ static bool tripulante_tid_es_menor_que(void *data1, void *data2){
     return (temp1->TID <= temp2->TID)? true: false;
 }
 
-static int get_index_from_cola_by_tid(t_queue *src_list, int tid_buscado){
+ int get_index_from_cola_by_tid(t_queue *src_list, int tid_buscado){
     t_list_iterator *iterador_nuevo;
     iterador_nuevo = list_iterator_create(src_list->elements);
     int index_buscado = -1;
@@ -416,13 +416,13 @@ static int get_index_from_cola_by_tid(t_queue *src_list, int tid_buscado){
     return index_buscado;
 }
 
-static void gestionar_bloqueo_io(t_queue *peticiones_from_exec, t_queue *peticiones_to_ready, enum algoritmo code_algor){
+ void gestionar_bloqueo_io(t_queue *peticiones_from_exec, t_queue *peticiones_to_ready, enum algoritmo code_algor){
     //printf("Gestionando bloqueos_IO...\n");
     get_buffer_peticiones_and_swap_exec_blocked_io(peticiones_from_exec, code_algor);
     get_buffer_peticiones_and_swap_blocked_io_ready(peticiones_to_ready, code_algor);
 }
 
-static void desbloquear_tripulantes_tras_sabotaje(void){
+ void desbloquear_tripulantes_tras_sabotaje(void){
     while(existe_tripulantes_en_cola(cola_bloqueado_emergency)){
         queue_push(cola_ready, queue_pop(cola_bloqueado_emergency));
     }
@@ -442,7 +442,7 @@ void agregar_a_buffer_peticiones(t_queue *peticiones_destino, int tid){
     queue_push(peticiones_destino, tid_ptr);
 }
 
-static int get_buffer_peticiones_and_swap_exec_blocked_io(t_queue *peticiones_origen, enum algoritmo code_algor){
+ int get_buffer_peticiones_and_swap_exec_blocked_io(t_queue *peticiones_origen, enum algoritmo code_algor){
     int *buffer;
     t_tripulante *trip_transito;
     if ( queue_size(peticiones_origen) > 0){
@@ -457,7 +457,7 @@ static int get_buffer_peticiones_and_swap_exec_blocked_io(t_queue *peticiones_or
         return EXIT_FAILURE;
 }
 
-static int get_buffer_peticiones_and_swap_blocked_io_ready(t_queue *peticiones_origen, enum algoritmo code_algor){
+ int get_buffer_peticiones_and_swap_blocked_io_ready(t_queue *peticiones_origen, enum algoritmo code_algor){
     int *buffer;
     t_tripulante *trip_transito;
     if ( queue_size(peticiones_origen) > 0){
@@ -472,7 +472,7 @@ static int get_buffer_peticiones_and_swap_blocked_io_ready(t_queue *peticiones_o
         return EXIT_FAILURE;
 }
 
-static void gestionar_exec(int grado_multiprocesamiento){
+ void gestionar_exec(int grado_multiprocesamiento){
     t_tripulante *temp;
     while( queue_size(cola_running)%grado_multiprocesamiento > 0 ){
         temp = queue_pop(cola_ready);
@@ -485,17 +485,17 @@ void dispatcher_pausar(){
     estado_planificador = PLANIFICADOR_BLOCKED;
 }
 
-static t_tripulante *obtener_tripulante_por_tid(t_queue *cola_src, int tid_buscado){
+ t_tripulante *obtener_tripulante_por_tid(t_queue *cola_src, int tid_buscado){
     int index;
     index = get_index_from_cola_by_tid(cola_src, tid_buscado);
     return list_remove(cola_src->elements, index);
 }
 
-static int hay_tripulantes_sin_quantum(){
+ int hay_tripulantes_sin_quantum(){
     return existe_tripulantes_en_cola(buffer_peticiones_exec_to_ready);
 }
 
-static void gestionar_tripulantes_sin_quantum(){
+ void gestionar_tripulantes_sin_quantum(){
     int *buffer;
     while( hay_tripulantes_sin_quantum() ){
         buffer = queue_pop(buffer_peticiones_exec_to_ready);

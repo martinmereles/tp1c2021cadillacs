@@ -1,7 +1,7 @@
 #ifndef MI_RAM_HQ_H_
 #define MI_RAM_HQ_H_
 
-#include <commons/log.h>
+#include "commons/log.h"
 #include <sys/time.h>
 #include <sys/types.h>
 #include <unistd.h>

@@ -1,32 +1,9 @@
 #ifndef SEGMENTACION_H_
 #define SEGMENTACION_H_
 
-<<<<<<< HEAD
 #include "mi_ram_hq_variables_globales.h"
 
 #define DIR_LOG_TAREAS  0x00010000
-=======
-#include "variables_globales_shared.h"
-#include "commons/bitarray.h"
-#include "commons/config.h"
-#include "commons/collections/list.h"
-#include <sys/types.h>
-#include <string.h>
-#include "commons/string.h"
-#include "memoria_principal.h"
-
-#define DIR_LOG_PCB     0x00000000
-#define DIR_LOG_TAREAS  0x00010000
-#define DESPL_PID       0 
-#define DESPL_TAREAS    4 
-
-#define DESPL_TID           0
-#define DESPL_ESTADO        4
-#define DESPL_POS_X         5
-#define DESPL_POS_Y         9
-#define DESPL_PROX_INSTR    13
-#define DESPL_DIR_PCB       17
->>>>>>> main
 
 /*
 direccion logica = nro segmento | desplazamiento
