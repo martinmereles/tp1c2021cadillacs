@@ -1,16 +1,22 @@
-#include "i-mongostore.h"
+#include "i_mongostore.h"
+
+
 
 int main(void)
 {
 	// inicializo semaforos
 	sem_init(&semaforo_aceptar_conexiones, 0, 0);
-
+	
 	logger = log_create("./cfg/i-mongostore.log", "I-MongoStore", 1, LOG_LEVEL_DEBUG);
-
+	
 	// Leo IP y PUERTO del config
-	t_config *config = config_create("./cfg/i-mongo-store.config");
+	config = config_create("./cfg/i-mongo-store.config");
+	
 	char* puerto_escucha = config_get_string_value(config, "PUERTO");
 	char* ip = "127.0.0.1";
+	leer_config();
+	//Levanto/Creo el Filesystem
+	iniciar_filesystem();
 
 	int server_fd = iniciar_servidor(ip, puerto_escucha);
 	log_info(logger, "I-MongoStore listo para recibir al Discordiador");
@@ -20,8 +26,19 @@ int main(void)
 	log_info(logger, "Cerrando socket servidor");
 	close(server_fd);
 	log_destroy(logger);
-
+	munmap(superbloquemap, superbloque_stat.st_size);
+	munmap(blocksmap, blocks_stat.st_size);
+	close(sbfile);
+	close(bfile);
 	return EXIT_SUCCESS;
+}
+
+void leer_config(){
+	config = config_create("./cfg/i-mongo-store.config");
+	fs_config.puerto = config_get_string_value(config,"PUERTO");
+	fs_config.punto_montaje = config_get_string_value(config,"PUNTO_MONTAJE");
+	fs_config.tiempo_sincro = config_get_int_value(config, "TIEMPO_SINCRONIZACION");
+	fs_config.posiciones_sabotaje = config_get_string_value(config, "TIEMPO_SINCRONIZACION");
 }
 
 void i_mongo_store(int servidor_fd) {
@@ -139,7 +156,8 @@ bool leer_mensaje_cliente_y_procesar(int cliente_fd){
 	int cod_op = recibir_operacion(cliente_fd);
 	switch(cod_op) {
 		case COD_MENSAJE:
-			recibir_payload_y_ejecutar(cliente_fd, loguear_mensaje);
+		//prueba COD_RECIBIR_TAREA
+			recibir_payload_y_ejecutar(cliente_fd, recibir_tarea);
 			break;
 		case -1:
 			log_error(logger, "El cliente se desconecto.");
