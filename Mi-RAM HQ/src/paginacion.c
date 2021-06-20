@@ -597,3 +597,20 @@ void escribir_marco(marco_t* marco, char* informacion){
         fwrite(informacion, sizeof(char), tamanio_pagina, memoria_virtual);
     }
 }
+
+uint32_t espacio_disponible_paginacion(){
+    uint32_t cantidad_marcos_libres = 0;
+
+    // Por cada marco, nos fijamos si esta libre o no
+    t_list_iterator* iterador = list_iterator_create(lista_de_marcos);    // Creamos el iterador
+    marco_t* marco;
+
+    while(list_iterator_has_next(iterador)){
+        marco = list_iterator_next(iterador);
+        if(marco->estado == MARCO_LIBRE)
+            cantidad_marcos_libres++;
+    }
+
+    list_iterator_destroy(iterador);    // Liberamos el iterador
+    return cantidad_marcos_libres;
+}

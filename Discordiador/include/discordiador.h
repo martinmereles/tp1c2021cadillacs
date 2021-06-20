@@ -14,7 +14,7 @@ enum status_discordiador{   RUNNING,
 
 enum comando_discordiador{  INICIAR_PATOTA, 
                             LISTAR_TRIPULANTES,
-                            EXPULSAR_TRIPULANTES, 
+                            EXPULSAR_TRIPULANTE, 
                             INICIAR_PLANIFICACION,
                             PAUSAR_PLANIFICACION,
                             OBTENER_BITACORA,

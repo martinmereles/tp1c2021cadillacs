@@ -59,6 +59,7 @@ marco_t* get_pagina(tabla_paginas_t* tabla_patota, int numero_pagina_buscada);
 int cantidad_paginas(tabla_paginas_t* tabla_patota);
 void eliminar_patota(tabla_paginas_t* tabla_patota);
 void liberar_marco(void*);
+uint32_t espacio_disponible_paginacion();
 
 // Dump
 void dump_memoria_paginacion();

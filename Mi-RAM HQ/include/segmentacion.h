@@ -51,6 +51,7 @@ int leer_memoria_principal_segmentacion(void* args, uint32_t inicio_logico, uint
 // Mapa memoria disponible
 void reservar_memoria_segmentacion(uint32_t inicio, uint32_t tamanio);
 void liberar_memoria_segmentacion(uint32_t inicio, uint32_t tamanio);
+uint32_t espacio_disponible_segmentacion();
 
 // Patotas y Tripulantes
 int crear_patota_segmentacion(uint32_t PID, uint32_t longitud_tareas, char* tareas);

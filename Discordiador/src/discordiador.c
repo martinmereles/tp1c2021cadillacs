@@ -181,7 +181,7 @@ void leer_consola_y_procesar(int i_mongo_store_fd, int mi_ram_hq_fd) {
                 sem_post(&sem_puede_ejecutar_planificador);
             }
 			break;
-		case EXPULSAR_TRIPULANTES:
+		case EXPULSAR_TRIPULANTE:
 			log_info(logger, "Expulsando tripulante");
 			break;
 		case INICIAR_PLANIFICACION:
@@ -258,7 +258,7 @@ int iniciar_patota(char** argumentos, int mi_ram_hq_fd){
 	struct_iniciar_tripulante.PID = PID;
 
 	// Le pedimos a Mi-RAM HQ que inicie la patota
-	enviar_op_iniciar_patota(mi_ram_hq_fd, PID, lista_de_tareas);
+	enviar_op_iniciar_patota(mi_ram_hq_fd, PID, cantidad_tripulantes, lista_de_tareas);
 
 	// Esperamos a la confirmacion de que fue creada con exito
 	if(recibir_operacion(mi_ram_hq_fd) != COD_INICIAR_PATOTA_OK){
@@ -436,8 +436,8 @@ enum comando_discordiador string_to_comando_discordiador(char* string){
 		return INICIAR_PATOTA;
 	if(strcmp(string,"LISTAR_TRIPULANTES")==0)
 		return LISTAR_TRIPULANTES;
-	if(strcmp(string,"EXPULSAR_TRIPULANTES")==0)
-		return EXPULSAR_TRIPULANTES;
+	if(strcmp(string,"EXPULSAR_TRIPULANTE")==0)
+		return EXPULSAR_TRIPULANTE;
 	if(strcmp(string,"INICIAR_PLANIFICACION")==0)
 		return INICIAR_PLANIFICACION;
 	if(strcmp(string,"PAUSAR_PLANIFICACION")==0)

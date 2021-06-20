@@ -7,6 +7,7 @@ int loguear_mensaje(char* payload){
 
 int iniciar_patota(char* payload){
     uint32_t PID;
+    uint32_t cantidad_tripulantes;
     uint32_t longitud_tareas;
     char* tareas;
     int offset = 0;
@@ -16,8 +17,13 @@ int iniciar_patota(char* payload){
     // Leo el PID
     memcpy(&PID, payload + offset, sizeof(uint32_t));
     offset += sizeof(uint32_t);
-    log_info(logger, "El PID del proceso es: %d",PID);
-    
+    log_info(logger, "El PID de la patota es: %d",PID);
+
+    // Leo la cantidad de tripulantes
+    memcpy(&cantidad_tripulantes, payload + offset, sizeof(uint32_t));
+    offset += sizeof(uint32_t);
+    log_info(logger, "La cantidad de tripulantes de la patota es: %d",cantidad_tripulantes);
+
     // Leo la longitud de las tareas
     memcpy(&longitud_tareas, payload + offset, sizeof(uint32_t));
     offset += sizeof(uint32_t);
@@ -29,6 +35,14 @@ int iniciar_patota(char* payload){
     offset += sizeof(longitud_tareas);
     log_info(logger, "La lista de tareas del proceso es: %s",tareas);
 
+    // Revisamos si hay espacio suficiente en memoria para la patota
+    uint32_t espacio_necesario = TAMANIO_PCB + cantidad_tripulantes * TAMANIO_TCB + longitud_tareas;
+
+    if(espacio_necesario > espacio_disponible()){
+        log_error(logger, "ERROR: iniciar_patota. No hay espacio en memoria suficiente para crear la patota");
+        return COD_INICIAR_PATOTA_ERROR;
+    }
+        
     // Creamos la patota
     if(crear_patota(PID, longitud_tareas, tareas) == EXIT_FAILURE){
         log_error(logger, "NO SE PUDO CREAR LA PATOTA.");

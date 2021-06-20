@@ -557,3 +557,13 @@ t_list* lista_segmentos_en_memoria(){
 
     return lista_segmentos_memoria;
 }
+
+uint32_t espacio_disponible_segmentacion(){
+    uint32_t espacio_disponible = 0;
+    for(int i = 0;i < tamanio_memoria;i++){
+        // Si el byte esta disponible
+        if(!bitarray_test_bit(mapa_memoria_disponible, i))
+            espacio_disponible++;
+    }
+    return espacio_disponible;
+}

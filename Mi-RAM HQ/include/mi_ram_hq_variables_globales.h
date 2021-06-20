@@ -56,6 +56,7 @@ int (*leer_memoria_principal)(void*, uint32_t, uint32_t, void*, int);
 void* (*obtener_tabla_patota)(int);
 int (*tamanio_tareas)(void*);
 void (*eliminar_tripulante)(void*, uint32_t);
+uint32_t (*espacio_disponible)(void);
 //  uint32_t (*direccion_logica)(uint32_t, uint32_t);   // Hace falta??
 
 // Funciones comunes a paginacion y segmentacion

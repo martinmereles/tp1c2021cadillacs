@@ -2,7 +2,7 @@
 #define SERVIDOR_MI_RAM_HQ_H_
 
 #include "sockets_shared.h"
-#include "segmentacion.h"
+#include "memoria_principal.h"
 
 int loguear_mensaje(char* payload);
 int iniciar_patota(char* payload);

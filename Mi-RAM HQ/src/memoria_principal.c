@@ -56,6 +56,7 @@ int inicializar_esquema_memoria(t_config* config){
         obtener_tabla_patota = &obtener_tabla_patota_segmentacion;
         tamanio_tareas = &tamanio_tareas_segmentacion;
         eliminar_tripulante = &eliminar_tripulante_segmentacion;
+        espacio_disponible = &espacio_disponible_segmentacion;
 
         // Configuramos signal de compactacion
 	    signal(SIGINT, signal_handler);
@@ -152,6 +153,7 @@ int inicializar_esquema_memoria(t_config* config){
         obtener_tabla_patota = &obtener_tabla_patota_paginacion;
         tamanio_tareas = &tamanio_tareas_paginacion;
         eliminar_tripulante = &eliminar_tripulante_paginacion;
+        espacio_disponible = &espacio_disponible_paginacion;
 
         return EXIT_SUCCESS;
     }
