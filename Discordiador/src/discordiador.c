@@ -398,7 +398,6 @@ int submodulo_tripulante(void* args) {
 			log_error(logger, "No se pudo mandar el mensaje al i-Mongo-Store");
 
 		free(tarea);
-		
 	}
 
 	estado_envio_mensaje = enviar_op_expulsar_tripulante(mi_ram_hq_fd_tripulante);

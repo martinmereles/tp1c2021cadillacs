@@ -260,7 +260,7 @@ int escribir_memoria_principal_paginacion(void* args, uint32_t inicio_logico, ui
 
     // Actualizo informacion de la pagina
     actualizar_timestamp(pagina);   // LRU
-    pagina->bit_uso = 1;            // Clock
+    pagina->bit_uso = true;         // Clock
 
     // Calculo el tamanio de lo que me falto escribir
     tamanio_total -= tamanio_escritura_pagina_actual;
@@ -316,7 +316,7 @@ int leer_memoria_principal_paginacion(void* args, uint32_t inicio_logico, uint32
 
     // Actualizo informacion de la pagina
     actualizar_timestamp(pagina);   // LRU
-    pagina->bit_uso = 1;            // Clock
+    pagina->bit_uso = true;         // Clock
 
     // Calculo el tamanio de lo que me falto leer
     tamanio_total -= tamanio_lectura_pagina_actual;
@@ -505,7 +505,44 @@ marco_t* algoritmo_lru(){
 }
 
 marco_t* algoritmo_clock(){
-    return algoritmo_lru();
+    marco_t* pagina_victima = NULL;
+
+    bool es_pagina_presente(void* args){
+        marco_t* pagina = (marco_t*) args;
+        return pagina->bit_presencia;
+    }
+
+    t_list* paginas_presentes = list_filter(lista_de_marcos, es_pagina_presente);
+
+    // Doy la primera vuelta
+    t_list_iterator* iterador = list_iterator_create(paginas_presentes);   // Creamos el iterador
+    marco_t* marco;
+
+    //for(int oportunidad = 1;oportunidad <= 2;oportunidad++){
+        
+    while(list_iterator_has_next(iterador)){
+        marco = list_iterator_next(iterador);
+        if(marco->bit_uso == false){
+            pagina_victima = marco;
+            break;
+        }            
+        marco->bit_uso = false;
+    }
+
+    list_iterator_destroy(iterador);    // Liberamos el iterador
+
+    // Doy la segunda vuelta
+    while(list_iterator_has_next(iterador)){
+        marco = list_iterator_next(iterador);
+        if(marco->bit_uso == false){
+            pagina_victima = marco;
+            break;
+        }            
+        marco->bit_uso = false;
+    } 
+    
+    list_destroy(paginas_presentes);
+    return pagina_victima;
 }
 
 void proceso_swap(marco_t* pagina_necesitada){
@@ -557,6 +594,15 @@ void proceso_swap(marco_t* pagina_necesitada){
 
     pagina_necesitada->bit_presencia = true;    // Se mueve a RAM
     pagina_victima->bit_presencia = false;       // Se mueve a Memoria Virtual
+
+    // Reordenamos la lista de marcos por numero de marco
+    bool tiene_menor_numero_marco(void* args_1, void* args_2){
+        marco_t* marco_1 = args_1;
+        marco_t* marco_2 = args_2;
+        return marco_1->numero_marco < marco_2->numero_marco;
+    }
+
+    list_sort(lista_de_marcos, tiene_menor_numero_marco);    
 }
 
 char* leer_marco(marco_t* marco){
