@@ -4,13 +4,20 @@ int main(void) {
 
 	// Inicializo variables globales
 	status_discordiador = RUNNING;
+    estado_planificador = PLANIFICADOR_OFF;
 
 	generadorPID = 0;
 	generadorTID = 0;
 
+	cola_new=queue_create();
+
 	sem_init(&sem_generador_PID,0,1);
 	sem_init(&sem_generador_TID,0,1);
 	sem_init(&sem_struct_iniciar_tripulante,0,0);
+
+    //Inicializo semaforos del dispatcher
+    sem_init(&sem_mutex_ingreso_tripulantes_new,0,1);
+    sem_init(&sem_puede_ejecutar_planificador,0,1);
 	
 	// Creo logger
 	logger = log_create("./cfg/discordiador.log", "Discordiador", 1, LOG_LEVEL_DEBUG);
@@ -26,10 +33,26 @@ int main(void) {
 	puerto_i_Mongo_Store = string_new();
 	direccion_IP_Mi_RAM_HQ = string_new();
 	puerto_Mi_RAM_HQ = string_new();
+	char *algoritmo_planificador = string_new();
+    char *string_quantum = string_new();
 	string_append(&direccion_IP_i_Mongo_Store, config_get_string_value(config, "IP_I_MONGO_STORE"));
 	string_append(&puerto_i_Mongo_Store, config_get_string_value(config, "PUERTO_I_MONGO_STORE"));
 	string_append(&direccion_IP_Mi_RAM_HQ, config_get_string_value(config, "IP_MI_RAM_HQ"));
 	string_append(&puerto_Mi_RAM_HQ, config_get_string_value(config, "PUERTO_MI_RAM_HQ"));
+	string_append(&algoritmo_planificador, config_get_string_value(config, "ALGORITMO"));
+
+    if(strcmp(algoritmo_planificador,"RR")==0){
+        string_append(&string_quantum, config_get_string_value(config, "QUANTUM"));
+        quantum = atoi(string_quantum); // Variable global
+    }
+    else{
+	if(strcmp(algoritmo_planificador,"FIFO")==0)
+		quantum = 0; // Variable global
+    else
+        return EXIT_FAILURE;
+    }
+    free(string_quantum);
+
 	log_info(logger, "Configuracion terminada");
 
 	log_info(logger, "Conectando con i-Mongo-Store");
@@ -152,16 +175,22 @@ void leer_consola_y_procesar(int i_mongo_store_fd, int mi_ram_hq_fd) {
 			iniciar_patota(argumentos, mi_ram_hq_fd);
 			break;
 		case LISTAR_TRIPULANTES:
-			log_info(logger, "Listando tripulantes");
+            if (estado_planificador != PLANIFICADOR_OFF){
+                sem_wait(&sem_puede_ejecutar_planificador);
+                //listar_tripulantes(string_to_code_algor(algoritmo_planificador));
+                sem_post(&sem_puede_ejecutar_planificador);
+            }
 			break;
-		case EXPULSAR_TRIPULANTES:
+		case EXPULSAR_TRIPULANTE:
 			log_info(logger, "Expulsando tripulante");
 			break;
 		case INICIAR_PLANIFICACION:
-			log_info(logger, "Iniciando planificacion");
+            log_info(logger, "Iniciando planificacion");
+			//iniciar_dispatcher(algoritmo_planificador);
 			break;
 		case PAUSAR_PLANIFICACION:
 			log_info(logger, "Pausando planificacion");
+            //dispatcher_pausar();
 			break;
 		case OBTENER_BITACORA:
 			log_info(logger, "Obteniendo bitacora");
@@ -169,6 +198,7 @@ void leer_consola_y_procesar(int i_mongo_store_fd, int mi_ram_hq_fd) {
 		default:
 			log_error(logger, "%s: comando no encontrado", argumentos[0]);
 	}
+
 	// Libero los recursos del array argumentos
 	for(int i = 0;argumentos[i]!=NULL;i++){
 		free(argumentos[i]);
@@ -188,6 +218,7 @@ int iniciar_patota(char** argumentos, int mi_ram_hq_fd){
 	iniciar_tripulante_t struct_iniciar_tripulante;
 	char **posicion;
 	int PID;
+	t_tripulante *nuevo;
 
 	FILE* archivo_de_tareas;
 	char* lista_de_tareas = string_new();
@@ -227,7 +258,15 @@ int iniciar_patota(char** argumentos, int mi_ram_hq_fd){
 	struct_iniciar_tripulante.PID = PID;
 
 	// Le pedimos a Mi-RAM HQ que inicie la patota
-	enviar_op_iniciar_patota(mi_ram_hq_fd, PID, lista_de_tareas);
+	enviar_op_iniciar_patota(mi_ram_hq_fd, PID, cantidad_tripulantes, lista_de_tareas);
+
+	// Esperamos a la confirmacion de que fue creada con exito
+	if(recibir_operacion(mi_ram_hq_fd) != COD_INICIAR_PATOTA_OK){
+		log_error(logger,"Mi RAM HQ denego la creacion de la patota");
+		return EXIT_FAILURE;
+	}
+
+	log_info(logger,"Mi RAM HQ creo la patota con exito");
 
 	for(int i = 0;i < cantidad_tripulantes;i++){
 		if( 3 + i < cantidad_args){
@@ -246,6 +285,15 @@ int iniciar_patota(char** argumentos, int mi_ram_hq_fd){
 		}
 
 		struct_iniciar_tripulante.TID = generarNuevoTID();
+
+        // Agregando nuevo tripulante a cola NEW
+        sem_wait(&sem_mutex_ingreso_tripulantes_new);
+        nuevo = malloc(sizeof(t_tripulante));
+		nuevo->TID = struct_iniciar_tripulante.TID;
+		nuevo->PID = struct_iniciar_tripulante.PID;
+        nuevo->estado_previo = NEW;
+		queue_push(cola_new,nuevo);
+        sem_post(&sem_mutex_ingreso_tripulantes_new);
 
 		// Creamos el hilo para el submodulo tripulante
 		// NOTA: el struct pthread_t de cada hilo tripulante se pierde
@@ -284,6 +332,7 @@ int submodulo_tripulante(void* args) {
 		log_error(logger, "Submodulo Tripulante: No se pudo establecer la conexion con el i-MongoStore");
 		// Libero recursos
 		liberar_conexion(i_mongo_store_fd_tripulante);
+		sem_post(&sem_struct_iniciar_tripulante);
 		return EXIT_FAILURE;
 	}
 
@@ -293,27 +342,41 @@ int submodulo_tripulante(void* args) {
 		// Libero recursos
 		liberar_conexion(i_mongo_store_fd_tripulante);
 		liberar_conexion(mi_ram_hq_fd_tripulante);
+		sem_post(&sem_struct_iniciar_tripulante);
 		return EXIT_FAILURE;
 	}
 
 	// Le pedimos a Mi-RAM HQ que inicie al tripulante
 	estado_envio_mensaje = enviar_op_iniciar_tripulante(mi_ram_hq_fd_tripulante, struct_iniciar_tripulante);
-	if(estado_envio_mensaje != EXIT_SUCCESS)
+	if(estado_envio_mensaje != EXIT_SUCCESS){
 		log_error(logger, "No se pudo mandar el mensaje al Mi-Ram HQ");
+		// Libero recursos
+		liberar_conexion(i_mongo_store_fd_tripulante);
+		liberar_conexion(mi_ram_hq_fd_tripulante);
+		sem_post(&sem_struct_iniciar_tripulante);
+		return EXIT_FAILURE;
+	}
+	
+	// Esperamos a la confirmacion de que fue creada con exito
+	if(recibir_operacion(mi_ram_hq_fd_tripulante) != COD_INICIAR_TRIPULANTE_OK){
+		log_error(logger,"Mi RAM HQ denego la creacion del tripulante");
+		// Libero recursos
+		liberar_conexion(i_mongo_store_fd_tripulante);
+		liberar_conexion(mi_ram_hq_fd_tripulante);
+		sem_post(&sem_struct_iniciar_tripulante);
+		return EXIT_FAILURE;
+	}
+	
+	sem_post(&sem_struct_iniciar_tripulante);
+	
 	log_info(logger, "Tripulante inicializado");
 
-	sem_post(&sem_struct_iniciar_tripulante);
-
 	while(status_discordiador != END && estado_tripulante != 'F'){
-		sleep(10);
+		sleep(20);
 		// Test: Mando un mensaje al i-Mongo-Store y a Mi-Ram HQ
 		
 		// Hay que ver si el servidor esta conectado?
-		estado_envio_mensaje = enviar_mensaje(i_mongo_store_fd_tripulante, "Hola, soy un tripulante");
-		if(estado_envio_mensaje != EXIT_SUCCESS)
-			log_error(logger, "No se pudo mandar el mensaje al i-Mongo-Store");
 		
-		// Hay que ver si el servidor esta conectado?
 		estado_envio_mensaje = enviar_op_recibir_ubicacion_tripulante(mi_ram_hq_fd_tripulante, pos_X, pos_Y);
 		if(estado_envio_mensaje != EXIT_SUCCESS)
 			log_error(logger, "No se pudo mandar el mensaje a Mi-Ram HQ");
@@ -328,9 +391,15 @@ int submodulo_tripulante(void* args) {
 		log_info(logger,"La proxima tarea a ejecutar es:\n%s",tarea);
 		if(strcmp(tarea,"FIN") == 0)
 			estado_tripulante = 'F';
+				
+		// Hay que ver si el servidor esta conectado?
+		estado_envio_mensaje = enviar_mensaje(i_mongo_store_fd_tripulante, tarea);
+		if(estado_envio_mensaje != EXIT_SUCCESS)
+			log_error(logger, "No se pudo mandar el mensaje al i-Mongo-Store");
+
 		free(tarea);
 	}
-	
+
 	estado_envio_mensaje = enviar_op_expulsar_tripulante(mi_ram_hq_fd_tripulante);
 	if(estado_envio_mensaje != EXIT_SUCCESS)
 		log_error(logger, "No se pudo mandar el mensaje a Mi-Ram HQ");
@@ -366,8 +435,8 @@ enum comando_discordiador string_to_comando_discordiador(char* string){
 		return INICIAR_PATOTA;
 	if(strcmp(string,"LISTAR_TRIPULANTES")==0)
 		return LISTAR_TRIPULANTES;
-	if(strcmp(string,"EXPULSAR_TRIPULANTES")==0)
-		return EXPULSAR_TRIPULANTES;
+	if(strcmp(string,"EXPULSAR_TRIPULANTE")==0)
+		return EXPULSAR_TRIPULANTE;
 	if(strcmp(string,"INICIAR_PLANIFICACION")==0)
 		return INICIAR_PLANIFICACION;
 	if(strcmp(string,"PAUSAR_PLANIFICACION")==0)

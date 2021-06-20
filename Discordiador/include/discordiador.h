@@ -7,13 +7,14 @@
 #include "commons/string.h"
 #include "sockets_cliente.h"
 #include <semaphore.h>
+#include "planificador.h"
 
 enum status_discordiador{   RUNNING,
                             END };
 
 enum comando_discordiador{  INICIAR_PATOTA, 
                             LISTAR_TRIPULANTES,
-                            EXPULSAR_TRIPULANTES, 
+                            EXPULSAR_TRIPULANTE, 
                             INICIAR_PLANIFICACION,
                             PAUSAR_PLANIFICACION,
                             OBTENER_BITACORA,

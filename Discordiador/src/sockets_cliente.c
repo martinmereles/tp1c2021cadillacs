@@ -50,7 +50,7 @@ void liberar_conexion(int servidor_fd)
 	close(servidor_fd);
 }
 
-int enviar_op_iniciar_patota(int mi_ram_hq_fd, uint32_t PID, char* lista_de_tareas){
+int enviar_op_iniciar_patota(int mi_ram_hq_fd, uint32_t PID, uint32_t cantidad_tripulantes, char* lista_de_tareas){
 	int exit_status;
 	uint32_t longitud_lista_tareas = strlen(lista_de_tareas) + 1;
 	uint32_t longitud_stream = sizeof(PID) + sizeof(longitud_lista_tareas) + longitud_lista_tareas;
@@ -58,6 +58,9 @@ int enviar_op_iniciar_patota(int mi_ram_hq_fd, uint32_t PID, char* lista_de_tare
 	int offset = 0;
 
 	memcpy(stream + offset, &PID, sizeof(uint32_t));
+	offset += sizeof(uint32_t);
+
+	memcpy(stream + offset, &cantidad_tripulantes, sizeof(uint32_t));
 	offset += sizeof(uint32_t);
 
 	memcpy(stream + offset, &longitud_lista_tareas, sizeof(uint32_t));

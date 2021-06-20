@@ -13,12 +13,12 @@ CWD=$PWD
 #cd $CWD
 
 # Biblioteca para dibujar el mapa (revisar)
-#git clone https://github.com/sisoputnfrba/so-nivel-gui-library/
-#cd so-nivel-gui-library
-#sudo make uninstall
-#make all
-#sudo make install
-#cd $CWD
+git clone https://github.com/sisoputnfrba/so-nivel-gui-library/
+cd so-nivel-gui-library
+sudo make uninstall
+make all
+sudo make install
+cd $CWD
 
 echo -e "\n\nBuilding projects...\n\n"
 cd $PWD
