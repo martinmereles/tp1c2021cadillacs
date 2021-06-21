@@ -4,6 +4,7 @@ SHARED_IDIR = ../shared/include
 CC=gcc
 CFLAGS=-I$(IDIR) -I$(SHARED_IDIR) -g -Wall
 
+SWP =./swap
 DMP =./dump
 ODIR=./obj
 SRCDIR =./src
@@ -20,7 +21,7 @@ OBJ = $(patsubst $(SRCDIR)/%.c,$(ODIR)/%.o,$(SRC))
 all: DIRECTORIO_OBJ_CFG $(PROCESS_NAME)
 
 DIRECTORIO_OBJ_CFG:
-	mkdir -p $(ODIR) $(CFG) $(SHARED_ODIR) $(DMP)
+	mkdir -p $(ODIR) $(CFG) $(SHARED_ODIR) $(DMP) $(SWP)
 
 $(ODIR)/%.o: $(SRCDIR)/%.c $(DEPS) $(SHARED_DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)
