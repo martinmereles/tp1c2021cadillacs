@@ -23,6 +23,7 @@ t_queue *cola_exit;
 t_queue *buffer_peticiones_exec_to_blocked_io;
 t_queue *buffer_peticiones_blocked_io_to_ready;
 t_queue *buffer_peticiones_exec_to_ready; // RR
+t_queue *buffer_peticiones_ready_to_exec;
 
 enum status_planificador estado_planificador;
 // Estructura de dato para colas del planificador / dispatcher
@@ -58,17 +59,21 @@ sem_t sem_mutex_buffer_exec_to_ready;
 sem_t sem_mutex_buffer_exec_to_blocked_io;
 
 sem_t sem_mutex_ingreso_tripulantes_new;
-sem_t sem_puede_ejecutar_planificador;
+sem_t sem_mutex_ejecutar_dispatcher;
+sem_t sem_puede_expulsar_tripulante;
+sem_t sem_confirmar_expulsion_tripulante;
+sem_t sem_sabotaje_activado;
+sem_t sem_mutex_tripulante_a_expulsar;
 
 int iniciar_dispatcher(char *algoritmo_planificador);
-int existe_tripulantes_en_cola(t_queue *cola);
-void listar_tripulantes(enum algoritmo cod);
+int listar_tripulantes(enum algoritmo cod);
 char *code_dispatcher_to_string(enum estado_tripulante code);
 
-int hay_tarea_a_realizar(void);
 int dispatcher_expulsar_tripulante(int tid_tripulante);
 void dispatcher_pausar(void);
 enum algoritmo string_to_code_algor(char *string_algor);
 void agregar_a_buffer_peticiones(t_queue *buffer, int tid);
+int dispatcher_eliminar_tripulante(int tid_eliminar);
+void iniciador_tripulante(int tid, int pid);
 
 #endif

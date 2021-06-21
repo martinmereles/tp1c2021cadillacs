@@ -5,6 +5,7 @@ int main(void) {
 	// Inicializo variables globales
 	status_discordiador = RUNNING;
     estado_planificador = PLANIFICADOR_OFF;
+	tripulante_a_expulsar = -1;
 
 	generadorPID = 0;
 	generadorTID = 0;
@@ -15,9 +16,16 @@ int main(void) {
 	sem_init(&sem_generador_TID,0,1);
 	sem_init(&sem_struct_iniciar_tripulante,0,0);
 
-    //Inicializo semaforos del dispatcher
+	// Inicializo semaforo de Planificacion
+	sem_init(&sem_planificacion_fue_iniciada,0,0);
+
+    // Inicializo semaforos del dispatcher
     sem_init(&sem_mutex_ingreso_tripulantes_new,0,1);
-    sem_init(&sem_puede_ejecutar_planificador,0,1);
+    sem_init(&sem_mutex_ejecutar_dispatcher,0,1);
+	sem_init(&sem_puede_expulsar_tripulante,0,1);
+	sem_init(&sem_confirmar_expulsion_tripulante,0,0);
+	sem_init(&sem_sabotaje_activado,0,0);
+	sem_init(&sem_mutex_tripulante_a_expulsar,0,1);
 	
 	// Creo logger
 	logger = log_create("./cfg/discordiador.log", "Discordiador", 1, LOG_LEVEL_DEBUG);
@@ -33,8 +41,9 @@ int main(void) {
 	puerto_i_Mongo_Store = string_new();
 	direccion_IP_Mi_RAM_HQ = string_new();
 	puerto_Mi_RAM_HQ = string_new();
-	char *algoritmo_planificador = string_new();
-    char *string_quantum = string_new();
+	algoritmo_planificador = string_new();
+    char *string_quantum;
+	string_quantum = string_new();
 	string_append(&direccion_IP_i_Mongo_Store, config_get_string_value(config, "IP_I_MONGO_STORE"));
 	string_append(&puerto_i_Mongo_Store, config_get_string_value(config, "PUERTO_I_MONGO_STORE"));
 	string_append(&direccion_IP_Mi_RAM_HQ, config_get_string_value(config, "IP_MI_RAM_HQ"));
@@ -172,25 +181,75 @@ void leer_consola_y_procesar(int i_mongo_store_fd, int mi_ram_hq_fd) {
 
 	switch(comando){
 		case INICIAR_PATOTA:
+			/*
+			OBSERVACION: Para una ejecucion CORRECTA es necesario ejecutar PRIMERO el comando INICIAR_PLANIFICACION.
+			Esto es debido a que hay acoplamiento con la gestion de colas.
+
+			TAMBIEN en cumplimiento con la descripcion del TP:
+				Ver en -> Modulo Discordiador - Administracion de tripulantes
+			*/
 			iniciar_patota(argumentos, mi_ram_hq_fd);
+			
 			break;
 		case LISTAR_TRIPULANTES:
-            if (estado_planificador != PLANIFICADOR_OFF){
-                sem_wait(&sem_puede_ejecutar_planificador);
-                //listar_tripulantes(string_to_code_algor(algoritmo_planificador));
-                sem_post(&sem_puede_ejecutar_planificador);
-            }
+			/*
+			OBSERVACION: presenta posibles resultados no safisfactorios.
+			Se recomienda evitar su uso. 
+			*/
+			log_info(logger, "Listando tripulantes");
+			
+			sem_wait(&sem_mutex_ejecutar_dispatcher);
+			sem_wait(&sem_mutex_ingreso_tripulantes_new);
+			if (listar_tripulantes(string_to_code_algor(algoritmo_planificador)) != EXIT_SUCCESS) //TODO: revisar funcion
+				log_error(logger, "No hay tripulantes en ninguna de las colas");
+			else 
+				log_debug(logger, "Listado completado");
+			sem_post(&sem_mutex_ingreso_tripulantes_new);
+			sem_post(&sem_mutex_ejecutar_dispatcher);
+			
 			break;
-		case EXPULSAR_TRIPULANTE:
+		case EXPULSAR_TRIPULANTE:{
 			log_info(logger, "Expulsando tripulante");
-			break;
+			
+			sem_wait(&sem_mutex_ejecutar_dispatcher);
+			sem_wait(&sem_mutex_tripulante_a_expulsar);
+			tripulante_a_expulsar = atoi(argumentos[1]);
+			sem_post(&sem_mutex_tripulante_a_expulsar);
+			estado_envio_mensaje = dispatcher_expulsar_tripulante( atoi(argumentos[1]) );
+			if (estado_envio_mensaje != EXIT_SUCCESS){
+				log_error(logger, "No se encontro el tripulante");
+				sem_post(&sem_mutex_ejecutar_dispatcher);
+			}
+			else{
+				sem_post(&sem_mutex_ejecutar_dispatcher);
+
+				// Una vez que el hilo tripulante haya sido eliminado
+				sem_wait(&sem_confirmar_expulsion_tripulante);
+				log_debug(logger, "El hilo del tripulante fue eliminado/expulsado satisfactoriamente");
+				
+				sem_wait(&sem_mutex_tripulante_a_expulsar);
+				tripulante_a_expulsar = -1;
+				sem_post(&sem_mutex_tripulante_a_expulsar);
+			}
+			}break;
 		case INICIAR_PLANIFICACION:
             log_info(logger, "Iniciando planificacion");
-			//iniciar_dispatcher(algoritmo_planificador);
+
+			// Habilito la planificacion para cada tripulante cuando se ejecuta por 1ra vez:
+			if (estado_planificador == PLANIFICADOR_OFF)
+				sem_post(&sem_planificacion_fue_iniciada);
+
+			// Inicia la ejecucion del HILO Dispatcher: gestor de QUEUEs del Sistema
+			if ( iniciar_dispatcher(algoritmo_planificador) != EXIT_SUCCESS)
+				log_error(logger, "ERROR inesperado, no se pudo iniciar el dispatcher");
+
 			break;
 		case PAUSAR_PLANIFICACION:
 			log_info(logger, "Pausando planificacion");
-            //dispatcher_pausar();
+			/*
+			//En desarrollo...
+            //dispatcher_pausar(); //TODO: sincronicar con el submodulo tripulante
+			*/
 			break;
 		case OBTENER_BITACORA:
 			log_info(logger, "Obteniendo bitacora");
@@ -218,7 +277,6 @@ int iniciar_patota(char** argumentos, int mi_ram_hq_fd){
 	iniciar_tripulante_t struct_iniciar_tripulante;
 	char **posicion;
 	int PID;
-	t_tripulante *nuevo;
 
 	FILE* archivo_de_tareas;
 	char* lista_de_tareas = string_new();
@@ -287,13 +345,11 @@ int iniciar_patota(char** argumentos, int mi_ram_hq_fd){
 		struct_iniciar_tripulante.TID = generarNuevoTID();
 
         // Agregando nuevo tripulante a cola NEW
-        sem_wait(&sem_mutex_ingreso_tripulantes_new);
-        nuevo = malloc(sizeof(t_tripulante));
-		nuevo->TID = struct_iniciar_tripulante.TID;
-		nuevo->PID = struct_iniciar_tripulante.PID;
-        nuevo->estado_previo = NEW;
-		queue_push(cola_new,nuevo);
+ 
+		sem_wait(&sem_mutex_ingreso_tripulantes_new);
+		iniciador_tripulante(struct_iniciar_tripulante.TID, struct_iniciar_tripulante.PID);
         sem_post(&sem_mutex_ingreso_tripulantes_new);
+
 
 		// Creamos el hilo para el submodulo tripulante
 		// NOTA: el struct pthread_t de cada hilo tripulante se pierde
@@ -371,6 +427,13 @@ int submodulo_tripulante(void* args) {
 	
 	log_info(logger, "Tripulante inicializado");
 
+	
+	// Cada tripulante queda en espera hasta estar iniciado la Planificacion
+	sem_wait(&sem_planificacion_fue_iniciada);
+	log_debug(logger, "El tripulante %d inicia su planificacion",struct_iniciar_tripulante.TID);
+	sem_post(&sem_planificacion_fue_iniciada);
+	
+
 	while(status_discordiador != END && estado_tripulante != 'F'){
 		sleep(20);
 		// Test: Mando un mensaje al i-Mongo-Store y a Mi-Ram HQ
@@ -389,6 +452,13 @@ int submodulo_tripulante(void* args) {
 			log_error(logger, "No se pudo mandar el mensaje a Mi-Ram HQ");
 		tarea = leer_proxima_tarea_mi_ram_hq(mi_ram_hq_fd_tripulante);
 		log_info(logger,"La proxima tarea a ejecutar es:\n%s",tarea);
+
+		/*
+		// Notificacion al Planificador/Dispatcher que ingresa a cola EXEC 
+		agregar_a_buffer_peticiones(buffer_peticiones_ready_to_exec, struct_iniciar_tripulante.TID);
+		
+		*/
+		
 		if(strcmp(tarea,"FIN") == 0)
 			estado_tripulante = 'F';
 				
@@ -397,13 +467,65 @@ int submodulo_tripulante(void* args) {
 		if(estado_envio_mensaje != EXIT_SUCCESS)
 			log_error(logger, "No se pudo mandar el mensaje al i-Mongo-Store");
 
-		free(tarea);
+		// ¿El tripulante fue expulsado?
+		sem_wait(&sem_puede_expulsar_tripulante);
 		
+		sem_wait(&sem_mutex_tripulante_a_expulsar);
+		if(struct_iniciar_tripulante.TID == tripulante_a_expulsar){
+			sem_post(&sem_mutex_tripulante_a_expulsar);
+			log_debug(logger, "Solicitud de expulsion del TID: %d aceptada", struct_iniciar_tripulante.TID);
+
+			estado_envio_mensaje = enviar_op_expulsar_tripulante(mi_ram_hq_fd_tripulante);
+			if(estado_envio_mensaje != EXIT_SUCCESS)
+				log_error(logger, "No se pudo mandar el mensaje a Mi-Ram HQ");
+			
+			sem_wait(&sem_mutex_ejecutar_dispatcher);
+			
+			if (dispatcher_eliminar_tripulante(struct_iniciar_tripulante.TID) != EXIT_SUCCESS){
+				log_error(logger,"No se pudo eliminar de la cola EXIT");
+				sem_post(&sem_puede_expulsar_tripulante);
+				sem_post(&sem_mutex_ejecutar_dispatcher);
+				return EXIT_FAILURE;
+			}
+			
+			sem_post(&sem_mutex_ejecutar_dispatcher);
+			
+			log_debug(logger,"Se elimino el tripulante %d exitosamente",struct_iniciar_tripulante.TID);
+			sem_post(&sem_confirmar_expulsion_tripulante);
+			
+			// Libero recursos
+			liberar_conexion(i_mongo_store_fd_tripulante);
+			liberar_conexion(mi_ram_hq_fd_tripulante);
+			
+			sem_post(&sem_puede_expulsar_tripulante);
+			
+			return EXIT_SUCCESS;
+		}
+		sem_post(&sem_mutex_tripulante_a_expulsar);
+		sem_post(&sem_puede_expulsar_tripulante);
+				
+		free(tarea);
+
 	}
+
+	// Se desarman las estructuras administrativas del tripulante por FINALIZACION:
 
 	estado_envio_mensaje = enviar_op_expulsar_tripulante(mi_ram_hq_fd_tripulante);
 	if(estado_envio_mensaje != EXIT_SUCCESS)
 		log_error(logger, "No se pudo mandar el mensaje a Mi-Ram HQ");
+
+	// Habilito al dispatcher a eliminar al tripulante
+	sem_wait(&sem_puede_expulsar_tripulante);
+	sem_wait(&sem_mutex_ejecutar_dispatcher);
+	sem_wait(&sem_mutex_ingreso_tripulantes_new);
+	if (dispatcher_expulsar_tripulante(struct_iniciar_tripulante.TID) != EXIT_SUCCESS)
+		log_error(logger,"NO se pudo expulsar tripulante %d por finalizacion", struct_iniciar_tripulante.TID);
+	if (dispatcher_eliminar_tripulante(struct_iniciar_tripulante.TID) != EXIT_SUCCESS)
+		log_error(logger,"No se pudo eliminar de la cola EXIT");
+	sem_post(&sem_mutex_ingreso_tripulantes_new);
+	sem_post(&sem_mutex_ejecutar_dispatcher);
+	sem_post(&sem_puede_expulsar_tripulante);
+	log_debug(logger,"Se elimino por finalizacion el tripulante %d exitosamente",struct_iniciar_tripulante.TID);
 
 	// Libero recursos
 	liberar_conexion(i_mongo_store_fd_tripulante);

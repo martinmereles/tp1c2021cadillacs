@@ -15,7 +15,8 @@
 	],
 	"settings": {
 		"files.associations": {
-			"mi-ram-hq.h": "c"
+			"mi-ram-hq.h": "c",
+			"cstdlib": "c"
 		}
 	}
 }
