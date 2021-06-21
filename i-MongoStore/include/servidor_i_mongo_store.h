@@ -43,8 +43,9 @@ void eliminar_keys_tarea(t_config * tarea_config_file);
 void set_tarea_config(t_config * tarea_config_file,char * size, char * cantidad_bloques, char* bloques, char * md5);
 char * array_two_block_to_string(char ** bloq_antiguo, char** bloq_nuevo);
 char * array_block_to_string(char ** bloq_array,int indice);
+void generar_recurso(char* path, char caracter_llenado,char* parametro);
+void consumir_recurso(char* path, char* nombre_recurso ,char* parametro);
 
-t_config * tarea_config_file;
-t_config_tarea tarea_config;
+
 
 #endif

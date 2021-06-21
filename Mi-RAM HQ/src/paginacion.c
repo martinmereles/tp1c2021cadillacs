@@ -29,6 +29,12 @@ void liberar_marco(void* args){
 
 int crear_patota_paginacion(uint32_t PID, uint32_t longitud_tareas, char* tareas){
 
+
+
+    log_info(logger, "HOLISS");
+
+ 
+
     // Creamos la tabla de paginas de la patota
     tabla_paginas_t* tabla_patota = malloc(sizeof(tabla_paginas_t));
     tabla_patota->paginas = list_create();
@@ -37,6 +43,10 @@ int crear_patota_paginacion(uint32_t PID, uint32_t longitud_tareas, char* tareas
     tabla_patota->fragmentacion_interna = 0;
     tabla_patota->cantidad_tripulantes = 0;
 
+
+    log_info(logger, "HOLISS");
+
+ 
     // Buscamos un espacio en memoria para el PCB y lo reservamos
     uint32_t direccion_logica_PCB;
     if(reservar_memoria(tabla_patota, TAMANIO_PCB, &direccion_logica_PCB) == EXIT_FAILURE){
@@ -45,6 +55,10 @@ int crear_patota_paginacion(uint32_t PID, uint32_t longitud_tareas, char* tareas
         return EXIT_FAILURE;
     }
 
+
+    log_info(logger, "HOLISS");
+
+ 
     //log_info(logger,"La direccion logica del PCB es: %x",direccion_logica_PCB);
 
     // Buscamos un espacio en memoria para las tareas y lo reservamos
@@ -55,21 +69,37 @@ int crear_patota_paginacion(uint32_t PID, uint32_t longitud_tareas, char* tareas
         return EXIT_FAILURE;
     }
 
+
+    log_info(logger, "HOLISS");
+
+ 
     //log_info(logger,"La direccion logica de las tareas es: %x",direccion_logica_tareas);
 
     // Guardo en la tabla el tamanio de la lista de tareas
     tabla_patota->tamanio_tareas = longitud_tareas;
 
+
+    log_info(logger, "HOLISS");
+
+ 
     // Agregar la tabla a la lista de tablas
     list_add(tablas_de_patotas, tabla_patota);
 
+
+    log_info(logger, "HOLISS");
+
+ 
     // Guardo el PID y la direccion logica de las tareas en el PCB
     escribir_memoria_principal(tabla_patota, direccion_logica_PCB, DESPL_PID, &PID, sizeof(uint32_t));
     escribir_memoria_principal(tabla_patota, direccion_logica_PCB, DESPL_TAREAS, &direccion_logica_tareas, sizeof(uint32_t));  
 
+
+    log_info(logger, "HOLISS");
+
+ 
     // Guardo las tareas
     escribir_memoria_principal(tabla_patota, direccion_logica_tareas, 0, tareas, longitud_tareas);
-
+ 
     log_info(logger, "Estructuras de la patota inicializadas exitosamente");
 
     //ejecutar_rutina(dump_memoria);
@@ -221,18 +251,26 @@ int reservar_memoria(tabla_paginas_t* tabla_patota, int tamanio, uint32_t* direc
 
 int escribir_memoria_principal_paginacion(void* args, uint32_t inicio_logico, uint32_t desplazamiento_logico, void* dato, int tamanio_total){
     
+    log_info(logger, "wooo");
+
+ 
     tabla_paginas_t* tabla = (tabla_paginas_t*) args;
     uint32_t direccion_logica = direccion_logica_paginacion(inicio_logico, desplazamiento_logico);
 
-
+    log_info(logger, "wooo");
+    
+    
     // Si la pagina esta en memoria virtual, debo traerla
     marco_t* pagina = get_pagina(tabla, numero_pagina(direccion_logica)); 
 
-    /*
-    if(pagina->bit_presencia)
+    log_info(logger, "wooo");
+    
+    if(!pagina->bit_presencia)
         proceso_swap(pagina);
-    */
 
+    log_info(logger, "wooo");
+    
+    
     // Calculo la direccion fisica
     uint32_t direccion_fisica_dato; 
     if(direccion_fisica_paginacion(tabla, direccion_logica, &direccion_fisica_dato) == EXIT_FAILURE){
@@ -240,6 +278,9 @@ int escribir_memoria_principal_paginacion(void* args, uint32_t inicio_logico, ui
         return EXIT_FAILURE;
     }
 
+    log_info(logger, "wooo");
+    
+    
     // log_info(logger,"DIRECCION FISICA A ESCRIBIR: %x",direccion_fisica_dato);
 
     int desplazamiento = get_desplazamiento(direccion_logica);
@@ -258,10 +299,16 @@ int escribir_memoria_principal_paginacion(void* args, uint32_t inicio_logico, ui
     // Escribo el dato en memoria principal
     memcpy(memoria_principal + direccion_fisica_dato, dato, tamanio_escritura_pagina_actual);
 
+    log_info(logger, "wooo");
+    
+    
     // Actualizo informacion de la pagina
     actualizar_timestamp(pagina);   // LRU
-    pagina->bit_uso = 1;            // Clock
+    pagina->bit_uso = true;         // Clock
 
+    log_info(logger, "wooo");
+    
+    
     // Calculo el tamanio de lo que me falto escribir
     tamanio_total -= tamanio_escritura_pagina_actual;
     
@@ -281,13 +328,11 @@ int leer_memoria_principal_paginacion(void* args, uint32_t inicio_logico, uint32
     tabla_paginas_t* tabla = (tabla_paginas_t*) args;
     uint32_t direccion_logica = direccion_logica_paginacion(inicio_logico, desplazamiento_logico);
 
-    
     // Si la pagina esta en memoria virtual, debo traerla
     marco_t* pagina = get_pagina(tabla, numero_pagina(direccion_logica)); 
-    /*
-    if(pagina->bit_presencia)
+
+    if(!pagina->bit_presencia)
         proceso_swap(pagina);
-    */
 
     // Calculo la direccion fisica
     uint32_t direccion_fisica_dato; 
@@ -316,7 +361,7 @@ int leer_memoria_principal_paginacion(void* args, uint32_t inicio_logico, uint32
 
     // Actualizo informacion de la pagina
     actualizar_timestamp(pagina);   // LRU
-    pagina->bit_uso = 1;            // Clock
+    pagina->bit_uso = true;         // Clock
 
     // Calculo el tamanio de lo que me falto leer
     tamanio_total -= tamanio_lectura_pagina_actual;
@@ -374,6 +419,7 @@ int crear_pagina(tabla_paginas_t* tabla_patota){
     pagina->bit_uso = true;
     pagina->numero_pagina = tabla_patota->proximo_numero_pagina;
     actualizar_timestamp(pagina);
+    actualizar_reloj(pagina);
 
     tabla_patota->proximo_numero_pagina++;
     list_add(tabla_patota->paginas,pagina);
@@ -505,7 +551,29 @@ marco_t* algoritmo_lru(){
 }
 
 marco_t* algoritmo_clock(){
-    return algoritmo_lru();
+
+    // Recorro el reloj hasta que encuentro un marco con bit de uso en 0
+    while(aguja_reloj->marco->bit_uso == true){
+        aguja_reloj->marco->bit_uso = false;
+        aguja_reloj = aguja_reloj->siguiente;
+    }
+
+    return aguja_reloj->marco;  // El primer marco con bit de uso en 0 es la "PAGINA VICTIMA"
+}
+
+// Se llama al crear una pagina nueva
+int actualizar_reloj(marco_t* pagina){
+
+    // Si no es un marco en memoria principal, la aguja del reloj no se mueve    
+    if(pagina->bit_presencia == false)
+        return EXIT_SUCCESS;
+
+    // La aguja del reloj avanza hasta encontrar el marco de la pagina creada
+    while(aguja_reloj->marco->numero_marco != pagina->numero_marco){
+        aguja_reloj = aguja_reloj->siguiente;
+    }
+    aguja_reloj = aguja_reloj->siguiente;   // El reloj apunta al marco siguiente de la pagina creada
+    return EXIT_SUCCESS;
 }
 
 void proceso_swap(marco_t* pagina_necesitada){
@@ -557,6 +625,19 @@ void proceso_swap(marco_t* pagina_necesitada){
 
     pagina_necesitada->bit_presencia = true;    // Se mueve a RAM
     pagina_victima->bit_presencia = false;       // Se mueve a Memoria Virtual
+
+    // Actualizamos el reloj de clock (la aguja quedo apuntando a la hora de la pagina victima)
+    aguja_reloj->marco = pagina_necesitada; // La pagina traida a memoria ocupa el lugar de la pagina victima
+    aguja_reloj = aguja_reloj->siguiente;   // El reloj queda apuntando al siguiente marco
+
+    // Reordenamos la lista de marcos por numero de marco
+    bool tiene_menor_numero_marco(void* args_1, void* args_2){
+        marco_t* marco_1 = args_1;
+        marco_t* marco_2 = args_2;
+        return marco_1->numero_marco < marco_2->numero_marco;
+    }
+
+    list_sort(lista_de_marcos, tiene_menor_numero_marco);    
 }
 
 char* leer_marco(marco_t* marco){
@@ -612,5 +693,5 @@ uint32_t espacio_disponible_paginacion(){
     }
 
     list_iterator_destroy(iterador);    // Liberamos el iterador
-    return cantidad_marcos_libres;
+    return cantidad_marcos_libres * tamanio_pagina;
 }
