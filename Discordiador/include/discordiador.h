@@ -35,6 +35,9 @@ char* direccion_IP_i_Mongo_Store;
 char* puerto_i_Mongo_Store;
 char* direccion_IP_Mi_RAM_HQ;
 char* puerto_Mi_RAM_HQ;
+char* algoritmo_planificador;
+
+int tripulante_a_expulsar;
 
 enum status_discordiador status_discordiador;
 
@@ -44,5 +47,7 @@ int generadorTID;
 sem_t sem_generador_TID;
 sem_t sem_generador_PID;
 sem_t sem_struct_iniciar_tripulante;
+
+sem_t sem_planificacion_fue_iniciada;
 
 #endif
