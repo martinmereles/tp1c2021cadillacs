@@ -94,6 +94,11 @@ int inicializar_esquema_memoria(t_config* config){
 
         // Abrimos el archivo
         memoria_virtual = fopen(path_swap,"w+");
+        truncate(path_swap, tamanio_swap);
+        for(int i=0;i<tamanio_swap;i++){
+            fwrite("HOLA PAPA\n", sizeof(char), strlen("HOLA PAPA\n"), memoria_virtual);
+        }
+
 
         if(memoria_virtual == NULL){
             log_error(logger,"ERROR. No se pudo crear el archivo de memoria virtual swap.");
@@ -130,6 +135,8 @@ int inicializar_esquema_memoria(t_config* config){
             marco->estado = MARCO_LIBRE;
             marco->bit_presencia = 1;
             marco->timestamp = temporal_get_string_time("%y_%m_%d_%H_%M_%S");
+            marco->semaforo = malloc(sizeof(sem_t));
+            sem_init(marco->semaforo, 0, 1);
             list_add(lista_de_marcos, marco);
 
             // Voy agregando al reloj el marco de memoria principal
@@ -153,6 +160,8 @@ int inicializar_esquema_memoria(t_config* config){
             marco->estado = MARCO_LIBRE;
             marco->bit_presencia = 0;
             marco->timestamp = temporal_get_string_time("%y_%m_%d_%H_%M_%S");
+            marco->semaforo = malloc(sizeof(sem_t));
+            sem_init(marco->semaforo, 0, 1);
             list_add(lista_de_marcos, marco); 
         }
 
@@ -181,7 +190,7 @@ void liberar_estructuras_memoria(){
     bitarray_destroy(mapa_memoria_disponible);
     free(memoria_principal);
     fclose(memoria_virtual);
-    remove(path_swap);
+    //remove(path_swap);
 }
 
 void leer_tarea_memoria_principal(void* tabla, char** tarea, uint32_t id_prox_tarea){    
@@ -199,6 +208,8 @@ void leer_tarea_memoria_principal(void* tabla, char** tarea, uint32_t id_prox_ta
     char* tareas = malloc(tamanio);
     leer_memoria_principal(tabla, dir_log_tareas, 0, tareas, tamanio);
     log_info(logger,"La lista de tareas es:\n %s",tareas);
+
+    log_info(logger,"El ID de la proxima tarea es: %d",id_prox_tarea);
 
     // Obtenemos el array de tareas
     char** array_tareas = (char**) string_split(tareas, "\n");

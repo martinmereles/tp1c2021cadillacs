@@ -29,12 +29,6 @@ void liberar_marco(void* args){
 
 int crear_patota_paginacion(uint32_t PID, uint32_t longitud_tareas, char* tareas){
 
-
-
-    log_info(logger, "HOLISS");
-
- 
-
     // Creamos la tabla de paginas de la patota
     tabla_paginas_t* tabla_patota = malloc(sizeof(tabla_paginas_t));
     tabla_patota->paginas = list_create();
@@ -42,11 +36,9 @@ int crear_patota_paginacion(uint32_t PID, uint32_t longitud_tareas, char* tareas
     tabla_patota->proximo_numero_pagina = 0;
     tabla_patota->fragmentacion_interna = 0;
     tabla_patota->cantidad_tripulantes = 0;
+    tabla_patota->semaforo = malloc(sizeof(sem_t));
+    sem_init(tabla_patota->semaforo, 0, 1);
 
-
-    log_info(logger, "HOLISS");
-
- 
     // Buscamos un espacio en memoria para el PCB y lo reservamos
     uint32_t direccion_logica_PCB;
     if(reservar_memoria(tabla_patota, TAMANIO_PCB, &direccion_logica_PCB) == EXIT_FAILURE){
@@ -55,10 +47,6 @@ int crear_patota_paginacion(uint32_t PID, uint32_t longitud_tareas, char* tareas
         return EXIT_FAILURE;
     }
 
-
-    log_info(logger, "HOLISS");
-
- 
     //log_info(logger,"La direccion logica del PCB es: %x",direccion_logica_PCB);
 
     // Buscamos un espacio en memoria para las tareas y lo reservamos
@@ -68,35 +56,19 @@ int crear_patota_paginacion(uint32_t PID, uint32_t longitud_tareas, char* tareas
         eliminar_patota(tabla_patota);
         return EXIT_FAILURE;
     }
-
-
-    log_info(logger, "HOLISS");
-
  
     //log_info(logger,"La direccion logica de las tareas es: %x",direccion_logica_tareas);
 
     // Guardo en la tabla el tamanio de la lista de tareas
     tabla_patota->tamanio_tareas = longitud_tareas;
 
-
-    log_info(logger, "HOLISS");
-
- 
     // Agregar la tabla a la lista de tablas
     list_add(tablas_de_patotas, tabla_patota);
 
-
-    log_info(logger, "HOLISS");
-
- 
     // Guardo el PID y la direccion logica de las tareas en el PCB
     escribir_memoria_principal(tabla_patota, direccion_logica_PCB, DESPL_PID, &PID, sizeof(uint32_t));
     escribir_memoria_principal(tabla_patota, direccion_logica_PCB, DESPL_TAREAS, &direccion_logica_tareas, sizeof(uint32_t));  
 
-
-    log_info(logger, "HOLISS");
-
- 
     // Guardo las tareas
     escribir_memoria_principal(tabla_patota, direccion_logica_tareas, 0, tareas, longitud_tareas);
  
@@ -205,7 +177,7 @@ int liberar_memoria(tabla_paginas_t* tabla_patota, int tamanio_total, uint32_t d
         liberar_memoria(tabla_patota, tamanio_total, direccion_logica_proxima_pagina);
     }
 
-    ejecutar_rutina(dump_memoria);
+    //ejecutar_rutina(dump_memoria);
 
     return EXIT_SUCCESS;
 }
@@ -244,42 +216,31 @@ int reservar_memoria(tabla_paginas_t* tabla_patota, int tamanio, uint32_t* direc
     ultima_pagina(tabla_patota)->fragmentacion_interna = -tamanio;
 
     // PARA TESTEAR
-    ejecutar_rutina(dump_memoria);
+    //ejecutar_rutina(dump_memoria);
 
     return EXIT_SUCCESS;
 }
 
 int escribir_memoria_principal_paginacion(void* args, uint32_t inicio_logico, uint32_t desplazamiento_logico, void* dato, int tamanio_total){
-    
-    log_info(logger, "wooo");
 
- 
     tabla_paginas_t* tabla = (tabla_paginas_t*) args;
     uint32_t direccion_logica = direccion_logica_paginacion(inicio_logico, desplazamiento_logico);
-
-    log_info(logger, "wooo");
-    
-    
+  
     // Si la pagina esta en memoria virtual, debo traerla
     marco_t* pagina = get_pagina(tabla, numero_pagina(direccion_logica)); 
 
-    log_info(logger, "wooo");
-    
     if(!pagina->bit_presencia)
         proceso_swap(pagina);
+   
+    sem_wait(pagina->semaforo);
 
-    log_info(logger, "wooo");
-    
-    
     // Calculo la direccion fisica
     uint32_t direccion_fisica_dato; 
     if(direccion_fisica_paginacion(tabla, direccion_logica, &direccion_fisica_dato) == EXIT_FAILURE){
         log_error(logger,"ERROR: escribir_memoria_principal. Direccionamiento invalido.");
+        sem_post(pagina->semaforo);
         return EXIT_FAILURE;
-    }
-
-    log_info(logger, "wooo");
-    
+    }   
     
     // log_info(logger,"DIRECCION FISICA A ESCRIBIR: %x",direccion_fisica_dato);
 
@@ -298,27 +259,24 @@ int escribir_memoria_principal_paginacion(void* args, uint32_t inicio_logico, ui
 
     // Escribo el dato en memoria principal
     memcpy(memoria_principal + direccion_fisica_dato, dato, tamanio_escritura_pagina_actual);
-
-    log_info(logger, "wooo");
-    
-    
+   
     // Actualizo informacion de la pagina
     actualizar_timestamp(pagina);   // LRU
     pagina->bit_uso = true;         // Clock
-
-    log_info(logger, "wooo");
-    
-    
+  
     // Calculo el tamanio de lo que me falto escribir
     tamanio_total -= tamanio_escritura_pagina_actual;
     
     // Si no termine de escribir, continuo al principio de la siguiente pagina
     if(tamanio_total != 0){
         int numero_proxima_pagina = numero_pagina(direccion_logica) + 1;
+        sem_post(pagina->semaforo);
         int inicio_logico_proxima_pagina = (numero_proxima_pagina << 16) & 0xFFFF0000;
         void* dato_proxima_pagina = dato + tamanio_escritura_pagina_actual;
         escribir_memoria_principal_paginacion(args, inicio_logico_proxima_pagina, 0, dato_proxima_pagina, tamanio_total);
     }
+
+    sem_post(pagina->semaforo);
 
     return EXIT_SUCCESS;
 }
@@ -334,10 +292,13 @@ int leer_memoria_principal_paginacion(void* args, uint32_t inicio_logico, uint32
     if(!pagina->bit_presencia)
         proceso_swap(pagina);
 
+    sem_wait(pagina->semaforo);
+
     // Calculo la direccion fisica
     uint32_t direccion_fisica_dato; 
     if(direccion_fisica_paginacion(tabla, direccion_logica, &direccion_fisica_dato) == EXIT_FAILURE){
         log_error(logger,"ERROR: leer_memoria_principal. Direccionamiento invalido.");
+        sem_post(pagina->semaforo);
         return EXIT_FAILURE;
     }
 
@@ -369,10 +330,13 @@ int leer_memoria_principal_paginacion(void* args, uint32_t inicio_logico, uint32
     // Si no termine de leer, continuo al principio de la siguiente pagina
     if(tamanio_total != 0){
         int numero_proxima_pagina = numero_pagina(direccion_logica) + 1;
+        sem_post(pagina->semaforo);
         int inicio_logico_proxima_pagina = (numero_proxima_pagina << 16) & 0xFFFF0000;
         void* dato_proxima_pagina = dato + tamanio_lectura_pagina_actual;
         leer_memoria_principal_paginacion(args, inicio_logico_proxima_pagina, 0, dato_proxima_pagina, tamanio_total);
     }
+
+    sem_post(pagina->semaforo);
 
     return EXIT_SUCCESS;
 }
@@ -414,15 +378,21 @@ int crear_pagina(tabla_paginas_t* tabla_patota){
 
     // 2do paso: Si hay un marco disponible, lo reservamos y lo agregamos a la tabla de la patota como pagina
     
+    sem_wait(pagina->semaforo);
+
     pagina->PID = tabla_patota->PID;
     pagina->estado = MARCO_OCUPADO;
     pagina->bit_uso = true;
-    pagina->numero_pagina = tabla_patota->proximo_numero_pagina;
     actualizar_timestamp(pagina);
     actualizar_reloj(pagina);
 
+    sem_wait(tabla_patota->semaforo);
+    pagina->numero_pagina = tabla_patota->proximo_numero_pagina;
     tabla_patota->proximo_numero_pagina++;
     list_add(tabla_patota->paginas,pagina);
+    sem_post(tabla_patota->semaforo);
+
+    sem_post(pagina->semaforo);
 
     return EXIT_SUCCESS;
 }
@@ -477,6 +447,7 @@ int direccion_fisica_paginacion(tabla_paginas_t* tabla_patota, uint32_t direccio
 
 // DUMP MEMORIA
 void dump_memoria_paginacion(){
+    // Bloquear todas las paginas con semaforos??
     crear_archivo_dump(lista_de_marcos, dump_marco);
 }
 
@@ -578,6 +549,13 @@ int actualizar_reloj(marco_t* pagina){
 
 void proceso_swap(marco_t* pagina_necesitada){
 
+    log_info(logger, "INICIANDO PROCESO SWAP");
+    ejecutar_rutina(dump_memoria);
+
+    // Bloquear con semaforos las paginas
+    sem_wait(pagina_necesitada->semaforo);
+    log_info(logger, "BLOQUEO MARCO NUMERO %d", pagina_necesitada->numero_marco);
+
     // Copiamos en un buffer el contenido de la pagina necesitada
     char* buffer_necesitado = leer_marco(pagina_necesitada);
 
@@ -594,11 +572,16 @@ void proceso_swap(marco_t* pagina_necesitada){
 
         // Buscamos una pagina victima con algoritmo de reemplazo
         pagina_victima = algoritmo_de_reemplazo();
-
+        sem_wait(pagina_victima->semaforo);
+        log_info(logger, "BLOQUEO MARCO NUMERO %d", pagina_victima->numero_marco);
         // Movemos la informacion de la pagina victima a donde estaba la pagina necesitada en memoria virtual 
         char* buffer_victima = leer_marco(pagina_victima);
         escribir_marco(pagina_necesitada, buffer_victima);
         free(buffer_victima);
+    }
+    else{
+        sem_wait(pagina_victima->semaforo);
+        log_info(logger, "BLOQUEO MARCO NUMERO %d", pagina_victima->numero_marco);
     }
 
     // Movemos el contenido de la pagina necesitada a memoria principal
@@ -638,6 +621,14 @@ void proceso_swap(marco_t* pagina_necesitada){
     }
 
     list_sort(lista_de_marcos, tiene_menor_numero_marco);    
+
+    // Liberar los semaforos de las paginas
+    sem_post(pagina_necesitada->semaforo);
+    sem_post(pagina_victima->semaforo);
+
+    log_info(logger, "FINALIZANDO SWAP");
+    log_info(logger, "DESBLOQUEO MARCOs NUMERO %d %d", pagina_necesitada->numero_marco, pagina_victima->numero_marco);
+    ejecutar_rutina(dump_memoria);
 }
 
 char* leer_marco(marco_t* marco){
@@ -645,14 +636,14 @@ char* leer_marco(marco_t* marco){
     uint32_t direccion_fisica;
 
     // Si el marco esta en memoria principal
-    if(marco->numero_pagina < cantidad_marcos_memoria_principal){
-        direccion_fisica = (marco->numero_pagina) * tamanio_pagina;
+    if(marco->numero_marco < cantidad_marcos_memoria_principal){
+        direccion_fisica = (marco->numero_marco) * tamanio_pagina;
         memcpy(informacion, memoria_principal + direccion_fisica, tamanio_pagina);
     }
 
     /// Si el marco esta en memoria virtual
     else{
-        direccion_fisica = marco->numero_pagina - cantidad_marcos_memoria_principal;
+        direccion_fisica = marco->numero_marco - cantidad_marcos_memoria_principal;
         direccion_fisica *= tamanio_pagina;
         fseek(memoria_virtual, direccion_fisica, SEEK_SET);
         fread(informacion, sizeof(char), tamanio_pagina, memoria_virtual);
@@ -665,14 +656,14 @@ void escribir_marco(marco_t* marco, char* informacion){
     uint32_t direccion_fisica;
 
     // Si el marco esta en memoria principal
-    if(marco->numero_pagina < cantidad_marcos_memoria_principal){
-        direccion_fisica = (marco->numero_pagina) * tamanio_pagina;
+    if(marco->numero_marco < cantidad_marcos_memoria_principal){
+        direccion_fisica = (marco->numero_marco) * tamanio_pagina;
         memcpy(memoria_principal + direccion_fisica, informacion, tamanio_pagina);
     }
 
-    /// Si el marco esta en memoria virtual
+    // Si el marco esta en memoria virtual
     else{
-        direccion_fisica = marco->numero_pagina - cantidad_marcos_memoria_principal;
+        direccion_fisica = marco->numero_marco - cantidad_marcos_memoria_principal;
         direccion_fisica *= tamanio_pagina;
         fseek(memoria_virtual, direccion_fisica, SEEK_SET);
         fwrite(informacion, sizeof(char), tamanio_pagina, memoria_virtual);

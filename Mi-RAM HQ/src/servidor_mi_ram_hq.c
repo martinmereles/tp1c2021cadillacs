@@ -12,40 +12,22 @@ int iniciar_patota(char* payload){
     char* tareas;
     int offset = 0;
 
-
-    log_info(logger, "HOLANDA PRROOOOOOOOO");
-
- 
     log_info(logger, "Iniciando estructuras de la patota");
-
-
-    log_info(logger, "HOLANDA PRROOOOOOOOO");
-
  
     // Leo el PID
     memcpy(&PID, payload + offset, sizeof(uint32_t));
     offset += sizeof(uint32_t);
     log_info(logger, "El PID de la patota es: %d",PID);
 
-  
-
-    log_info(logger, "HOLANDA PRROOOOOOOOO");
-
    // Leo la cantidad de tripulantes
     memcpy(&cantidad_tripulantes, payload + offset, sizeof(uint32_t));
     offset += sizeof(uint32_t);
     log_info(logger, "La cantidad de tripulantes de la patota es: %d",cantidad_tripulantes);
 
-
-    log_info(logger, "HOLANDA PRROOOOOOOOO");
-
- 
     // Leo la longitud de las tareas
     memcpy(&longitud_tareas, payload + offset, sizeof(uint32_t));
     offset += sizeof(uint32_t);
     log_info(logger, "La longitud de la tarea es: %d",longitud_tareas);
-
-    log_info(logger, "HOLANDA PRROOOOOOOOO");
 
     // Leo la lista de tareas
     tareas = malloc(longitud_tareas);
@@ -53,16 +35,9 @@ int iniciar_patota(char* payload){
     offset += sizeof(longitud_tareas);
     log_info(logger, "La lista de tareas del proceso es: %s",tareas);
 
-
-    log_info(logger, "HOLANDA PRROOOOOOOOO");
-
     // Revisamos si hay espacio suficiente en memoria para la patota
     uint32_t espacio_necesario = TAMANIO_PCB + cantidad_tripulantes * TAMANIO_TCB + longitud_tareas;
 
-
-    log_info(logger, "HOLANDA PRROOOOOOOOO");
-
- 
     if(espacio_necesario > espacio_disponible()){
         log_error(logger, "ERROR: iniciar_patota. No hay espacio en memoria suficiente para crear la patota");
         return COD_INICIAR_PATOTA_ERROR;

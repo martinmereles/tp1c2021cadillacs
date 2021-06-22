@@ -23,6 +23,7 @@ typedef struct{
     int fragmentacion_interna;
     enum estado_marco estado;
     int PID;
+    sem_t* semaforo;
 } marco_t;
 
 typedef struct{
@@ -32,6 +33,7 @@ typedef struct{
     int cantidad_tripulantes;
     int PID;
     uint32_t tamanio_tareas;
+    sem_t* semaforo;
 } tabla_paginas_t;
 
 // Para armar el reloj del algoritmo CLOCK

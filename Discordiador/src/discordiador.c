@@ -157,15 +157,17 @@ void leer_consola_y_procesar(int i_mongo_store_fd, int mi_ram_hq_fd) {
 	linea_consola[strlen(linea_consola)-1]='\0';	// Le saco el \n
 
 	argumentos = (char**) string_split(linea_consola, " ");
-	 
+	 /*
 	// Test: Mando cada argumento como un mensaje al i-Mongo-Store
 	for(int i = 0;argumentos[i]!=NULL;i++){
 		//log_info(logger, "Llego un mensaje por consola: %s", argumentos[i]);
 		// Enviamos el mensaje leido al i-MongoStore (porque pinto)
+		
 		estado_envio_mensaje = enviar_mensaje(i_mongo_store_fd, argumentos[i]);
 		if(estado_envio_mensaje != EXIT_SUCCESS)
 			log_error(logger, "No se pudo mandar el mensaje al i-Mongo-Store");
-	}
+		
+	}*/
 
 	// Reviso cual fue el comando ingresado y lo ejecuto
 	comando = string_to_comando_discordiador(argumentos[0]);
