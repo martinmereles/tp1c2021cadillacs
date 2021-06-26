@@ -449,10 +449,41 @@ int submodulo_tripulante(void* args) {
 		pos_Y++;
 		pos_Y++;
 
+		// PIDO LA TAREA A MI RAM HQ
 		estado_envio_mensaje = enviar_op_enviar_proxima_tarea(mi_ram_hq_fd_tripulante);
 		if(estado_envio_mensaje != EXIT_SUCCESS)
 			log_error(logger, "No se pudo mandar el mensaje a Mi-Ram HQ");
+
 		tarea = leer_proxima_tarea_mi_ram_hq(mi_ram_hq_fd_tripulante);
+
+		/*
+		// HAGO SLEEP (1 CICLO DE CPU)
+		sleep(tiempo_sleep);
+
+		// Si no estoy en la posicion de la tarea, avanzo a la tarea
+		if(pos_actual != pos_tarea)
+			// Me muevo un paso
+			// Informa a i-MongoStore y Mi RAM HQ que se movio
+
+		else{
+			// Estoy en posicion de la tarea
+			if(ciclos_cumplidos == 0){
+				// Avisa a i-mongostore que arranca la tarea
+			}
+
+			// Si todavia no la termine 
+			if(ciclos_cumplidos < ciclos_tarea){
+				ciclos_cumplidos++;
+			}
+			else{
+				// EJECUTA LA TAREA POSTA
+				// AVISA QUE FINALIZO
+				// PIDE LA SIGUIENTE TAREA
+				ciclos_cumplidos = 0;	// Reinicio ciclos cumplidos
+			}
+		}
+		*/
+
 		log_info(logger,"La proxima tarea a ejecutar es:\n%s",tarea);
 
 		/*
@@ -463,7 +494,9 @@ int submodulo_tripulante(void* args) {
 		
 		if(strcmp(tarea,"FIN") == 0)
 			estado_tripulante = 'F';
-				
+
+		// 
+
 		// Hay que ver si el servidor esta conectado?
 		estado_envio_mensaje = enviar_mensaje(i_mongo_store_fd_tripulante, tarea);
 		if(estado_envio_mensaje != EXIT_SUCCESS)
