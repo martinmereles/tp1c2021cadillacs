@@ -115,7 +115,7 @@ int iniciar_dispatcher(char *algoritmo_planificador){
 
         estado_planificador = PLANIFICADOR_RUNNING;
     }
-    else{
+    else if(estado_planificador == PLANIFICADOR_BLOCKED){
         sem_post(&sem_mutex_ejecutar_dispatcher);
         estado_planificador = PLANIFICADOR_RUNNING;
     }

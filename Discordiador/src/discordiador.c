@@ -237,21 +237,27 @@ void leer_consola_y_procesar(int i_mongo_store_fd, int mi_ram_hq_fd) {
 		case INICIAR_PLANIFICACION:
             log_info(logger, "Iniciando planificacion");
 
-			// Habilito la planificacion para cada tripulante cuando se ejecuta por 1ra vez:
-			if (estado_planificador == PLANIFICADOR_OFF)
+			// Habilito la planificacion para cada tripulante cuando se ejecuta por 1ra vez o si fue pausado:
+			if (estado_planificador == PLANIFICADOR_OFF || estado_planificador == PLANIFICADOR_BLOCKED){
 				sem_post(&sem_planificacion_fue_iniciada);
-
-			// Inicia la ejecucion del HILO Dispatcher: gestor de QUEUEs del Sistema
-			if ( iniciar_dispatcher(algoritmo_planificador) != EXIT_SUCCESS)
-				log_error(logger, "ERROR inesperado, no se pudo iniciar el dispatcher");
+				// Inicia la ejecucion del HILO Dispatcher: gestor de QUEUEs del Sistema
+				if ( iniciar_dispatcher(algoritmo_planificador) != EXIT_SUCCESS)
+					log_error(logger, "ERROR inesperado, no se pudo iniciar el dispatcher");
+			}
+			else 
+				log_debug(logger, "La planificacion ya fue iniciada");
 
 			break;
 		case PAUSAR_PLANIFICACION:
 			log_info(logger, "Pausando planificacion");
-			/*
-			//En desarrollo...
-            //dispatcher_pausar(); //TODO: sincronicar con el submodulo tripulante
-			*/
+	
+			if (estado_planificador == PLANIFICADOR_RUNNING){
+				dispatcher_pausar();
+				sem_wait(&sem_planificacion_fue_iniciada);
+				log_debug(logger, "Fue pausado exitosamente");
+			}else 
+				log_debug(logger, "Ya esta pausado");
+			
 			break;
 		case OBTENER_BITACORA:
 			log_info(logger, "Obteniendo bitacora");
@@ -440,6 +446,11 @@ int submodulo_tripulante(void* args) {
 
 	while(status_discordiador != END && estado_tripulante != 'F'){
 		//sleep(20);
+
+		// Implementacion de semaforo ante una pausa de la Planificacion.
+		sem_wait(&sem_planificacion_fue_iniciada);
+		sem_post(&sem_planificacion_fue_iniciada);
+
 		// Test: Mando un mensaje al i-Mongo-Store y a Mi-Ram HQ
 		
 		// Hay que ver si el servidor esta conectado?
@@ -487,6 +498,11 @@ int submodulo_tripulante(void* args) {
 			int primer_ejecucion = 1;
 			while(!tarea_finalizada){
 				sleep(1);
+				
+				// Implementacion de semaforo ante una pausa de la Planificacion.
+				sem_wait(&sem_planificacion_fue_iniciada);
+				sem_post(&sem_planificacion_fue_iniciada);
+				
 				if(tripulante_esta_en_posicion(&struct_iniciar_tripulante, st_tarea)){
 					if(primer_ejecucion){
 						printf("estoy en posicion\n");
@@ -536,14 +552,7 @@ int submodulo_tripulante(void* args) {
 		// Notificacion al Planificador/Dispatcher que ingresa a cola EXEC 
 		agregar_a_buffer_peticiones(buffer_peticiones_ready_to_exec, struct_iniciar_tripulante.TID);
 		
-		*/
-		
-		
-
-		// 
-
-		// Hay que ver si el servidor esta conectado?
-		
+		*/	
 
 		// ¿El tripulante fue expulsado?
 		sem_wait(&sem_puede_expulsar_tripulante);
