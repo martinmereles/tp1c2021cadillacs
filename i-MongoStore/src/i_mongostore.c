@@ -5,8 +5,9 @@
 int main(void)
 {
 	// inicializo semaforos
-	sem_init(&semaforo_aceptar_conexiones, 0, 0);
 	
+	iniciar_semaforos_fs();
+
 	logger = log_create("./cfg/i-mongostore.log", "I-MongoStore", 1, LOG_LEVEL_DEBUG);
 	
 	// Leo IP y PUERTO del config
@@ -31,6 +32,16 @@ int main(void)
 	close(sbfile);
 	close(bfile);
 	return EXIT_SUCCESS;
+}
+
+void iniciar_semaforos_fs(){
+	sem_init(&semaforo_aceptar_conexiones, 0, 0);
+	sem_init(&sem_mutex_superbloque,0,1);
+	sem_init(&sem_mutex_blocks,0,1);
+	sem_init(&sem_mutex_oxigeno,0,1);
+	sem_init(&sem_mutex_comida,0,1);
+	sem_init(&sem_mutex_basura,0,1);
+	sem_init(&sem_mutex_bitmap,0,1);
 }
 
 void leer_config(){
@@ -154,10 +165,17 @@ bool leer_mensaje_cliente_y_procesar(int cliente_fd){
 	bool cliente_conectado = true;
 	// Leo codigo de operacion
 	int cod_op = recibir_operacion(cliente_fd);
+	char * payload;
+	
 	switch(cod_op) {
 		case COD_MENSAJE:
 		//prueba COD_RECIBIR_TAREA
 			recibir_payload_y_ejecutar(cliente_fd, recibir_tarea);
+			break;
+		case COD_INICIAR_TRIPULANTE:
+			payload = recibir_payload(cliente_fd);
+			iniciar_tripulante(payload);
+			free(payload);
 			break;
 		case -1:
 			log_error(logger, "El cliente se desconecto.");
