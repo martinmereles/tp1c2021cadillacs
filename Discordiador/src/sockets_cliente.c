@@ -75,7 +75,7 @@ int enviar_op_iniciar_patota(int mi_ram_hq_fd, uint32_t PID, uint32_t cantidad_t
 	return exit_status;
 }
 
-int enviar_op_iniciar_tripulante(int mi_ram_hq_fd, iniciar_tripulante_t struct_iniciar_tripulante){
+int enviar_op_iniciar_tripulante(int i_mongo_store_fd,int mi_ram_hq_fd, iniciar_tripulante_t struct_iniciar_tripulante){
 	int exit_status;
 	uint32_t longitud_stream = sizeof(uint32_t) * 4;
 	char* stream = malloc(longitud_stream);
@@ -94,6 +94,8 @@ int enviar_op_iniciar_tripulante(int mi_ram_hq_fd, iniciar_tripulante_t struct_i
 	offset += sizeof(uint32_t);
 
 	exit_status = enviar_operacion(mi_ram_hq_fd, COD_INICIAR_TRIPULANTE, stream, longitud_stream);
+	exit_status = enviar_operacion(i_mongo_store_fd, COD_INICIAR_TRIPULANTE, stream, longitud_stream);
+	
 	free(stream);
 
 	return exit_status;

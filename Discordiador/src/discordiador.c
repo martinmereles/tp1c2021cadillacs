@@ -405,7 +405,8 @@ int submodulo_tripulante(void* args) {
 	}
 
 	// Le pedimos a Mi-RAM HQ que inicie al tripulante
-	estado_envio_mensaje = enviar_op_iniciar_tripulante(mi_ram_hq_fd_tripulante, struct_iniciar_tripulante);
+	estado_envio_mensaje = enviar_op_iniciar_tripulante(i_mongo_store_fd_tripulante, mi_ram_hq_fd_tripulante, struct_iniciar_tripulante);
+
 	if(estado_envio_mensaje != EXIT_SUCCESS){
 		log_error(logger, "No se pudo mandar el mensaje al Mi-Ram HQ");
 		// Libero recursos
