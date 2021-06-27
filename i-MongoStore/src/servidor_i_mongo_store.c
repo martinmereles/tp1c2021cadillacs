@@ -184,6 +184,8 @@ void leer_bitacora(char* payload){
 
 }
 
+
+
 void recibir_tarea(char* payload){
     
     t_tarea tarea;

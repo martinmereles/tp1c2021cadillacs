@@ -373,6 +373,7 @@ int iniciar_patota(char** argumentos, int mi_ram_hq_fd){
 
 int submodulo_tripulante(void* args) {
 	iniciar_tripulante_t struct_iniciar_tripulante = *((iniciar_tripulante_t*) args);
+	t_tarea st_tarea;
 	char* tarea;
 	char estado_tripulante = 'E';
 
@@ -438,7 +439,7 @@ int submodulo_tripulante(void* args) {
 	
 
 	while(status_discordiador != END && estado_tripulante != 'F'){
-		sleep(20);
+		//sleep(20);
 		// Test: Mando un mensaje al i-Mongo-Store y a Mi-Ram HQ
 		
 		// Hay que ver si el servidor esta conectado?
@@ -446,9 +447,9 @@ int submodulo_tripulante(void* args) {
 		estado_envio_mensaje = enviar_op_recibir_ubicacion_tripulante(mi_ram_hq_fd_tripulante, pos_X, pos_Y);
 		if(estado_envio_mensaje != EXIT_SUCCESS)
 			log_error(logger, "No se pudo mandar el mensaje a Mi-Ram HQ");
-		pos_X++;
-		pos_Y++;
-		pos_Y++;
+		//pos_X++;
+		//pos_Y++;
+		//pos_Y++;
 
 		// PIDO LA TAREA A MI RAM HQ
 		estado_envio_mensaje = enviar_op_enviar_proxima_tarea(mi_ram_hq_fd_tripulante);
@@ -457,6 +458,51 @@ int submodulo_tripulante(void* args) {
 
 		tarea = leer_proxima_tarea_mi_ram_hq(mi_ram_hq_fd_tripulante);
 
+		log_info(logger,"La proxima tarea a ejecutar es:\n%s",tarea);
+
+		estado_envio_mensaje = enviar_mensaje(i_mongo_store_fd_tripulante, tarea);
+		if(estado_envio_mensaje != EXIT_SUCCESS)
+			log_error(logger, "No se pudo mandar el mensaje al i-Mongo-Store");
+		
+		if(strcmp(tarea,"FIN") == 0){
+			estado_tripulante = 'F';
+		}else{
+			//parseo la tarea
+			char ** parametros;
+			char ** nombre_parametros;
+			int tarea_comun = 0;
+			int tiempo_ejecutado = 0;
+			parametros = string_split(tarea,";");
+			st_tarea.nombre = parametros[0];
+			st_tarea.pos_x = parametros[1];
+			st_tarea.pos_y = parametros[2];
+			st_tarea.duracion = parametros[3];
+			//nombre[0]=nombre de la tarea, nombre[1]=parametro numerico
+			nombre_parametros = string_split(st_tarea.nombre," ");
+			if(nombre_parametros[1]==NULL){
+				tarea_comun=1;
+			}
+			//cada while es 1 sleep/1 rafaga
+			int tarea_finalizada = 0;
+			int primer_ejecucion = 1;
+			while(!tarea_finalizada){
+				sleep(1);
+				if(tripulante_esta_en_posicion(&struct_iniciar_tripulante, st_tarea)){
+					if(primer_ejecucion){
+						printf("estoy en posicion\n");
+						log_info(logger,"Comienzo a %s\n",nombre_parametros[0]);
+						primer_ejecucion=0;
+					}
+					tiempo_ejecutado++;
+					if(tiempo_ejecutado==atoi(st_tarea.duracion)){
+					tarea_finalizada=1;
+					printf("termine la tarea\n");
+					}
+				}	
+				printf("ejecute 1 seg\n");		
+			}	
+		}
+			
 		/*
 		// HAGO SLEEP (1 CICLO DE CPU)
 		sleep(tiempo_sleep);
@@ -485,7 +531,6 @@ int submodulo_tripulante(void* args) {
 		}
 		*/
 
-		log_info(logger,"La proxima tarea a ejecutar es:\n%s",tarea);
 
 		/*
 		// Notificacion al Planificador/Dispatcher que ingresa a cola EXEC 
@@ -493,15 +538,12 @@ int submodulo_tripulante(void* args) {
 		
 		*/
 		
-		if(strcmp(tarea,"FIN") == 0)
-			estado_tripulante = 'F';
+		
 
 		// 
 
 		// Hay que ver si el servidor esta conectado?
-		estado_envio_mensaje = enviar_mensaje(i_mongo_store_fd_tripulante, tarea);
-		if(estado_envio_mensaje != EXIT_SUCCESS)
-			log_error(logger, "No se pudo mandar el mensaje al i-Mongo-Store");
+		
 
 		// ¿El tripulante fue expulsado?
 		sem_wait(&sem_puede_expulsar_tripulante);
@@ -621,4 +663,29 @@ int generarNuevoTID() {
 	nuevo_valor = generadorTID;
 	sem_post(&sem_generador_TID);
 	return nuevo_valor;
+}
+
+//mueve al tripulante y retorna true cuando esta en posicion
+int tripulante_esta_en_posicion(iniciar_tripulante_t* tripulante, t_tarea tarea){
+	if(tripulante->posicion_X < atoi(tarea.pos_x)){
+		tripulante->posicion_X++;
+		printf("me movi a: %dx %dy\n",tripulante->posicion_X,tripulante->posicion_Y);
+		return 0;
+	}
+	if(tripulante->posicion_X > atoi(tarea.pos_x)){
+		tripulante->posicion_X--;
+		printf("me movi a: %dx %dy\n",tripulante->posicion_X,tripulante->posicion_Y);
+		return 0;
+	}
+	if(tripulante->posicion_Y < atoi(tarea.pos_y)){
+		tripulante->posicion_Y++;
+		printf("me movi a: %dx %dy\n",tripulante->posicion_X,tripulante->posicion_Y);
+		return 0;
+	}
+	if(tripulante->posicion_Y > atoi(tarea.pos_y)){
+		tripulante->posicion_Y--;
+		printf("me movi a: %dx %dy\n",tripulante->posicion_X,tripulante->posicion_Y);
+		return 0;
+	}
+	return 1;
 }

@@ -9,6 +9,14 @@
 #include <semaphore.h>
 #include "planificador.h"
 
+//struct para parsear tareas
+typedef struct {
+    char* nombre;
+    char* pos_x;
+    char* pos_y;
+    char* duracion;
+}t_tarea;
+
 enum status_discordiador{   RUNNING,
                             END };
 
