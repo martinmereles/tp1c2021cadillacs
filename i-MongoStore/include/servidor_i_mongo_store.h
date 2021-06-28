@@ -36,8 +36,8 @@ typedef struct {
     int size;
 }t_config_bitacora;
 
-void loguear_mensaje(char* payload);
-void recibir_tarea(char* payload);
+int loguear_mensaje(char* payload);
+int recibir_tarea(char* payload);
 void conseguir_codigo_tarea(char* nombre, int * codigo);
 void crear_archivo (char* path);
 char ** bits_libres (t_bitarray * bitarray, int cantidad_bits);
@@ -51,7 +51,7 @@ char * array_block_to_string(char ** bloq_array,int indice);
 void generar_recurso(char* path, char caracter_llenado,char* parametro);
 void consumir_recurso(char* path, char* nombre_recurso ,char* parametro);
 void escribir_bitacora(char* payload);
-void leer_bitacora(char* payload);
+char* leer_bitacora(char* payload);
 void iniciar_tripulante(char* payload);
 void leer_bitacora_config(t_config * bitacora_config_file);
 void eliminar_keys_bitacora(t_config * bitacora_config_file);

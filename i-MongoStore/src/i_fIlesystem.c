@@ -67,10 +67,11 @@ void mapear_blocks(){
 
 	//test de lectura de un bloque usando indice
 	//(en practica hay que tener en cuenta el tamaño del archivo para el ultimo bloque en vez de blocksize)
-	int indicetest = 5;
+	int indicetest = 2;
 	char * contenidotest = calloc(1,super_bloque.blocksize);
 	memcpy(contenidotest, blocksmap+(super_bloque.blocksize * indicetest), super_bloque.blocksize);
 	printf("se leyo el bloque %d, con el contenido : %s\n",indicetest,contenidotest);
+	free(contenidotest);
 	
 }
 

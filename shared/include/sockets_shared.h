@@ -28,9 +28,11 @@ enum op_code{
     COD_INICIAR_PATOTA_ERROR,
     COD_INICIAR_PATOTA_OK,
     COD_INICIAR_TRIPULANTE_ERROR,
-    COD_INICIAR_TRIPULANTE_OK
+    COD_INICIAR_TRIPULANTE_OK,
 
     // Codigos para servidor i-Mongo-Store: FALTA
+    COD_EJECUTAR_TAREA,
+    COD_OBTENER_BITACORA
 };
 
 int recibir_operacion(int servidor_fd);

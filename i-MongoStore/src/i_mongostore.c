@@ -31,6 +31,7 @@ int main(void)
 	munmap(blocksmap, blocks_stat.st_size);
 	close(sbfile);
 	close(bfile);
+	free(super_bloque.bitarray);
 	return EXIT_SUCCESS;
 }
 
@@ -170,12 +171,23 @@ bool leer_mensaje_cliente_y_procesar(int cliente_fd){
 	switch(cod_op) {
 		case COD_MENSAJE:
 		//prueba COD_RECIBIR_TAREA
-			recibir_payload_y_ejecutar(cliente_fd, recibir_tarea);
+			recibir_payload_y_ejecutar(cliente_fd, loguear_mensaje);
 			break;
 		case COD_INICIAR_TRIPULANTE:
 			payload = recibir_payload(cliente_fd);
 			iniciar_tripulante(payload);
 			free(payload);
+			break;
+		case COD_OBTENER_BITACORA:
+			log_info(logger,"procesando solicitud de bitacora..");
+			payload = recibir_payload(cliente_fd);
+			char* bitacora = leer_bitacora(payload);
+			enviar_operacion(cliente_fd,COD_OBTENER_BITACORA,bitacora,strlen(bitacora)+1);
+			free(bitacora);
+			log_info(logger,"bitacora enviada");
+			break;
+		case COD_EJECUTAR_TAREA:
+			recibir_payload_y_ejecutar(cliente_fd, recibir_tarea);
 			break;
 		case -1:
 			log_error(logger, "El cliente se desconecto.");

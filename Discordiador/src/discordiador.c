@@ -147,6 +147,15 @@ void recibir_y_procesar_mensaje_i_mongo_store(int i_mongo_store_fd){
 			log_info(logger, "i-Mongo-Store envio un mensaje: %s", mensaje);
 			free(mensaje);
 			break;
+		case COD_OBTENER_BITACORA:;
+			log_info(logger, "obteniendo bitacora desde el i-mongo...");
+			char * bitacora = recibir_payload(i_mongo_store_fd);
+			log_info(logger, bitacora);
+			/*char ** lista_bitacora = string_split(bitacora,";");
+			for(int i =0 ;lista_bitacora[i]!=NULL ;i++){
+				log_info(logger, lista_bitacora[i]);
+			}*/
+			break;
 		case -1:
 			log_error(logger, "El i-Mongo-Store se desconecto. Terminando Discordiador");
 			status_discordiador = END;
@@ -255,6 +264,7 @@ void leer_consola_y_procesar(int i_mongo_store_fd, int mi_ram_hq_fd) {
 			break;
 		case OBTENER_BITACORA:
 			log_info(logger, "Obteniendo bitacora");
+			obtener_bitacora(argumentos,i_mongo_store_fd);
 			break;
 		default:
 			log_error(logger, "%s: comando no encontrado", argumentos[0]);
@@ -371,6 +381,25 @@ int iniciar_patota(char** argumentos, int mi_ram_hq_fd){
 	return EXIT_SUCCESS;
 }
 
+int obtener_bitacora(char ** argumentos, int i_mongo_store_fd){
+	int cantidad_args = cantidad_argumentos(argumentos);
+	char* id_tripulante;
+	if(cantidad_args < 2){
+		log_error(logger, "OBTENER_BITACORA: Faltan argumentos");
+		return EXIT_FAILURE;
+	}
+	if(cantidad_args > 2){
+		log_error(logger, "OBTENER_BITACORA: Sobran argumentos");
+		return EXIT_FAILURE;
+	}
+	id_tripulante = argumentos[1];
+	int estado_envio =  enviar_operacion(i_mongo_store_fd, COD_OBTENER_BITACORA, id_tripulante, strlen(id_tripulante)+1);
+	if(estado_envio != EXIT_SUCCESS)
+		log_error(logger, "No se pudo mandar el mensaje al i-Mongo-Store");
+
+	return EXIT_SUCCESS;
+}
+
 int submodulo_tripulante(void* args) {
 	iniciar_tripulante_t struct_iniciar_tripulante = *((iniciar_tripulante_t*) args);
 	t_tarea st_tarea;
@@ -460,7 +489,7 @@ int submodulo_tripulante(void* args) {
 
 		log_info(logger,"La proxima tarea a ejecutar es:\n%s",tarea);
 
-		estado_envio_mensaje = enviar_mensaje(i_mongo_store_fd_tripulante, tarea);
+		
 		if(estado_envio_mensaje != EXIT_SUCCESS)
 			log_error(logger, "No se pudo mandar el mensaje al i-Mongo-Store");
 		
@@ -491,6 +520,7 @@ int submodulo_tripulante(void* args) {
 					if(primer_ejecucion){
 						printf("estoy en posicion\n");
 						log_info(logger,"Comienzo a %s\n",nombre_parametros[0]);
+						estado_envio_mensaje = enviar_operacion(i_mongo_store_fd_tripulante,COD_EJECUTAR_TAREA, tarea,strlen(tarea)+1);
 						primer_ejecucion=0;
 					}
 					tiempo_ejecutado++;
