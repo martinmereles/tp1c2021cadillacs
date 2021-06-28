@@ -44,11 +44,22 @@ int main(void) {
 	algoritmo_planificador = string_new();
     char *string_quantum;
 	string_quantum = string_new();
+	char *string_grado_multitarea;
+	string_grado_multitarea = string_new();
+	char *string_duracion_sabotaje = string_new();
+	char *string_retardo = string_new();
 	string_append(&direccion_IP_i_Mongo_Store, config_get_string_value(config, "IP_I_MONGO_STORE"));
 	string_append(&puerto_i_Mongo_Store, config_get_string_value(config, "PUERTO_I_MONGO_STORE"));
 	string_append(&direccion_IP_Mi_RAM_HQ, config_get_string_value(config, "IP_MI_RAM_HQ"));
 	string_append(&puerto_Mi_RAM_HQ, config_get_string_value(config, "PUERTO_MI_RAM_HQ"));
 	string_append(&algoritmo_planificador, config_get_string_value(config, "ALGORITMO"));
+	string_append(&string_grado_multitarea, config_get_string_value(config, "GRADO_MULTITAREA"));
+	string_append(&string_duracion_sabotaje, config_get_string_value(config, "DURACION_SABOTAJE"));
+	string_append(&string_retardo, config_get_string_value(config, "RETARDO_CICLO_CPU"));
+
+	grado_multiproc = atoi(string_grado_multitarea);
+	duracion_sabotaje = atoi(string_duracion_sabotaje);
+	retardo_ciclo_cpu = atoi(string_retardo);
 
     if(strcmp(algoritmo_planificador,"RR")==0){
         string_append(&string_quantum, config_get_string_value(config, "QUANTUM"));
@@ -61,6 +72,9 @@ int main(void) {
         return EXIT_FAILURE;
     }
     free(string_quantum);
+
+	// Inicializo semaforo grado multitarea
+	sem_init(&sem_recurso_multitarea_disponible, 0, grado_multiproc);
 
 	log_info(logger, "Configuracion terminada");
 
@@ -200,14 +214,22 @@ void leer_consola_y_procesar(int i_mongo_store_fd, int mi_ram_hq_fd) {
 			*/
 			log_info(logger, "Listando tripulantes");
 			
-			sem_wait(&sem_mutex_ejecutar_dispatcher);
-			sem_wait(&sem_mutex_ingreso_tripulantes_new);
-			if (listar_tripulantes(string_to_code_algor(algoritmo_planificador)) != EXIT_SUCCESS) //TODO: revisar funcion
-				log_error(logger, "No hay tripulantes en ninguna de las colas");
-			else 
-				log_debug(logger, "Listado completado");
-			sem_post(&sem_mutex_ingreso_tripulantes_new);
-			sem_post(&sem_mutex_ejecutar_dispatcher);
+			if (estado_planificador != PLANIFICADOR_RUNNING){
+				if (listar_tripulantes() != EXIT_SUCCESS) //TODO: revisar funcion
+					log_error(logger, "No hay tripulantes en ninguna de las colas");
+				else 
+					log_debug(logger, "Listado completado");
+			}
+			else {
+				sem_wait(&sem_mutex_ejecutar_dispatcher);
+				sem_wait(&sem_mutex_ingreso_tripulantes_new);
+				if (listar_tripulantes() != EXIT_SUCCESS) //TODO: revisar funcion
+					log_error(logger, "No hay tripulantes en ninguna de las colas");
+				else 
+					log_debug(logger, "Listado completado");
+				sem_post(&sem_mutex_ingreso_tripulantes_new);
+				sem_post(&sem_mutex_ejecutar_dispatcher);
+			}
 			
 			break;
 		case EXPULSAR_TRIPULANTE:{
@@ -220,6 +242,9 @@ void leer_consola_y_procesar(int i_mongo_store_fd, int mi_ram_hq_fd) {
 			estado_envio_mensaje = dispatcher_expulsar_tripulante( atoi(argumentos[1]) );
 			if (estado_envio_mensaje != EXIT_SUCCESS){
 				log_error(logger, "No se encontro el tripulante");
+				sem_wait(&sem_mutex_tripulante_a_expulsar);
+				tripulante_a_expulsar = -1;
+				sem_post(&sem_mutex_tripulante_a_expulsar);
 				sem_post(&sem_mutex_ejecutar_dispatcher);
 			}
 			else{
@@ -252,8 +277,8 @@ void leer_consola_y_procesar(int i_mongo_store_fd, int mi_ram_hq_fd) {
 			log_info(logger, "Pausando planificacion");
 	
 			if (estado_planificador == PLANIFICADOR_RUNNING){
-				dispatcher_pausar();
 				sem_wait(&sem_planificacion_fue_iniciada);
+				dispatcher_pausar();
 				log_debug(logger, "Fue pausado exitosamente");
 			}else 
 				log_debug(logger, "Ya esta pausado");
@@ -445,13 +470,15 @@ int submodulo_tripulante(void* args) {
 	
 
 	while(status_discordiador != END && estado_tripulante != 'F'){
-		//sleep(20);
+		//sleep(retardo_ciclo_cpu);
 
 		// Implementacion de semaforo ante una pausa de la Planificacion.
 		sem_wait(&sem_planificacion_fue_iniciada);
 		sem_post(&sem_planificacion_fue_iniciada);
 
-		// Test: Mando un mensaje al i-Mongo-Store y a Mi-Ram HQ
+		// Implementacion de semaforo para Grado de Multitarea/Multiprocesamiento
+		sem_wait(&sem_recurso_multitarea_disponible);
+		log_debug(logger, "El tripulante %d cambia a estado EXEC", struct_iniciar_tripulante.TID);
 		
 		// Hay que ver si el servidor esta conectado?
 		
@@ -497,7 +524,7 @@ int submodulo_tripulante(void* args) {
 			int tarea_finalizada = 0;
 			int primer_ejecucion = 1;
 			while(!tarea_finalizada){
-				sleep(1);
+				sleep(retardo_ciclo_cpu);
 				
 				// Implementacion de semaforo ante una pausa de la Planificacion.
 				sem_wait(&sem_planificacion_fue_iniciada);
@@ -505,8 +532,12 @@ int submodulo_tripulante(void* args) {
 				
 				if(tripulante_esta_en_posicion(&struct_iniciar_tripulante, st_tarea)){
 					if(primer_ejecucion){
-						printf("estoy en posicion\n");
-						log_info(logger,"Comienzo a %s\n",nombre_parametros[0]);
+						//printf("estoy en posicion\n");
+						log_info(logger,"Comienzo a %s",nombre_parametros[0]);
+						if (!tarea_comun){
+							agregar_a_buffer_peticiones(buffer_peticiones_exec_to_blocked_io, struct_iniciar_tripulante.TID);
+							log_debug(logger, "El tripulante %d cambia a estado BLOCKED IO", struct_iniciar_tripulante.TID);
+						}
 						primer_ejecucion=0;
 					}
 					tiempo_ejecutado++;
@@ -515,13 +546,19 @@ int submodulo_tripulante(void* args) {
 					printf("termine la tarea\n");
 					}
 				}	
-				printf("ejecute 1 seg\n");		
-			}	
-		}
+				//printf("ejecute 1 seg\n");		
+			}
+			if (!tarea_comun){
+				agregar_a_buffer_peticiones(buffer_peticiones_blocked_io_to_ready, struct_iniciar_tripulante.TID);
+				log_debug(logger, "El tripulante %d completo tarea de %d ciclos exitosamente, pasando a estado READY", struct_iniciar_tripulante.TID, atoi(st_tarea.duracion));	
+			}
 			
+		}
+		sem_post(&sem_recurso_multitarea_disponible);	
+
 		/*
 		// HAGO SLEEP (1 CICLO DE CPU)
-		sleep(tiempo_sleep);
+		sleep(retardo_ciclo_cpu);
 
 		// Si no estoy en la posicion de la tarea, avanzo a la tarea
 		if(pos_actual != pos_tarea)
@@ -572,6 +609,7 @@ int submodulo_tripulante(void* args) {
 				log_error(logger,"No se pudo eliminar de la cola EXIT");
 				sem_post(&sem_puede_expulsar_tripulante);
 				sem_post(&sem_mutex_ejecutar_dispatcher);
+				//sem_post(&sem_recurso_multitarea_disponible);
 				return EXIT_FAILURE;
 			}
 			
@@ -585,6 +623,7 @@ int submodulo_tripulante(void* args) {
 			liberar_conexion(mi_ram_hq_fd_tripulante);
 			
 			sem_post(&sem_puede_expulsar_tripulante);
+			//sem_post(&sem_recurso_multitarea_disponible);
 			
 			return EXIT_SUCCESS;
 		}
