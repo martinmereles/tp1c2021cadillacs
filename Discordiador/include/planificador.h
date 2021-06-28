@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <pthread.h>
 #include <semaphore.h>
+#include <commons/temporal.h>
 
 // en ESTADO NEW: genera las estructuras administrativas , una vez generado todo --> pasa a READY.
 t_queue *cola_new;
@@ -66,7 +67,7 @@ sem_t sem_sabotaje_activado;
 sem_t sem_mutex_tripulante_a_expulsar;
 
 int iniciar_dispatcher(char *algoritmo_planificador);
-int listar_tripulantes(enum algoritmo cod);
+int listar_tripulantes(void);
 char *code_dispatcher_to_string(enum estado_tripulante code);
 
 int dispatcher_expulsar_tripulante(int tid_tripulante);

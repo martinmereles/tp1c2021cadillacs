@@ -47,6 +47,9 @@ char* direccion_IP_Mi_RAM_HQ;
 char* puerto_Mi_RAM_HQ;
 char* algoritmo_planificador;
 
+//grado_multitarea = grado multiprocesamiento
+int duracion_sabotaje; // expresado como cantidad en ciclos CPU
+int retardo_ciclo_cpu; // tiempo de espera por c/ciclo CPU
 int tripulante_a_expulsar;
 
 enum status_discordiador status_discordiador;
@@ -59,5 +62,6 @@ sem_t sem_generador_PID;
 sem_t sem_struct_iniciar_tripulante;
 
 sem_t sem_planificacion_fue_iniciada;
+sem_t sem_recurso_multitarea_disponible;
 
 #endif
