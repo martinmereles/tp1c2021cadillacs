@@ -32,6 +32,7 @@ typedef struct dato_tripulante{
     int PID, TID;
     int estado_previo;
     int quantum;
+    sem_t sem_planificacion_fue_reanudada;
 }t_tripulante;
 
 // CODIGO ESTADO del Tripulante
@@ -76,5 +77,8 @@ enum algoritmo string_to_code_algor(char *string_algor);
 void agregar_a_buffer_peticiones(t_queue *buffer, int tid);
 int dispatcher_eliminar_tripulante(int tid_eliminar);
 void iniciador_tripulante(int tid, int pid);
+
+// Lista global de tripulantes (sirve para pausar/reanudar la planificacion)
+t_list* lista_tripulantes;
 
 #endif

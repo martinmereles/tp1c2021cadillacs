@@ -551,7 +551,16 @@ void dispatcher_pausar(){
 }
 
 int dispatcher_eliminar_tripulante(int tid_eliminar){
-    free(obtener_tripulante_por_tid(cola_exit, tid_eliminar));
+    t_tripulante* tripulante = obtener_tripulante_por_tid(cola_exit, tid_eliminar);
+    sem_destroy(&(tripulante->sem_planificacion_fue_reanudada));    // Destruyo su semaforo
+    bool tiene_TID_a_eliminar(void* args){
+        t_tripulante* tripulante_encontrado = (t_tripulante*) args;
+        return tripulante_encontrado->TID == tid_eliminar;
+    }
+    // Lo quito de la lista global de tripulantes
+    list_remove_by_condition(lista_tripulantes, tiene_TID_a_eliminar);
+    free(tripulante);   // Libero el struct
+
     if (dispatcher_expulsar_tripulante(tid_eliminar) != EXIT_SUCCESS)
         return EXIT_SUCCESS;
     else
@@ -564,5 +573,8 @@ void iniciador_tripulante(int tid, int pid){
     nuevo -> PID = pid;
     nuevo -> TID = tid;
     nuevo -> estado_previo = NEW;
+    // El tripulante tiene un semaforo para pausar/reanudar la planificacion
+	// Inicializamos el semaforo
+	sem_init(&(nuevo -> sem_planificacion_fue_reanudada), 0, 0);    // Inicializa en 0 a proposito
     queue_push(cola_new, nuevo);
 }

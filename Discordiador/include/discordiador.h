@@ -40,6 +40,7 @@ void recibir_y_procesar_mensaje_i_mongo_store(int i_mongo_store_fd);
 char* leer_proxima_tarea_mi_ram_hq(int mi_ram_hq_fd_tripulante);
 int tripulante_esta_en_posicion(iniciar_tripulante_t* tripulante, t_tarea tarea);
 int obtener_bitacora(char ** argumentos, int i_mongo_store_fd);
+void reanudar_planificacion();
 
 char* direccion_IP_i_Mongo_Store;
 char* puerto_i_Mongo_Store;
@@ -61,7 +62,10 @@ sem_t sem_generador_TID;
 sem_t sem_generador_PID;
 sem_t sem_struct_iniciar_tripulante;
 
-sem_t sem_planificacion_fue_iniciada;
+//sem_t sem_planificacion_fue_iniciada;
 sem_t sem_recurso_multitarea_disponible;
+
+// Booleano para poder pausar/reanudar la planificacion
+bool planificacion_pausada;
 
 #endif

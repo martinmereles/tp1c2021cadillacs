@@ -17,7 +17,7 @@ int main(void) {
 	sem_init(&sem_struct_iniciar_tripulante,0,0);
 
 	// Inicializo semaforo de Planificacion
-	sem_init(&sem_planificacion_fue_iniciada,0,0);
+	// sem_init(&sem_planificacion_fue_iniciada,0,0);
 
     // Inicializo semaforos del dispatcher
     sem_init(&sem_mutex_ingreso_tripulantes_new,0,1);
@@ -37,44 +37,38 @@ int main(void) {
 	// Leo IP y PUERTO del config
 	t_config *config = config_create("./cfg/discordiador.config");
 	log_info(logger, "Iniciando configuracion");
-	direccion_IP_i_Mongo_Store = string_new();
-	puerto_i_Mongo_Store = string_new();
-	direccion_IP_Mi_RAM_HQ = string_new();
-	puerto_Mi_RAM_HQ = string_new();
-	algoritmo_planificador = string_new();
-    char *string_quantum;
-	string_quantum = string_new();
-	char *string_grado_multitarea;
-	string_grado_multitarea = string_new();
-	char *string_duracion_sabotaje = string_new();
-	char *string_retardo = string_new();
-	string_append(&direccion_IP_i_Mongo_Store, config_get_string_value(config, "IP_I_MONGO_STORE"));
-	string_append(&puerto_i_Mongo_Store, config_get_string_value(config, "PUERTO_I_MONGO_STORE"));
-	string_append(&direccion_IP_Mi_RAM_HQ, config_get_string_value(config, "IP_MI_RAM_HQ"));
-	string_append(&puerto_Mi_RAM_HQ, config_get_string_value(config, "PUERTO_MI_RAM_HQ"));
-	string_append(&algoritmo_planificador, config_get_string_value(config, "ALGORITMO"));
-	string_append(&string_grado_multitarea, config_get_string_value(config, "GRADO_MULTITAREA"));
-	string_append(&string_duracion_sabotaje, config_get_string_value(config, "DURACION_SABOTAJE"));
-	string_append(&string_retardo, config_get_string_value(config, "RETARDO_CICLO_CPU"));
 
-	grado_multiproc = atoi(string_grado_multitarea);
-	duracion_sabotaje = atoi(string_duracion_sabotaje);
-	retardo_ciclo_cpu = atoi(string_retardo);
+	direccion_IP_i_Mongo_Store = config_get_string_value(config, "IP_I_MONGO_STORE");
+	puerto_i_Mongo_Store = config_get_string_value(config, "PUERTO_I_MONGO_STORE");
+	direccion_IP_Mi_RAM_HQ = config_get_string_value(config, "IP_MI_RAM_HQ");
+	puerto_Mi_RAM_HQ = config_get_string_value(config, "PUERTO_MI_RAM_HQ");
+	algoritmo_planificador = config_get_string_value(config, "ALGORITMO");
+	grado_multiproc = atoi(config_get_string_value(config, "GRADO_MULTITAREA"));
+	duracion_sabotaje = atoi(config_get_string_value(config, "DURACION_SABOTAJE"));
+	retardo_ciclo_cpu = atoi(config_get_string_value(config, "RETARDO_CICLO_CPU"));
 
     if(strcmp(algoritmo_planificador,"RR")==0){
-        string_append(&string_quantum, config_get_string_value(config, "QUANTUM"));
-        quantum = atoi(string_quantum); // Variable global
+		log_info(logger, "El algoritmo de planificacion es: RR");
+		quantum = atoi(config_get_string_value(config, "QUANTUM"));	// Variable global
+		log_info(logger, "El quantum es: %d", quantum);
     }
     else{
-	if(strcmp(algoritmo_planificador,"FIFO")==0)
+	if(strcmp(algoritmo_planificador,"FIFO")==0){
+		log_info(logger, "El algoritmo de planificacion es: FIFO");
 		quantum = 0; // Variable global
-    else
-        return EXIT_FAILURE;
+	}
+    else{
+		log_error(logger, "ERROR. Algoritmo de planificacion: %s. No es valido", algoritmo_planificador);
+		return EXIT_FAILURE;
+	}
+        
     }
-    free(string_quantum);
 
 	// Inicializo semaforo grado multitarea
 	sem_init(&sem_recurso_multitarea_disponible, 0, grado_multiproc);
+
+	// Lista de tripulantes (sirve para poder pausar/reanudar la planificacion)
+	lista_tripulantes = list_create();	// La inicializo
 
 	log_info(logger, "Configuracion terminada");
 
@@ -107,11 +101,12 @@ int main(void) {
 
 	// Libero recursos
 	log_info(logger,"Finalizando Discordiador");
+	list_destroy(lista_tripulantes);	// Lista global para pausar/reanudar planif.
 	log_destroy(logger);
 	config_destroy(config);
 	liberar_conexion(i_mongo_store_fd);
 	liberar_conexion(mi_ram_hq_fd);
-	
+
 	return EXIT_SUCCESS;
 }
 
@@ -273,7 +268,9 @@ void leer_consola_y_procesar(int i_mongo_store_fd, int mi_ram_hq_fd) {
 
 			// Habilito la planificacion para cada tripulante cuando se ejecuta por 1ra vez o si fue pausado:
 			if (estado_planificador == PLANIFICADOR_OFF || estado_planificador == PLANIFICADOR_BLOCKED){
-				sem_post(&sem_planificacion_fue_iniciada);
+				// sem_post(&sem_planificacion_fue_iniciada);
+				reanudar_planificacion();
+				
 				// Inicia la ejecucion del HILO Dispatcher: gestor de QUEUEs del Sistema
 				if ( iniciar_dispatcher(algoritmo_planificador) != EXIT_SUCCESS)
 					log_error(logger, "ERROR inesperado, no se pudo iniciar el dispatcher");
@@ -286,7 +283,8 @@ void leer_consola_y_procesar(int i_mongo_store_fd, int mi_ram_hq_fd) {
 			log_info(logger, "Pausando planificacion");
 	
 			if (estado_planificador == PLANIFICADOR_RUNNING){
-				sem_wait(&sem_planificacion_fue_iniciada);
+				//sem_wait(&sem_planificacion_fue_iniciada);
+				planificacion_pausada = true;
 				dispatcher_pausar();
 				log_debug(logger, "Fue pausado exitosamente");
 			}else 
@@ -306,6 +304,25 @@ void leer_consola_y_procesar(int i_mongo_store_fd, int mi_ram_hq_fd) {
 		free(argumentos[i]);
 	}
 	free(argumentos);
+}
+
+void reanudar_planificacion(){
+	// Actualizo el booleano de planificacion pausada
+	planificacion_pausada = false;
+
+	t_list_iterator* iterador = list_iterator_create(lista_tripulantes);
+    t_tripulante* tripulante;
+    int valor_semaforo;
+
+	// Por cada tripulante, reviso su semaforo. Si estaba bloqueado, lo desbloqueo
+    while(list_iterator_has_next(iterador)){
+        tripulante = list_iterator_next(iterador);
+        sem_getvalue(&(tripulante->sem_planificacion_fue_reanudada), &valor_semaforo);
+        if(valor_semaforo < 0)
+			sem_post(&(tripulante->sem_planificacion_fue_reanudada));
+    }
+
+    list_iterator_destroy(iterador);    // Liberamos el iterador
 }
 
 int cantidad_argumentos(char** argumentos){
@@ -444,6 +461,8 @@ int submodulo_tripulante(void* args) {
 	pos_X = 0;
 	pos_Y = 0;
 
+	t_tripulante* tripulante; // Lo tengo que declarar piola
+
 	log_info(logger, "Iniciando tripulante");
 
 	// Intento conectarme con i-MongoStore
@@ -490,27 +509,28 @@ int submodulo_tripulante(void* args) {
 	sem_post(&sem_struct_iniciar_tripulante);
 	
 	log_info(logger, "Tripulante inicializado");
-
 	
 	// Cada tripulante queda en espera hasta estar iniciado la Planificacion
-	sem_wait(&sem_planificacion_fue_iniciada);
-	log_debug(logger, "El tripulante %d inicia su planificacion",struct_iniciar_tripulante.TID);
-	sem_post(&sem_planificacion_fue_iniciada);
+	if(planificacion_pausada)
+		sem_wait(&(tripulante->sem_planificacion_fue_reanudada));
 	
+	log_debug(logger, "El tripulante %d inicia su planificacion",struct_iniciar_tripulante.TID);	
 
 	while(status_discordiador != END && estado_tripulante != 'F'){
-		//sleep(retardo_ciclo_cpu);
+			
+		// Si la planificacion fue pausada, se bloquea el tripulante
+		if(planificacion_pausada)
+			sem_wait(&(tripulante->sem_planificacion_fue_reanudada));
 
-		// Implementacion de semaforo ante una pausa de la Planificacion.
-		sem_wait(&sem_planificacion_fue_iniciada);
-		sem_post(&sem_planificacion_fue_iniciada);
+		// Retardo de ciclo de cpu
+		sleep(retardo_ciclo_cpu);
 
 		// Implementacion de semaforo para Grado de Multitarea/Multiprocesamiento
 		sem_wait(&sem_recurso_multitarea_disponible);
 		log_debug(logger, "El tripulante %d cambia a estado EXEC", struct_iniciar_tripulante.TID);
 		
 		// Hay que ver si el servidor esta conectado?
-		
+		// CODIGO VIEJO
 		estado_envio_mensaje = enviar_op_recibir_ubicacion_tripulante(mi_ram_hq_fd_tripulante, pos_X, pos_Y);
 		if(estado_envio_mensaje != EXIT_SUCCESS)
 			log_error(logger, "No se pudo mandar el mensaje a Mi-Ram HQ");
@@ -556,9 +576,13 @@ int submodulo_tripulante(void* args) {
 				sleep(retardo_ciclo_cpu);
 				
 				// Implementacion de semaforo ante una pausa de la Planificacion.
-				sem_wait(&sem_planificacion_fue_iniciada);
-				sem_post(&sem_planificacion_fue_iniciada);
-				
+				// sem_wait(&sem_planificacion_fue_iniciada);
+				// sem_post(&sem_planificacion_fue_iniciada);
+				// Si la planificacion fue pausada, se bloquea el tripulante
+				if(planificacion_pausada)
+					sem_wait(&(tripulante->sem_planificacion_fue_reanudada));
+
+
 				if(tripulante_esta_en_posicion(&struct_iniciar_tripulante, st_tarea)){
 					if(primer_ejecucion){
 						//printf("estoy en posicion\n");
