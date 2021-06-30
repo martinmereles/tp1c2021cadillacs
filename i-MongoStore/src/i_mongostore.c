@@ -5,8 +5,9 @@
 int main(void)
 {
 	// inicializo semaforos
-	sem_init(&semaforo_aceptar_conexiones, 0, 0);
 	
+	iniciar_semaforos_fs();
+
 	logger = log_create("./cfg/i-mongostore.log", "I-MongoStore", 1, LOG_LEVEL_DEBUG);
 	
 	// Leo IP y PUERTO del config
@@ -30,7 +31,18 @@ int main(void)
 	munmap(blocksmap, blocks_stat.st_size);
 	close(sbfile);
 	close(bfile);
+	free(super_bloque.bitarray);
 	return EXIT_SUCCESS;
+}
+
+void iniciar_semaforos_fs(){
+	sem_init(&semaforo_aceptar_conexiones, 0, 0);
+	sem_init(&sem_mutex_superbloque,0,1);
+	sem_init(&sem_mutex_blocks,0,1);
+	sem_init(&sem_mutex_oxigeno,0,1);
+	sem_init(&sem_mutex_comida,0,1);
+	sem_init(&sem_mutex_basura,0,1);
+	sem_init(&sem_mutex_bitmap,0,1);
 }
 
 void leer_config(){
@@ -154,9 +166,27 @@ bool leer_mensaje_cliente_y_procesar(int cliente_fd){
 	bool cliente_conectado = true;
 	// Leo codigo de operacion
 	int cod_op = recibir_operacion(cliente_fd);
+	char * payload;
+	
 	switch(cod_op) {
 		case COD_MENSAJE:
 		//prueba COD_RECIBIR_TAREA
+			recibir_payload_y_ejecutar(cliente_fd, loguear_mensaje);
+			break;
+		case COD_INICIAR_TRIPULANTE:
+			payload = recibir_payload(cliente_fd);
+			iniciar_tripulante(payload);
+			free(payload);
+			break;
+		case COD_OBTENER_BITACORA:
+			log_info(logger,"procesando solicitud de bitacora..");
+			payload = recibir_payload(cliente_fd);
+			char* bitacora = leer_bitacora(payload);
+			enviar_operacion(cliente_fd,COD_OBTENER_BITACORA,bitacora,strlen(bitacora)+1);
+			free(bitacora);
+			log_info(logger,"bitacora enviada");
+			break;
+		case COD_EJECUTAR_TAREA:
 			recibir_payload_y_ejecutar(cliente_fd, recibir_tarea);
 			break;
 		case -1:

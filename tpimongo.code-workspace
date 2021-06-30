@@ -1,0 +1,21 @@
+{
+	"folders": [
+		{
+			"path": "Discordiador"
+		},
+		{
+			"path": "i-MongoStore"
+		},
+		{
+			"path": "Mi-RAM HQ"
+		},
+		{
+			"path": "shared"
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"cstdlib": "c"
+		}
+	}
+}

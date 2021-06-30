@@ -36,6 +36,7 @@ int comunicacion_cliente(int cliente_fd);
 void atender_cliente(void *args);
 bool leer_mensaje_cliente_y_procesar(int);
 void leer_config();
+void iniciar_semaforos_fs();
 
 int status_servidor;
 sem_t semaforo_aceptar_conexiones;
@@ -46,5 +47,11 @@ void* superbloquemap;
 char * blocksmap;
 int sbfile;
 int bfile;
+sem_t sem_mutex_superbloque;
+sem_t sem_mutex_blocks;
+sem_t sem_mutex_oxigeno;
+sem_t sem_mutex_comida;
+sem_t sem_mutex_basura;
+sem_t sem_mutex_bitmap;
 
 #endif
