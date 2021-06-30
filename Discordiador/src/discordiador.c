@@ -477,6 +477,14 @@ int submodulo_tripulante(void* args) {
 			}
 			else{
 				// EJECUTA LA TAREA POSTA
+				if(tiene_un_espacio(tarea)){
+					mandar_mensaje_i_mongo_store();
+					// Se bloquea
+
+					// GENERAR_OXIGENO 10;14;43;23
+					// REGAR_PLANTAS;43;54
+				}
+				
 				// AVISA QUE FINALIZO
 				// PIDE LA SIGUIENTE TAREA
 				ciclos_cumplidos = 0;	// Reinicio ciclos cumplidos
