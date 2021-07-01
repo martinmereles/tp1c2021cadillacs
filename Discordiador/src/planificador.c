@@ -119,7 +119,7 @@ int iniciar_dispatcher(char *algoritmo_planificador){
         sem_post(&sem_mutex_ejecutar_dispatcher);
         estado_planificador = PLANIFICADOR_RUNNING;
     }
-
+    
     return EXIT_SUCCESS;
 }
 
@@ -567,7 +567,7 @@ int dispatcher_eliminar_tripulante(int tid_eliminar){
         return EXIT_FAILURE;
 }
 
-void iniciador_tripulante(int tid, int pid){
+t_tripulante* iniciador_tripulante(int tid, int pid){
     t_tripulante *nuevo;
     nuevo = malloc(sizeof(t_tripulante));
     nuevo -> PID = pid;
@@ -576,5 +576,7 @@ void iniciador_tripulante(int tid, int pid){
     // El tripulante tiene un semaforo para pausar/reanudar la planificacion
 	// Inicializamos el semaforo
 	sem_init(&(nuevo -> sem_planificacion_fue_reanudada), 0, 0);    // Inicializa en 0 a proposito
+    list_add(lista_tripulantes, nuevo); // Lo agrego a la lista global de tripulantes
     queue_push(cola_new, nuevo);
+    return nuevo;
 }
