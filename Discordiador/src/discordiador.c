@@ -495,133 +495,168 @@ int submodulo_tripulante(void* args) {
 	// char estado_tripulante = 'E';
 
 	log_info(logger, "Tripulante inicializado");
-	
-	// Cada tripulante queda en espera hasta estar iniciado la Planificacion
-	if(estado_planificador != PLANIFICADOR_RUNNING){
-		log_info(logger, "El tripulante %d pauso su planificacion", tripulante->TID);
-		sem_wait(&(tripulante->sem_planificacion_fue_reanudada));
-	}
 		
-	
-	log_debug(logger, "El tripulante %d inicia su planificacion",tripulante->TID);	
-
 	while(status_discordiador != END && tripulante->estado_previo != EXIT){
 			
-		// Si la planificacion fue pausada, se bloquea el tripulante
-		if(estado_planificador != PLANIFICADOR_RUNNING)
-			sem_wait(&(tripulante->sem_planificacion_fue_reanudada));
-
-		// Retardo de ciclo de cpu
-		// sleep(retardo_ciclo_cpu);
-
-		// Implementacion de semaforo para Grado de Multitarea/Multiprocesamiento
-		sem_wait(&sem_recurso_multitarea_disponible);
-		log_debug(logger, "El tripulante %d cambia a estado EXEC", tripulante->TID);
-		
-		// PIDO LA TAREA A MI RAM HQ
-		estado_envio_mensaje = enviar_op_enviar_proxima_tarea(mi_ram_hq_fd_tripulante);
-		if(estado_envio_mensaje != EXIT_SUCCESS)
-			log_error(logger, "No se pudo mandar el mensaje a Mi-Ram HQ");
-
-		tarea = leer_proxima_tarea_mi_ram_hq(mi_ram_hq_fd_tripulante);
-
-		log_info(logger,"La proxima tarea a ejecutar es:\n%s",tarea);
-
-
-
-
-		if(strcmp(tarea,"FIN") == 0){
-			tripulante->estado_previo = EXIT;
-			// estado_tripulante = 'F';
-		}else{
-			//parseo la tarea
-			char ** parametros;
-			char ** nombre_parametros;
-			int tarea_comun = 0;
-			int tiempo_ejecutado = 0;
-			parametros = string_split(tarea,";");
-			st_tarea.nombre = parametros[0];
-			st_tarea.pos_x = parametros[1];
-			st_tarea.pos_y = parametros[2];
-			st_tarea.duracion = parametros[3];
-			//nombre[0]=nombre de la tarea, nombre[1]=parametro numerico
-			nombre_parametros = string_split(st_tarea.nombre," ");
-			if(nombre_parametros[1]==NULL){
-				tarea_comun=1;
-			}
-			//cada while es 1 sleep/1 rafaga
-			int tarea_finalizada = 0;
-			int primer_ejecucion = 1;
-			while(!tarea_finalizada){
-				sleep(retardo_ciclo_cpu);
-				
-				// Implementacion de semaforo ante una pausa de la Planificacion.
-				// sem_wait(&sem_planificacion_fue_iniciada);
-				// sem_post(&sem_planificacion_fue_iniciada);
-
-				// Si la planificacion fue pausada, se bloquea el tripulante
-				if(estado_planificador != PLANIFICADOR_RUNNING)
-					sem_wait(&(tripulante->sem_planificacion_fue_reanudada));
-
-				if(tripulante_esta_en_posicion(tripulante, st_tarea, mi_ram_hq_fd_tripulante)){
-					if(primer_ejecucion){
-						//printf("estoy en posicion\n");
-						log_info(logger,"Comienzo a %s",nombre_parametros[0]);
-						estado_envio_mensaje = enviar_operacion(i_mongo_store_fd_tripulante,COD_EJECUTAR_TAREA, tarea,strlen(tarea)+1);
-						if (!tarea_comun){
-							agregar_a_buffer_peticiones(buffer_peticiones_exec_to_blocked_io, tripulante->TID);
-							log_debug(logger, "El tripulante %d cambia a estado BLOCKED IO", tripulante->TID);
-						}
-						primer_ejecucion=0;
-					}
-					tiempo_ejecutado++;
-					if(tiempo_ejecutado==atoi(st_tarea.duracion)){
-					tarea_finalizada=1;
-					printf("termine la tarea\n");
-					}
-				}	
-				//printf("ejecute 1 seg\n");		
-			}
-			if (!tarea_comun){
-				agregar_a_buffer_peticiones(buffer_peticiones_blocked_io_to_ready, tripulante->TID);
-				log_debug(logger, "El tripulante %d completo tarea de %d ciclos exitosamente, pasando a estado READY", tripulante->TID, atoi(st_tarea.duracion));	
-			}
-			
-		}
-		sem_post(&sem_recurso_multitarea_disponible);	
-
 		/*
-		// HAGO SLEEP (1 CICLO DE CPU)
-		sleep(retardo_ciclo_cpu);
+		Estados tripulante:		EXEC	(s)
+								READY
+								BLOCKED
+								INICIO
+								FIN			*/
 
-		// Si no estoy en la posicion de la tarea, avanzo a la tarea
-		if(pos_actual != pos_tarea)
-			// Me muevo un paso
-			// Informa a i-MongoStore y Mi RAM HQ que se movio
+		// Si la planificacion fue pausada, se bloquea el tripulante
+		if(estado_planificador != PLANIFICADOR_RUNNING){
+			log_info(logger, "El tripulante %d pauso su planificacion", tripulante->TID);
+			sem_wait(&(tripulante->sem_planificacion_fue_reanudada));
+			log_debug(logger, "El tripulante %d inicia su planificacion",tripulante->TID);
+		}
 
-		else{
-			// Estoy en posicion de la tarea
-			if(ciclos_cumplidos == 0){
-				// Avisa a i-mongostore que arranca la tarea
-			}
+		// Mientras la planificacion no este pausada
+		switch(tripulante->estado){
+			case READY:
+				// Si la planificacion fue pausada no hay problema, se queda esperando aca
+				sem_wait(tripulante->sem_tripulante_dejo_ready);
+				break;
 
-			// Si todavia no la termine 
-			if(ciclos_cumplidos < ciclos_tarea){
-				ciclos_cumplidos++;
-			}
-			else{
-				// EJECUTA LA TAREA POSTA
-				if(tiene_un_espacio(tarea)){
-					mandar_mensaje_i_mongo_store();
-					// Se bloquea
+			case BLOCKED:	// Solo hay que esperar los ciclos hasta que se libere
 
-					// GENERAR_OXIGENO 10;14;43;23
-					// REGAR_PLANTAS;43;54
+				if(ciclos_en_blocked >= ciclos_bloqueo_tarea){
+					tripulante->estado = READY;	
+					// Avisa que finalizo la tarea
+					break;	// Voy al fin del switch
+				}
+
+				// Se crea un hilo aparte que termina despues de un ciclo
+				ciclo_t* ciclo = crear_ciclo_cpu();	
+
+				ciclos_en_blocked++;
+
+				// Se espera que termine el ciclo
+				esperar_fin_ciclo_de_cpu(ciclo);					
+				break;
+
+			case EXEC:
+
+				// Si al tripulante se le acabo el quantum => pasa a READY
+				if(algoritmo = ROUND_ROBIN && ciclos_en_exec >= quantum){
+					tripulante->estado = READY;
+					break;	// Salgo del switch
+				}
+
+				// Inicio 1 ciclo de cpu
+				ciclo_t* ciclo = crear_ciclo_cpu();
+
+				// Si no inicie la tarea, la pido (consume 1 ciclo de cpu)
+				if(tarea == NULL){
+					
+					// PIDO LA TAREA A MI RAM HQ
+					estado_envio_mensaje = enviar_op_enviar_proxima_tarea(mi_ram_hq_fd_tripulante);
+					if(estado_envio_mensaje != EXIT_SUCCESS)
+						log_error(logger, "No se pudo mandar el mensaje a Mi-Ram HQ");
+
+					tarea = leer_proxima_tarea_mi_ram_hq(mi_ram_hq_fd_tripulante);
+
+					log_info(logger,"La proxima tarea a ejecutar es:\n%s",tarea);
+
+					// Se espera que termine el ciclo
+					esperar_fin_ciclo_de_cpu(ciclo);
+					break;	// Salgo del switch
 				}
 				
-				// AVISA QUE FINALIZO
-				// PIDE LA SIGUIENTE TAREA
-				ciclos_cumplidos = 0;	// Reinicio ciclos cumplidos
+				// Si la tarea leida es la tarea "FIN"
+				if(strcmp(tarea,"FIN") == 0){
+					tripulante->estado_previo = EXIT;
+					break;
+				}
+
+				// Si es una tarea normal, la parseo
+				char ** parametros;
+				char ** nombre_parametros;
+				int tarea_comun = 0;
+				int tiempo_ejecutado = 0;
+				parametros = string_split(tarea,";");
+				st_tarea.nombre = parametros[0];
+				st_tarea.pos_x = parametros[1];
+				st_tarea.pos_y = parametros[2];
+				st_tarea.duracion = parametros[3];
+				//nombre[0]=nombre de la tarea, nombre[1]=parametro numerico
+				nombre_parametros = string_split(st_tarea.nombre," ");
+				if(nombre_parametros[1]==NULL){
+					tarea_comun=1;
+				}
+				//cada while es 1 sleep/1 rafaga
+				int tarea_finalizada = 0;
+				int primer_ejecucion = 1;
+
+				if(!tarea_finalizada){
+					if(tripulante_esta_en_posicion(tripulante, st_tarea, mi_ram_hq_fd_tripulante)){
+						if(primer_ejecucion){
+							//printf("estoy en posicion\n");
+							log_info(logger,"Comienzo a %s",nombre_parametros[0]);
+							estado_envio_mensaje = enviar_operacion(i_mongo_store_fd_tripulante,COD_EJECUTAR_TAREA, tarea,strlen(tarea)+1);
+							if (!tarea_comun){
+								agregar_a_buffer_peticiones(buffer_peticiones_exec_to_blocked_io, tripulante->TID);
+								log_debug(logger, "El tripulante %d cambia a estado BLOCKED IO", tripulante->TID);
+							}
+							primer_ejecucion=0;
+						}
+						tiempo_ejecutado++;
+						if(tiempo_ejecutado==atoi(st_tarea.duracion)){
+						tarea_finalizada=1;
+						printf("termine la tarea\n");
+						}
+					}			
+				}
+				if (!tarea_comun){
+					agregar_a_buffer_peticiones(buffer_peticiones_blocked_io_to_ready, tripulante->TID);
+					log_debug(logger, "El tripulante %d completo tarea de %d ciclos exitosamente, pasando a estado READY", tripulante->TID, atoi(st_tarea.duracion));	
+				}
+
+			
+				// Espero que termine el ciclo de cpu
+				esperar_fin_ciclo_de_cpu(ciclo);
+				break;
+		}
+
+		else{
+
+			
+		}
+		
+
+
+		/*
+
+			// Si no estoy en la posicion de la tarea, avanzo a la tarea
+			if(pos_actual != pos_tarea)
+				// Me muevo un paso
+				// Informa a i-MongoStore y Mi RAM HQ que se movio
+
+			else{
+				// Estoy en posicion de la tarea
+				if(ciclos_cumplidos == 0){
+					// Avisa a i-mongostore que arranca la tarea
+				}
+
+				// Si todavia no la termine 
+				if(ciclos_cumplidos < ciclos_tarea){
+					ciclos_cumplidos++;
+				}
+				else{
+					// EJECUTA LA TAREA POSTA
+					if(tiene_un_espacio(tarea)){
+						mandar_mensaje_i_mongo_store();
+						// Se bloquea
+
+						// GENERAR_OXIGENO 10;14;43;23
+						// REGAR_PLANTAS;43;54
+					}
+					
+					// AVISA QUE FINALIZO
+					// PIDE LA SIGUIENTE TAREA
+					ciclos_cumplidos = 0;	// Reinicio ciclos cumplidos
+				}
 			}
 		}
 		*/
