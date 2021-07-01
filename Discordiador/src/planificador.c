@@ -196,6 +196,14 @@ int dispatcher_expulsar_tripulante(int tid_buscado){
     estado = get_index_from_cola_by_tid(cola_bloqueado_io, tid_buscado);
     if(estado != -1){
         trip_expulsado = obtener_tripulante_por_tid(cola_bloqueado_io, tid_buscado);
+        
+        // desbloqueo semaforo
+        int valor_semaforo;
+        log_info(logger, "Reanudo planificacion del tripulante %d", trip_expulsado->TID);
+        sem_getvalue(&(trip_expulsado->sem_planificacion_fue_reanudada), &valor_semaforo);
+	    if(valor_semaforo == 0)
+        sem_post(&(trip_expulsado->sem_planificacion_fue_reanudada));
+        
         queue_push(cola_exit, trip_expulsado);
         //list_clean_and_destroy_elements(cola_exit->elements,destructor_elementos_tripulante);
     }

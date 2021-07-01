@@ -14,6 +14,7 @@
 #include "commons/temporal.h"
 #include <pthread.h>
 #include <semaphore.h>
+#include "mapa.h"
 
 // La direccion logica del PCB es siempre la misma
 #define DIR_LOG_PCB     0x00000000

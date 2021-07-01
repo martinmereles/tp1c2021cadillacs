@@ -17,7 +17,7 @@ int inicializar_mapa();
 int finalizar_mapa();
 int dibujar_tripulante_mapa(int TID, int posicion_X, int posicion_Y);
 int borrar_tripulante_mapa(int TID);
-int desplazar_tripulante_mapa(int TID, enum desplazamiento_mapa desplazamiento);
+int desplazar_tripulante_mapa(int TID, int desplazamiento_X, int desplazamiento_Y);
 char caracter_tripulante(int TID);
 
 // VARIABLES GLOBALES

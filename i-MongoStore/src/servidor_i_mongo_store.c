@@ -21,25 +21,29 @@ int loguear_mensaje(char* payload){
 }
 
 void iniciar_tripulante(char* payload){
-    //uint32_t PID, posicion_X, posicion_Y, TID;
-    int offset = 0;
+    uint32_t PID, posicion_X, posicion_Y, TID;
+    uint32_t offset = 0;
     
     log_info(logger, "Iniciando estructuras del tripulante");
 
-    memcpy(&tripulante.PID, payload + offset, sizeof(uint32_t));
-	offset += sizeof(uint32_t);
-    log_info(logger, "El PID del tripulante es: %d",tripulante.PID);
+    memcpy(&PID, payload + offset, sizeof(uint32_t));
+    //memcpy(&(tripulante.PID), payload + offset, sizeof(uint32_t));
+    offset += sizeof(uint32_t);
+    log_info(logger, "El PID del tripulante es: %d",PID);    //tripulante.PID);
 
-    memcpy(&tripulante.TID, payload + offset, sizeof(uint32_t));
+    memcpy(&TID, payload + offset, sizeof(uint32_t));
+    //memcpy(&(tripulante.TID), payload + offset, sizeof(uint32_t));
 	offset += sizeof(uint32_t);
-    log_info(logger, "El TID del tripulante es: %d",tripulante.TID);
+    log_info(logger, "El TID del tripulante es: %d",TID);     //tripulante.TID);
 
-    memcpy(&tripulante.pos_x, payload + offset, sizeof(uint32_t));
+    memcpy(&posicion_X, payload + offset, sizeof(uint32_t));
+    //memcpy(&(tripulante.pos_x), payload + offset, sizeof(uint32_t));
 	offset += sizeof(uint32_t);
 
-    memcpy(&tripulante.pos_y, payload + offset, sizeof(uint32_t));
+    memcpy(&posicion_Y, payload + offset, sizeof(uint32_t));
+    //memcpy(&(tripulante.pos_y), payload + offset, sizeof(uint32_t));
 	offset += sizeof(uint32_t);
-    log_info(logger, "La posicion inicial del tripulante es: (%d,%d)",tripulante.pos_x,tripulante.pos_y);
+    log_info(logger, "La posicion inicial del tripulante es: (%d,%d)",posicion_X,posicion_Y);      //tripulante.pos_x,tripulante.pos_y);
     //char * mensaje = string_new();
     //string_append(&mensaje, "Se inicio el tripulante ");
     //string_append(&mensaje, string_itoa(tripulante.TID));

@@ -227,7 +227,6 @@ void leer_consola_y_procesar(int i_mongo_store_fd, int mi_ram_hq_fd) {
 			break;
 		case EXPULSAR_TRIPULANTE:{
 			log_info(logger, "Expulsando tripulante");
-			
 			sem_wait(&sem_mutex_ejecutar_dispatcher);
 			sem_wait(&sem_mutex_tripulante_a_expulsar);
 			tripulante_a_expulsar = atoi(argumentos[1]);
@@ -455,11 +454,14 @@ int submodulo_tripulante(void* args) {
 		return EXIT_FAILURE;
 	}
 
+	// TEST SERVIDOR i-Mongo-Store
+	enviar_mensaje(i_mongo_store_fd_tripulante, "Hola, soy un tripulante!");
+
 	// Le pedimos a Mi-RAM HQ que inicie al tripulante
 	estado_envio_mensaje = enviar_op_iniciar_tripulante(i_mongo_store_fd_tripulante, mi_ram_hq_fd_tripulante, struct_iniciar_tripulante);
 
 	if(estado_envio_mensaje != EXIT_SUCCESS){
-		log_error(logger, "No se pudo mandar el mensaje al Mi-Ram HQ");
+		log_error(logger, "No se pudo mandar el mensaje a Mi-Ram HQ");
 		// Libero recursos
 		liberar_conexion(i_mongo_store_fd_tripulante);
 		liberar_conexion(mi_ram_hq_fd_tripulante);
@@ -489,6 +491,7 @@ int submodulo_tripulante(void* args) {
 
 	tripulante->posicion_X = 0;	// Deberia leerlo de la RAM
 	tripulante->posicion_Y = 0; // Deberia leerlo de la RAM
+
 	// char estado_tripulante = 'E';
 
 	log_info(logger, "Tripulante inicializado");
@@ -515,12 +518,6 @@ int submodulo_tripulante(void* args) {
 		sem_wait(&sem_recurso_multitarea_disponible);
 		log_debug(logger, "El tripulante %d cambia a estado EXEC", tripulante->TID);
 		
-		// Le envio a la RAM mo posicion actual
-		// Hay que ver si el servidor esta conectado?
-		estado_envio_mensaje = enviar_op_recibir_ubicacion_tripulante(mi_ram_hq_fd_tripulante, tripulante->posicion_X, tripulante->posicion_Y);
-		if(estado_envio_mensaje != EXIT_SUCCESS)
-			log_error(logger, "No se pudo mandar el mensaje a Mi-Ram HQ");
-
 		// PIDO LA TAREA A MI RAM HQ
 		estado_envio_mensaje = enviar_op_enviar_proxima_tarea(mi_ram_hq_fd_tripulante);
 		if(estado_envio_mensaje != EXIT_SUCCESS)
@@ -566,7 +563,7 @@ int submodulo_tripulante(void* args) {
 				if(estado_planificador != PLANIFICADOR_RUNNING)
 					sem_wait(&(tripulante->sem_planificacion_fue_reanudada));
 
-				if(tripulante_esta_en_posicion(tripulante, st_tarea)){
+				if(tripulante_esta_en_posicion(tripulante, st_tarea, mi_ram_hq_fd_tripulante)){
 					if(primer_ejecucion){
 						//printf("estoy en posicion\n");
 						log_info(logger,"Comienzo a %s",nombre_parametros[0]);
@@ -724,6 +721,35 @@ char* leer_proxima_tarea_mi_ram_hq(int mi_ram_hq_fd_tripulante){
 	return tarea;
 }
 
+void leer_ubicacion_tripulante_mi_ram_hq(int mi_ram_hq_fd_tripulante, int* posicion_X, int* posicion_Y){
+	char* payload = NULL;
+	int cod_op = recibir_operacion(mi_ram_hq_fd_tripulante);
+	switch(cod_op)
+	{
+		case COD_UBICACION_TRIPULANTE:
+			payload = recibir_payload(mi_ram_hq_fd_tripulante);
+
+			int offset = 0;
+		
+			memcpy(posicion_X, payload + offset, sizeof(uint32_t));
+			offset += sizeof(uint32_t);
+
+			memcpy(posicion_Y, payload + offset, sizeof(uint32_t));
+			offset += sizeof(uint32_t);
+
+			break;
+		case -1:
+			log_error(logger, "Mi-RAM HQ se desconecto. Terminando discordiador");
+			status_discordiador = END;
+			break;
+		default:
+			log_warning(logger, "Operacion desconocida. No quieras meter la pata");
+			break;
+	}
+}
+
+	
+
 enum comando_discordiador string_to_comando_discordiador(char* string){
 	if(strcmp(string,"INICIAR_PATOTA")==0)
 		return INICIAR_PATOTA;
@@ -759,37 +785,65 @@ int generarNuevoTID() {
 }
 
 //mueve al tripulante y retorna true cuando esta en posicion
-int tripulante_esta_en_posicion(t_tripulante* tripulante, t_tarea tarea){
-	// Leer posicion de la memoria RAM
+int tripulante_esta_en_posicion(t_tripulante* tripulante, t_tarea tarea, int mi_ram_hq_fd_tripulante){
 
+	// PIDO LA POSICION A MI RAM HQ
+	int estado_envio_mensaje = enviar_op_enviar_ubicacion_tripulante(mi_ram_hq_fd_tripulante);
+	if(estado_envio_mensaje != EXIT_SUCCESS)
+		log_error(logger, "No se pudo mandar el mensaje a Mi-Ram HQ");
+
+	leer_ubicacion_tripulante_mi_ram_hq(mi_ram_hq_fd_tripulante, &(tripulante->posicion_X), &(tripulante->posicion_Y));
+	printf("Tripulante %d: Estoy en la posicion (%d,%d)\n", tripulante->TID, tripulante->posicion_X, tripulante->posicion_Y);
 
 	if(tripulante->posicion_X < atoi(tarea.pos_x)){
 		tripulante->posicion_X++;
-		printf("me movi a: %dx %dy\n",tripulante->posicion_X,tripulante->posicion_Y);
+		// printf("me movi a: %dx %dy\n",tripulante->posicion_X,tripulante->posicion_Y);
+
 		// Actualizo posicion en la memoria RAM
+		// Hay que ver si el servidor esta conectado?
+		estado_envio_mensaje = enviar_op_recibir_ubicacion_tripulante(mi_ram_hq_fd_tripulante, tripulante->posicion_X, tripulante->posicion_Y);
+		if(estado_envio_mensaje != EXIT_SUCCESS)
+			log_error(logger, "No se pudo mandar el mensaje a Mi-Ram HQ");
 
 		return 0;
 	}
 	if(tripulante->posicion_X > atoi(tarea.pos_x)){
 		tripulante->posicion_X--;
-		printf("me movi a: %dx %dy\n",tripulante->posicion_X,tripulante->posicion_Y);
+		// printf("me movi a: %dx %dy\n",tripulante->posicion_X,tripulante->posicion_Y);
+
 		// Actualizo posicion en la memoria RAM
+		estado_envio_mensaje = enviar_op_recibir_ubicacion_tripulante(mi_ram_hq_fd_tripulante, tripulante->posicion_X, tripulante->posicion_Y);
+		if(estado_envio_mensaje != EXIT_SUCCESS)
+			log_error(logger, "No se pudo mandar el mensaje a Mi-Ram HQ");
 
 		return 0;
 	}
 	if(tripulante->posicion_Y < atoi(tarea.pos_y)){
 		tripulante->posicion_Y++;
-		printf("me movi a: %dx %dy\n",tripulante->posicion_X,tripulante->posicion_Y);
+		// printf("me movi a: %dx %dy\n",tripulante->posicion_X,tripulante->posicion_Y);
+
 		// Actualizo posicion en la memoria RAM
+		estado_envio_mensaje = enviar_op_recibir_ubicacion_tripulante(mi_ram_hq_fd_tripulante, tripulante->posicion_X, tripulante->posicion_Y);
+		if(estado_envio_mensaje != EXIT_SUCCESS)
+			log_error(logger, "No se pudo mandar el mensaje a Mi-Ram HQ");
 
 		return 0;
 	}
 	if(tripulante->posicion_Y > atoi(tarea.pos_y)){
 		tripulante->posicion_Y--;
-		printf("me movi a: %dx %dy\n",tripulante->posicion_X,tripulante->posicion_Y);
-		// Actualizo posicion en la memoria RAM
+		// printf("me movi a: %dx %dy\n",tripulante->posicion_X,tripulante->posicion_Y);
 
+		// Actualizo posicion en la memoria RAM
+		estado_envio_mensaje = enviar_op_recibir_ubicacion_tripulante(mi_ram_hq_fd_tripulante, tripulante->posicion_X, tripulante->posicion_Y);
+		if(estado_envio_mensaje != EXIT_SUCCESS)
+			log_error(logger, "No se pudo mandar el mensaje a Mi-Ram HQ");
+		
 		return 0;
 	}
 	return 1;
 }
+
+
+int enviar_op_recibir_estado_tripulante(int mi_ram_hq_fd, char estado_trip);// Operacion nueva
+int enviar_op_enviar_ubicacion_tripulante(int mi_ram_hq_fd);// Operacion nueva
+int enviar_op_enviar_estado_tripulante(int mi_ram_hq_fd); // Operacion nueva

@@ -47,11 +47,16 @@ int dibujar_tripulante_mapa(int TID, int posicion_X, int posicion_Y){
     int error = personaje_crear(nivel, caracter_tripulante(TID), posicion_X, posicion_Y);
 	ASSERT_CREATE(nivel, caracter_tripulante(TID), error);
 
+    // Redibujo el nivel
+    nivel_gui_dibujar(nivel);
+
     return EXIT_SUCCESS;
 }
 
 int borrar_tripulante_mapa(int TID){
     int error = item_borrar(nivel, caracter_tripulante(TID));
+    // Redibujo el nivel
+    nivel_gui_dibujar(nivel);
     if(error){
         log_error(logger, "WARNING: %s\n", nivel_gui_string_error(error));
         return EXIT_FAILURE;
@@ -59,8 +64,8 @@ int borrar_tripulante_mapa(int TID){
     return EXIT_SUCCESS; 
 }
 
-int desplazar_tripulante_mapa(int TID, enum desplazamiento_mapa desplazamiento){
-    int error;
+int desplazar_tripulante_mapa(int TID, int desplazamiento_X, int desplazamiento_Y){
+    /*int error;
     switch(desplazamiento){
         case ARRIBA:
             error = item_desplazar(nivel, caracter_tripulante(TID), 0, -1);
@@ -74,8 +79,12 @@ int desplazar_tripulante_mapa(int TID, enum desplazamiento_mapa desplazamiento){
         case DERECHA:
             error = item_desplazar(nivel, caracter_tripulante(TID), 1, 0);
             break;
-    }
+    }*/
 
+    int error = item_desplazar(nivel, caracter_tripulante(TID), desplazamiento_X, desplazamiento_Y);
+    // Redibujo el nivel
+    nivel_gui_dibujar(nivel);
+    
     if(error){
         log_error(logger, "WARNING: %s\n", nivel_gui_string_error(error));
         return EXIT_FAILURE;
