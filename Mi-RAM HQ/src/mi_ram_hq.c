@@ -5,7 +5,7 @@ int main(void)
 	// inicializo semaforos
 	sem_init(&semaforo_aceptar_conexiones, 0, 0);
 
-	logger = log_create("./cfg/mi-ram-hq.log", "Mi-RAM HQ", 1, LOG_LEVEL_DEBUG);
+	logger = log_create("./cfg/mi-ram-hq.log", "Mi-RAM HQ", 0, LOG_LEVEL_DEBUG);
 
 	// Leo IP y PUERTO del config
 	t_config *config = config_create("./cfg/mi-ram-hq.config");
