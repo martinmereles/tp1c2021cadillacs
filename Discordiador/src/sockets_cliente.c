@@ -94,8 +94,7 @@ int enviar_op_iniciar_tripulante(int i_mongo_store_fd,int mi_ram_hq_fd, iniciar_
 	offset += sizeof(uint32_t);
 
 	exit_status = enviar_operacion(mi_ram_hq_fd, COD_INICIAR_TRIPULANTE, stream, longitud_stream);
-	sleep(1);
-	exit_status = enviar_operacion(i_mongo_store_fd, COD_INICIAR_TRIPULANTE, stream, longitud_stream);
+	exit_status = enviar_operacion(i_mongo_store_fd, COD_INICIAR_TRIPULANTE_I_MONGO_STORE, stream, longitud_stream);
 	
 	free(stream);
 

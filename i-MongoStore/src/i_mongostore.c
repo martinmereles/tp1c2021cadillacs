@@ -173,7 +173,7 @@ bool leer_mensaje_cliente_y_procesar(int cliente_fd){
 		//prueba COD_RECIBIR_TAREA
 			recibir_payload_y_ejecutar(cliente_fd, loguear_mensaje);
 			break;
-		case COD_INICIAR_TRIPULANTE:
+		case COD_INICIAR_TRIPULANTE_I_MONGO_STORE:
 			payload = recibir_payload(cliente_fd);
 			iniciar_tripulante(payload);
 			free(payload);
