@@ -38,9 +38,12 @@ int generarNuevoPID();
 int generarNuevoTID();
 void recibir_y_procesar_mensaje_i_mongo_store(int i_mongo_store_fd);
 char* leer_proxima_tarea_mi_ram_hq(int mi_ram_hq_fd_tripulante);
-int tripulante_esta_en_posicion(t_tripulante* tripulante, t_tarea tarea);
+int tripulante_esta_en_posicion(t_tripulante* tripulante, t_tarea tarea, int mi_ram_hq_fd_tripulante);
 int obtener_bitacora(char ** argumentos, int i_mongo_store_fd);
 void reanudar_planificacion();
+void operar_algoritmo_rr(t_tripulante *self, int total_quantum, int i_mongo_store_fd_tripulante, int mi_ram_hq_fd_tripulante);
+int tripulante_esta_en_posicion_rr(t_tripulante* tripulante, t_tarea tarea);
+int ejecutar_protocolo_expulsion(t_tripulante *tripulante, int i_mongo_store_fd_tripulante, int mi_ram_hq_fd_tripulante);
 
 char* direccion_IP_i_Mongo_Store;
 char* puerto_i_Mongo_Store;

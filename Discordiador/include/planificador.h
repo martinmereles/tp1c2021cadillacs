@@ -69,6 +69,7 @@ sem_t sem_puede_expulsar_tripulante;
 sem_t sem_confirmar_expulsion_tripulante;
 sem_t sem_sabotaje_activado;
 sem_t sem_mutex_tripulante_a_expulsar;
+sem_t sem_uso_de_recurso_IO;
 
 int iniciar_dispatcher(char *algoritmo_planificador);
 int listar_tripulantes(void);
