@@ -11,11 +11,18 @@
 
 //struct para parsear tareas
 typedef struct {
+    char* string;
     char* nombre;
-    char* pos_x;
-    char* pos_y;
-    char* duracion;
+    char* parametro;
+    int pos_x;    
+    int pos_y;
+    int duracion;
+    bool es_bloqueante;
 }t_tarea;
+
+typedef struct {
+	pthread_t hilo;
+} ciclo_t;
 
 enum status_discordiador{   RUNNING,
                             END };
@@ -28,6 +35,8 @@ enum comando_discordiador{  INICIAR_PATOTA,
                             OBTENER_BITACORA,
                             ERROR };
 
+
+// PROTOTIPOS DE FUNCIONES
 void leer_consola_y_procesar(int, int);
 void leer_fds(int, int);
 enum comando_discordiador string_to_comando_discordiador(char*);
@@ -37,11 +46,21 @@ int submodulo_tripulante();
 int generarNuevoPID();
 int generarNuevoTID();
 void recibir_y_procesar_mensaje_i_mongo_store(int i_mongo_store_fd);
-char* leer_proxima_tarea_mi_ram_hq(int mi_ram_hq_fd_tripulante);
 void leer_ubicacion_tripulante_mi_ram_hq(int mi_ram_hq_fd_tripulante, int* posicion_X, int* posicion_Y);
-int tripulante_esta_en_posicion(t_tripulante* tripulante, t_tarea tarea, int mi_ram_hq_fd_tripulante);
+int tripulante_esta_en_posicion(t_tripulante* tripulante, t_tarea* tarea, int mi_ram_hq_fd_tripulante);
 int obtener_bitacora(char ** argumentos, int i_mongo_store_fd);
 void reanudar_planificacion();
+t_tarea* leer_proxima_tarea_mi_ram_hq(int mi_ram_hq_fd_tripulante);
+
+// Funciones para crear/destruir una tarea
+t_tarea* crear_tarea(char* string);
+void destruir_tarea(t_tarea* tarea);
+
+// Funciones ciclo cpu
+ciclo_t* crear_ciclo_cpu();
+void esperar_fin_ciclo_de_cpu(ciclo_t* ciclo);
+
+// VARIABLES GLOBALES
 
 char* direccion_IP_i_Mongo_Store;
 char* puerto_i_Mongo_Store;

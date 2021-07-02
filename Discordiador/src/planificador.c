@@ -145,22 +145,14 @@ int iniciar_dispatcher(char *algoritmo_planificador){
     }
 }
 
- int transicion_new_to_ready(t_tripulante *dato, enum algoritmo cod_algor){
-    t_tripulante *nuevo_trip_fifo;
-    t_tripulante *nuevo_trip_rr;
-
+ int transicion_new_to_ready(t_tripulante *nuevo_trip, enum algoritmo cod_algor){
     switch(cod_algor){
         case FIFO:
-            nuevo_trip_fifo = dato;
-            nuevo_trip_fifo->estado_previo = READY;
-            nuevo_trip_fifo->quantum = 0;
-            queue_push(cola_ready,nuevo_trip_fifo);
-            break;
         case RR:
-            nuevo_trip_rr = dato;
-            nuevo_trip_rr->estado_previo = READY;
-            nuevo_trip_rr->quantum = quantum; // Variable global
-            queue_push(cola_ready,nuevo_trip_rr);
+            nuevo_trip->estado = READY;
+            nuevo_trip->quantum = quantum;
+            queue_push(cola_ready, nuevo_trip); // Variable global (si es FIFO vale 0 por defecto)
+            sem_post(nuevo_trip->sem_tripulante_dejo_new);
             break;
         default:
             //Error de ejecucion de transicion.
@@ -192,18 +184,22 @@ int dispatcher_expulsar_tripulante(int tid_buscado){
 
     // Busqueda del tripulante a expulsar por cada cola del planificador
 
-    // busqueda en cola BLOQUEADO_IO:
-    estado = get_index_from_cola_by_tid(cola_bloqueado_io, tid_buscado);
-    if(estado != -1){
-        trip_expulsado = obtener_tripulante_por_tid(cola_bloqueado_io, tid_buscado);
-        
+    // TODO: se puede buscar en la lista global
+    /*
+        // TODO: Hay un deadlock??
         // desbloqueo semaforo
         int valor_semaforo;
         log_info(logger, "Reanudo planificacion del tripulante %d", trip_expulsado->TID);
-        sem_getvalue(&(trip_expulsado->sem_planificacion_fue_reanudada), &valor_semaforo);
+        sem_getvalue(trip_expulsado->sem_planificacion_fue_reanudada, &valor_semaforo);
 	    if(valor_semaforo == 0)
         sem_post(&(trip_expulsado->sem_planificacion_fue_reanudada));
-        
+    */
+
+
+    // busqueda en cola BLOQUEADO_IO:
+    estado = get_index_from_cola_by_tid(cola_bloqueado_io, tid_buscado);
+    if(estado != -1){
+        trip_expulsado = obtener_tripulante_por_tid(cola_bloqueado_io, tid_buscado);        
         queue_push(cola_exit, trip_expulsado);
         //list_clean_and_destroy_elements(cola_exit->elements,destructor_elementos_tripulante);
     }
@@ -328,13 +324,13 @@ int listar_tripulantes(void){
  void imprimir_info_elemento_fifo(void *data){
     t_tripulante *tripulante_fifo;
     tripulante_fifo = data;
-    printf("Tripulante:%3d\tPatota:%3d\tStatus: %s\n", tripulante_fifo->TID, tripulante_fifo->PID, code_dispatcher_to_string(tripulante_fifo->estado_previo));
+    printf("Tripulante:%3d\tPatota:%3d\tStatus: %s\n", tripulante_fifo->TID, tripulante_fifo->PID, code_dispatcher_to_string(tripulante_fifo->estado));
 }
 /*
  void imprimir_info_elemento_rr(void *data){
     t_tripulante *tripulante_rr;     
     tripulante_rr = data;
-    printf("Elemento:\nNro TID: %d - Nro PID: %d - Estado: %s\n", tripulante_rr->TID, tripulante_rr->PID, code_dispatcher_to_string(tripulante_rr->estado_previo));
+    printf("Elemento:\nNro TID: %d - Nro PID: %d - Estado: %s\n", tripulante_rr->TID, tripulante_rr->PID, code_dispatcher_to_string(tripulante_rr->estado));
 }*/
 
  void destructor_elementos_tripulante(void *data){
@@ -367,7 +363,7 @@ char *code_dispatcher_to_string(enum estado_tripulante code){
     //temp = malloc(sizeof(t_tripulante));
     //memcpy(temp, dato, sizeof(t_tripulante));
     temp = dato;
-    temp->estado_previo = EXEC;
+    temp->estado = EXEC;
     queue_push(cola_running,temp);
 }
 
@@ -376,7 +372,7 @@ char *code_dispatcher_to_string(enum estado_tripulante code){
     //temp = malloc(sizeof(t_tripulante));
     //memcpy(temp, dato, sizeof(t_tripulante));
     temp = dato;
-    temp->estado_previo = BLOCKED_IO;
+    temp->estado = BLOCKED_IO;
     if(cod_algor == RR)
         temp->quantum = 0;
     queue_push(cola_bloqueado_io,temp);
@@ -387,7 +383,7 @@ char *code_dispatcher_to_string(enum estado_tripulante code){
     //temp = malloc(sizeof(t_tripulante));
     //memcpy(temp, dato, sizeof(t_tripulante));
     temp = dato;
-    temp->estado_previo = READY;
+    temp->estado = READY;
     if(cod_algor == RR)
         temp->quantum = quantum;
     queue_push(cola_running,temp);
@@ -398,7 +394,7 @@ char *code_dispatcher_to_string(enum estado_tripulante code){
     //temp = malloc(sizeof(t_tripulante));
     //memcpy(temp, dato, sizeof(t_tripulante));
     temp = dato;
-    temp->estado_previo = READY;
+    temp->estado = READY;
     temp->quantum = quantum;
     queue_push(cola_ready,temp);
 }
@@ -560,13 +556,23 @@ void dispatcher_pausar(){
 
 int dispatcher_eliminar_tripulante(int tid_eliminar){
     t_tripulante* tripulante = obtener_tripulante_por_tid(cola_exit, tid_eliminar);
-    sem_destroy(&(tripulante->sem_planificacion_fue_reanudada));    // Destruyo su semaforo
+
     bool tiene_TID_a_eliminar(void* args){
         t_tripulante* tripulante_encontrado = (t_tripulante*) args;
         return tripulante_encontrado->TID == tid_eliminar;
     }
+
     // Lo quito de la lista global de tripulantes
     list_remove_by_condition(lista_tripulantes, tiene_TID_a_eliminar);
+
+    // Destruyo todos sus semaforos
+    sem_destroy(tripulante->sem_planificacion_fue_reanudada);    
+    sem_destroy(tripulante->sem_tripulante_dejo_ready);          
+    sem_destroy(tripulante->sem_tripulante_dejo_new);            
+    free(tripulante->sem_planificacion_fue_reanudada);         
+    free(tripulante->sem_tripulante_dejo_ready);         
+    free(tripulante->sem_tripulante_dejo_new);
+
     free(tripulante);   // Libero el struct
 
     if (dispatcher_expulsar_tripulante(tid_eliminar) != EXIT_SUCCESS)
@@ -580,10 +586,17 @@ t_tripulante* iniciador_tripulante(int tid, int pid){
     nuevo = malloc(sizeof(t_tripulante));
     nuevo -> PID = pid;
     nuevo -> TID = tid;
-    nuevo -> estado_previo = NEW;
-    // El tripulante tiene un semaforo para pausar/reanudar la planificacion
-	// Inicializamos el semaforo
-	sem_init(&(nuevo -> sem_planificacion_fue_reanudada), 0, 0);    // Inicializa en 0 a proposito
+    nuevo -> estado = NEW;
+    
+	// Inicializamos los semaforos (inicializan todos en 0)
+    nuevo -> sem_planificacion_fue_reanudada = malloc(sizeof(sem_t));
+    nuevo -> sem_tripulante_dejo_ready = malloc(sizeof(sem_t));
+    nuevo -> sem_tripulante_dejo_new = malloc(sizeof(sem_t));
+
+	sem_init(nuevo -> sem_planificacion_fue_reanudada, 0, 0);    // Inicializa en 0 a proposito
+    sem_init(nuevo -> sem_tripulante_dejo_ready, 0, 0);          // Inicializa en 0 a proposito
+    sem_init(nuevo -> sem_tripulante_dejo_new, 0, 0);            // Inicializa en 0 a proposito
+
     list_add(lista_tripulantes, nuevo); // Lo agrego a la lista global de tripulantes
     queue_push(cola_new, nuevo);
     return nuevo;

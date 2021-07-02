@@ -41,11 +41,13 @@ enum estado_tripulante{
 // Estructura de dato para colas del planificador / dispatcher
 typedef struct dato_tripulante{
     int PID, TID;
-    enum estado_tripulante estado_previo;
+    enum estado_tripulante estado;
     int quantum;
     int posicion_X;
     int posicion_Y;
-    sem_t sem_planificacion_fue_reanudada;
+    sem_t* sem_planificacion_fue_reanudada;
+    sem_t* sem_tripulante_dejo_ready;
+    sem_t* sem_tripulante_dejo_new;
 }t_tripulante;
 
 enum status_planificador {
