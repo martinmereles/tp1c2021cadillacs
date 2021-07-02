@@ -499,186 +499,189 @@ int submodulo_tripulante(void* args) {
 		sem_wait(&(tripulante->sem_planificacion_fue_reanudada));
 	}
 		
-	
 	log_debug(logger, "El tripulante %d inicia su planificacion",tripulante->TID);	
 
-	while(status_discordiador != END && tripulante->estado_previo != EXIT){
-			
-		// Si la planificacion fue pausada, se bloquea el tripulante
-		if(estado_planificador != PLANIFICADOR_RUNNING)
-			sem_wait(&(tripulante->sem_planificacion_fue_reanudada));
-
-		// Retardo de ciclo de cpu
-		// sleep(retardo_ciclo_cpu);
-
-		// Implementacion de semaforo para Grado de Multitarea/Multiprocesamiento
-		sem_wait(&sem_recurso_multitarea_disponible);
-		log_debug(logger, "El tripulante %d cambia a estado EXEC", tripulante->TID);
-		
-		// Le envio a la RAM mo posicion actual
-		// Hay que ver si el servidor esta conectado?
-		estado_envio_mensaje = enviar_op_recibir_ubicacion_tripulante(mi_ram_hq_fd_tripulante, tripulante->posicion_X, tripulante->posicion_Y);
-		if(estado_envio_mensaje != EXIT_SUCCESS)
-			log_error(logger, "No se pudo mandar el mensaje a Mi-Ram HQ");
-
-		// PIDO LA TAREA A MI RAM HQ
-		estado_envio_mensaje = enviar_op_enviar_proxima_tarea(mi_ram_hq_fd_tripulante);
-		if(estado_envio_mensaje != EXIT_SUCCESS)
-			log_error(logger, "No se pudo mandar el mensaje a Mi-Ram HQ");
-
-		tarea = leer_proxima_tarea_mi_ram_hq(mi_ram_hq_fd_tripulante);
-
-		log_info(logger,"La proxima tarea a ejecutar es:\n%s",tarea);
-
-
-
-
-		if(strcmp(tarea,"FIN") == 0){
-			tripulante->estado_previo = EXIT;
-			// estado_tripulante = 'F';
-		}else{
-			//parseo la tarea
-			char ** parametros;
-			char ** nombre_parametros;
-			int tarea_comun = 0;
-			int tiempo_ejecutado = 0;
-			parametros = string_split(tarea,";");
-			st_tarea.nombre = parametros[0];
-			st_tarea.pos_x = parametros[1];
-			st_tarea.pos_y = parametros[2];
-			st_tarea.duracion = parametros[3];
-			//nombre[0]=nombre de la tarea, nombre[1]=parametro numerico
-			nombre_parametros = string_split(st_tarea.nombre," ");
-			if(nombre_parametros[1]==NULL){
-				tarea_comun=1;
-			}
-			//cada while es 1 sleep/1 rafaga
-			int tarea_finalizada = 0;
-			int primer_ejecucion = 1;
-			while(!tarea_finalizada){
-				sleep(retardo_ciclo_cpu);
+	if (string_to_code_algor(algoritmo_planificador) == RR){
+		operar_algoritmo_rr(tripulante, quantum, i_mongo_store_fd_tripulante, mi_ram_hq_fd_tripulante);
+	}
+	else {
+		while(status_discordiador != END && tripulante->estado_previo != EXIT){
 				
-				// Implementacion de semaforo ante una pausa de la Planificacion.
-				// sem_wait(&sem_planificacion_fue_iniciada);
-				// sem_post(&sem_planificacion_fue_iniciada);
+			// Si la planificacion fue pausada, se bloquea el tripulante
+			if(estado_planificador != PLANIFICADOR_RUNNING)
+				sem_wait(&(tripulante->sem_planificacion_fue_reanudada));
 
-				// Si la planificacion fue pausada, se bloquea el tripulante
-				if(estado_planificador != PLANIFICADOR_RUNNING)
-					sem_wait(&(tripulante->sem_planificacion_fue_reanudada));
+			// Retardo de ciclo de cpu
+			// sleep(retardo_ciclo_cpu);
 
-				if(tripulante_esta_en_posicion(tripulante, st_tarea)){
-					if(primer_ejecucion){
-						//printf("estoy en posicion\n");
-						log_info(logger,"Comienzo a %s",nombre_parametros[0]);
-						estado_envio_mensaje = enviar_operacion(i_mongo_store_fd_tripulante,COD_EJECUTAR_TAREA, tarea,strlen(tarea)+1);
-						if (!tarea_comun){
-							agregar_a_buffer_peticiones(buffer_peticiones_exec_to_blocked_io, tripulante->TID);
-							log_debug(logger, "El tripulante %d cambia a estado BLOCKED IO", tripulante->TID);
-						}
-						primer_ejecucion=0;
-					}
-					tiempo_ejecutado++;
-					if(tiempo_ejecutado==atoi(st_tarea.duracion)){
-					tarea_finalizada=1;
-					printf("termine la tarea\n");
-					}
-				}	
-				//printf("ejecute 1 seg\n");		
-			}
-			if (!tarea_comun){
-				agregar_a_buffer_peticiones(buffer_peticiones_blocked_io_to_ready, tripulante->TID);
-				log_debug(logger, "El tripulante %d completo tarea de %d ciclos exitosamente, pasando a estado READY", tripulante->TID, atoi(st_tarea.duracion));	
-			}
+			// Implementacion de semaforo para Grado de Multitarea/Multiprocesamiento
+			sem_wait(&sem_recurso_multitarea_disponible);
+			log_debug(logger, "El tripulante %d cambia a estado EXEC", tripulante->TID);
 			
-		}
-		sem_post(&sem_recurso_multitarea_disponible);	
-
-		/*
-		// HAGO SLEEP (1 CICLO DE CPU)
-		sleep(retardo_ciclo_cpu);
-
-		// Si no estoy en la posicion de la tarea, avanzo a la tarea
-		if(pos_actual != pos_tarea)
-			// Me muevo un paso
-			// Informa a i-MongoStore y Mi RAM HQ que se movio
-
-		else{
-			// Estoy en posicion de la tarea
-			if(ciclos_cumplidos == 0){
-				// Avisa a i-mongostore que arranca la tarea
-			}
-
-			// Si todavia no la termine 
-			if(ciclos_cumplidos < ciclos_tarea){
-				ciclos_cumplidos++;
-			}
-			else{
-				// EJECUTA LA TAREA POSTA
-				if(tiene_un_espacio(tarea)){
-					mandar_mensaje_i_mongo_store();
-					// Se bloquea
-
-					// GENERAR_OXIGENO 10;14;43;23
-					// REGAR_PLANTAS;43;54
-				}
-				
-				// AVISA QUE FINALIZO
-				// PIDE LA SIGUIENTE TAREA
-				ciclos_cumplidos = 0;	// Reinicio ciclos cumplidos
-			}
-		}
-		*/
-
-
-		/*
-		// Notificacion al Planificador/Dispatcher que ingresa a cola EXEC 
-		agregar_a_buffer_peticiones(buffer_peticiones_ready_to_exec, tripulante->TID);
-		
-		*/	
-
-		// ¿El tripulante fue expulsado?
-		sem_wait(&sem_puede_expulsar_tripulante);
-		
-		sem_wait(&sem_mutex_tripulante_a_expulsar);
-		if(tripulante->TID == tripulante_a_expulsar){
-			sem_post(&sem_mutex_tripulante_a_expulsar);
-			log_debug(logger, "Solicitud de expulsion del TID: %d aceptada", tripulante->TID);
-
-			estado_envio_mensaje = enviar_op_expulsar_tripulante(mi_ram_hq_fd_tripulante);
+			// Le envio a la RAM mo posicion actual
+			// Hay que ver si el servidor esta conectado?
+			estado_envio_mensaje = enviar_op_recibir_ubicacion_tripulante(mi_ram_hq_fd_tripulante, tripulante->posicion_X, tripulante->posicion_Y);
 			if(estado_envio_mensaje != EXIT_SUCCESS)
 				log_error(logger, "No se pudo mandar el mensaje a Mi-Ram HQ");
-			
-			sem_wait(&sem_mutex_ejecutar_dispatcher);
-			
-			if (dispatcher_eliminar_tripulante(tripulante->TID) != EXIT_SUCCESS){
-				log_error(logger,"No se pudo eliminar de la cola EXIT");
-				sem_post(&sem_puede_expulsar_tripulante);
-				sem_post(&sem_mutex_ejecutar_dispatcher);
-				//sem_post(&sem_recurso_multitarea_disponible);
-				return EXIT_FAILURE;
-			}
-			
-			sem_post(&sem_mutex_ejecutar_dispatcher);
-			
-			log_debug(logger,"Se elimino el tripulante %d exitosamente",tripulante->TID);
-			sem_post(&sem_confirmar_expulsion_tripulante);
-			
-			// Libero recursos
-			liberar_conexion(i_mongo_store_fd_tripulante);
-			liberar_conexion(mi_ram_hq_fd_tripulante);
-			
-			sem_post(&sem_puede_expulsar_tripulante);
-			//sem_post(&sem_recurso_multitarea_disponible);
-			
-			return EXIT_SUCCESS;
-		}
-		sem_post(&sem_mutex_tripulante_a_expulsar);
-		sem_post(&sem_puede_expulsar_tripulante);
+
+			// PIDO LA TAREA A MI RAM HQ
+			estado_envio_mensaje = enviar_op_enviar_proxima_tarea(mi_ram_hq_fd_tripulante);
+			if(estado_envio_mensaje != EXIT_SUCCESS)
+				log_error(logger, "No se pudo mandar el mensaje a Mi-Ram HQ");
+
+			tarea = leer_proxima_tarea_mi_ram_hq(mi_ram_hq_fd_tripulante);
+
+			log_info(logger,"La proxima tarea a ejecutar es:\n%s",tarea);
+
+
+
+
+			if(strcmp(tarea,"FIN") == 0){
+				tripulante->estado_previo = EXIT;
+				// estado_tripulante = 'F';
+			}else{
+				//parseo la tarea
+				char ** parametros;
+				char ** nombre_parametros;
+				int tarea_comun = 0;
+				int tiempo_ejecutado = 0;
+				parametros = string_split(tarea,";");
+				st_tarea.nombre = parametros[0];
+				st_tarea.pos_x = parametros[1];
+				st_tarea.pos_y = parametros[2];
+				st_tarea.duracion = parametros[3];
+				//nombre[0]=nombre de la tarea, nombre[1]=parametro numerico
+				nombre_parametros = string_split(st_tarea.nombre," ");
+				if(nombre_parametros[1]==NULL){
+					tarea_comun=1;
+				}
+				//cada while es 1 sleep/1 rafaga
+				int tarea_finalizada = 0;
+				int primer_ejecucion = 1;
+				while(!tarea_finalizada){
+					sleep(retardo_ciclo_cpu);
+					
+					// Implementacion de semaforo ante una pausa de la Planificacion.
+					// sem_wait(&sem_planificacion_fue_iniciada);
+					// sem_post(&sem_planificacion_fue_iniciada);
+
+					// Si la planificacion fue pausada, se bloquea el tripulante
+					if(estado_planificador != PLANIFICADOR_RUNNING)
+						sem_wait(&(tripulante->sem_planificacion_fue_reanudada));
+
+					if(tripulante_esta_en_posicion(tripulante, st_tarea)){
+						if(primer_ejecucion){
+							//printf("estoy en posicion\n");
+							log_info(logger,"Comienzo a %s",nombre_parametros[0]);
+							estado_envio_mensaje = enviar_operacion(i_mongo_store_fd_tripulante,COD_EJECUTAR_TAREA, tarea,strlen(tarea)+1);
+							if (!tarea_comun){
+								agregar_a_buffer_peticiones(buffer_peticiones_exec_to_blocked_io, tripulante->TID);
+								log_debug(logger, "El tripulante %d cambia a estado BLOCKED IO", tripulante->TID);
+							}
+							primer_ejecucion=0;
+						}
+						tiempo_ejecutado++;
+						if(tiempo_ejecutado==atoi(st_tarea.duracion)){
+						tarea_finalizada=1;
+						printf("termine la tarea\n");
+						}
+					}	
+					//printf("ejecute 1 seg\n");		
+				}
+				if (!tarea_comun){
+					agregar_a_buffer_peticiones(buffer_peticiones_blocked_io_to_ready, tripulante->TID);
+					log_debug(logger, "El tripulante %d completo tarea de %d ciclos exitosamente, pasando a estado READY", tripulante->TID, atoi(st_tarea.duracion));	
+				}
 				
-		free(tarea);
+			}
+			sem_post(&sem_recurso_multitarea_disponible);	
 
+			/*
+			// HAGO SLEEP (1 CICLO DE CPU)
+			sleep(retardo_ciclo_cpu);
+
+			// Si no estoy en la posicion de la tarea, avanzo a la tarea
+			if(pos_actual != pos_tarea)
+				// Me muevo un paso
+				// Informa a i-MongoStore y Mi RAM HQ que se movio
+
+			else{
+				// Estoy en posicion de la tarea
+				if(ciclos_cumplidos == 0){
+					// Avisa a i-mongostore que arranca la tarea
+				}
+
+				// Si todavia no la termine 
+				if(ciclos_cumplidos < ciclos_tarea){
+					ciclos_cumplidos++;
+				}
+				else{
+					// EJECUTA LA TAREA POSTA
+					if(tiene_un_espacio(tarea)){
+						mandar_mensaje_i_mongo_store();
+						// Se bloquea
+
+						// GENERAR_OXIGENO 10;14;43;23
+						// REGAR_PLANTAS;43;54
+					}
+					
+					// AVISA QUE FINALIZO
+					// PIDE LA SIGUIENTE TAREA
+					ciclos_cumplidos = 0;	// Reinicio ciclos cumplidos
+				}
+			}
+			*/
+
+
+			/*
+			// Notificacion al Planificador/Dispatcher que ingresa a cola EXEC 
+			agregar_a_buffer_peticiones(buffer_peticiones_ready_to_exec, tripulante->TID);
+			
+			*/	
+
+			// ¿El tripulante fue expulsado?
+			sem_wait(&sem_puede_expulsar_tripulante);
+			
+			sem_wait(&sem_mutex_tripulante_a_expulsar);
+			if(tripulante->TID == tripulante_a_expulsar){
+				sem_post(&sem_mutex_tripulante_a_expulsar);
+				log_debug(logger, "Solicitud de expulsion del TID: %d aceptada", tripulante->TID);
+
+				estado_envio_mensaje = enviar_op_expulsar_tripulante(mi_ram_hq_fd_tripulante);
+				if(estado_envio_mensaje != EXIT_SUCCESS)
+					log_error(logger, "No se pudo mandar el mensaje a Mi-Ram HQ");
+				
+				sem_wait(&sem_mutex_ejecutar_dispatcher);
+				
+				if (dispatcher_eliminar_tripulante(tripulante->TID) != EXIT_SUCCESS){
+					log_error(logger,"No se pudo eliminar de la cola EXIT");
+					sem_post(&sem_puede_expulsar_tripulante);
+					sem_post(&sem_mutex_ejecutar_dispatcher);
+					//sem_post(&sem_recurso_multitarea_disponible);
+					return EXIT_FAILURE;
+				}
+				
+				sem_post(&sem_mutex_ejecutar_dispatcher);
+				
+				log_debug(logger,"Se elimino el tripulante %d exitosamente",tripulante->TID);
+				sem_post(&sem_confirmar_expulsion_tripulante);
+				
+				// Libero recursos
+				liberar_conexion(i_mongo_store_fd_tripulante);
+				liberar_conexion(mi_ram_hq_fd_tripulante);
+				
+				sem_post(&sem_puede_expulsar_tripulante);
+				//sem_post(&sem_recurso_multitarea_disponible);
+				
+				return EXIT_SUCCESS;
+			}
+			sem_post(&sem_mutex_tripulante_a_expulsar);
+			sem_post(&sem_puede_expulsar_tripulante);
+					
+			free(tarea);
+
+		}
 	}
-
 	// Se desarman las estructuras administrativas del tripulante por FINALIZACION:
 
 	estado_envio_mensaje = enviar_op_expulsar_tripulante(mi_ram_hq_fd_tripulante);
@@ -792,4 +795,211 @@ int tripulante_esta_en_posicion(t_tripulante* tripulante, t_tarea tarea){
 		return 0;
 	}
 	return 1;
+}
+
+void operar_algoritmo_rr(t_tripulante *self, int total_quantum, int i_mongo_store_fd_tripulante, int mi_ram_hq_fd_tripulante){
+
+    bool tarea_asignada = false;
+    int contador_ciclos = 0;
+    int tripulante_quantum = 0;
+    t_tarea st_tarea;
+
+    char *tarea;
+    char ** parametros;
+    char ** nombre_parametros;
+    int tarea_comun = 0;
+    int primer_ejecucion = 1;
+	int estado_envio_mensaje;
+
+    while (status_discordiador != END && self->estado_previo != EXIT){
+
+        //Espero a poder pasar a EXEC
+        // Implementacion de semaforo para Grado de Multitarea/Multiprocesamiento
+		sem_wait(&sem_recurso_multitarea_disponible);
+        self->estado_previo = EXEC;
+        tripulante_quantum = total_quantum;
+		log_debug(logger, "El tripulante %d cambia a estado EXEC", self->TID);
+
+        while(self->estado_previo == EXEC && tripulante_quantum > 0){
+            
+            // Si la planificacion fue pausada, se bloquea el tripulante
+            if(estado_planificador != PLANIFICADOR_RUNNING)
+                sem_wait(&(self->sem_planificacion_fue_reanudada));
+            
+            // Le informo mi posicion actual tanto a RAM como i-Mongo
+            estado_envio_mensaje = enviar_op_recibir_ubicacion_tripulante(mi_ram_hq_fd_tripulante, self->posicion_X, self->posicion_Y);
+            if(estado_envio_mensaje != EXIT_SUCCESS)
+                log_error(logger, "No se pudo mandar el mensaje a Mi-Ram HQ");
+
+            // Consulto si no tiene tarea ya asignada
+            if (!tarea_asignada){
+                // PIDO LA TAREA A MI RAM HQ
+                estado_envio_mensaje = enviar_op_enviar_proxima_tarea(mi_ram_hq_fd_tripulante);
+                if(estado_envio_mensaje != EXIT_SUCCESS)
+                    log_error(logger, "No se pudo mandar el mensaje a Mi-Ram HQ");
+
+                tarea = leer_proxima_tarea_mi_ram_hq(mi_ram_hq_fd_tripulante);
+                log_info(logger,"La proxima tarea a ejecutar es:\n%s",tarea);
+
+                // Si ya completo sus tareas asignadas
+                if(strcmp(tarea,"FIN") == 0)
+                    self->estado_previo = EXIT;
+                else {
+                    // parseo la tarea
+                    parametros = string_split(tarea,";");
+                    st_tarea.nombre = parametros[0];
+                    st_tarea.pos_x = parametros[1];
+                    st_tarea.pos_y = parametros[2];
+                    st_tarea.duracion = parametros[3];
+                    //nombre[0]=nombre de la tarea, nombre[1]=parametro numerico
+                    nombre_parametros = string_split(st_tarea.nombre," ");
+                    if(nombre_parametros[1]==NULL){
+                        tarea_comun=1;
+                    }
+                    //cada while es 1 sleep/1 rafaga
+                    contador_ciclos = 0;
+                    primer_ejecucion = 1;
+                }
+                tarea_asignada = true;
+            }
+            
+            // Consulto si estoy en posicion destinada de la tarea
+            if ( !tripulante_esta_en_posicion_rr(self, st_tarea) ){
+                // --- Dar un paso:
+		        // sleep(retardo_ciclo_cpu);
+                tripulante_quantum--;
+            }
+            else{
+                // Ejecutar tarea posta
+                if(contador_ciclos < atoi(st_tarea.duracion)){
+                    // Si aun no termina la tarea
+                    if(primer_ejecucion){
+                        log_info(logger,"Comienzo a %s",nombre_parametros[0]);
+                        estado_envio_mensaje = enviar_operacion(i_mongo_store_fd_tripulante,COD_EJECUTAR_TAREA, tarea,strlen(tarea)+1);
+                        if (!tarea_comun){
+                            //sem_wait(&sem_uso_de_recurso_IO);
+                            //agregar_a_buffer_peticiones(buffer_peticiones_exec_to_blocked_io, self->TID);
+                            //--- Ejecuto una rafaga ---
+                            // sleep(retardo_ciclo_cpu);
+                            tripulante_quantum--;
+                            self->estado_previo = BLOCKED_IO;
+                            log_debug(logger, "El tripulante %d cambia a estado BLOCKED IO", self->TID);
+                            break;
+                        }
+                        primer_ejecucion=0;
+                    }
+                    //--- Ejecuto una rafaga ---
+                    // sleep(retardo_ciclo_cpu);
+                    tripulante_quantum--;
+                    contador_ciclos++;
+                }
+                else{
+                // Libero por finalizacion de tarea
+                    free(tarea);
+                    tarea_asignada = false;
+                }
+            }
+
+            // Consulto si fue expulsado:
+            sem_wait(&sem_mutex_tripulante_a_expulsar);
+            estado_envio_mensaje = tripulante_a_expulsar;
+            sem_post(&sem_mutex_tripulante_a_expulsar);
+            if (self->TID == estado_envio_mensaje){
+                self->estado_previo = EXIT;
+                break;
+            }
+        }
+
+        if (self->estado_previo == BLOCKED_IO){
+            //sem_wait(&sem_uso_de_recurso_IO);
+            for(contador_ciclos = 0; contador_ciclos < atoi(st_tarea.duracion); contador_ciclos++){
+
+                // Si la planificacion fue pausada, se bloquea el tripulante
+                if(estado_planificador != PLANIFICADOR_RUNNING)
+                    sem_wait(&(self->sem_planificacion_fue_reanudada));
+                
+                // Consulto si fue expulsado:
+                sem_wait(&sem_mutex_tripulante_a_expulsar);
+                estado_envio_mensaje = tripulante_a_expulsar;
+                sem_post(&sem_mutex_tripulante_a_expulsar);
+                if(self->TID == estado_envio_mensaje){
+                    if (ejecutar_protocolo_expulsion(self, i_mongo_store_fd_tripulante, mi_ram_hq_fd_tripulante) != EXIT_SUCCESS)
+                        log_error(logger,"Error al intentar expulsar al tripulante %d",self->TID);
+                }
+            }
+            //sem_post(&sem_uso_de_recurso_IO);
+        }        
+        // Consulto si fue expulsado:
+        sem_wait(&sem_mutex_tripulante_a_expulsar);
+        estado_envio_mensaje = tripulante_a_expulsar;
+        sem_post(&sem_mutex_tripulante_a_expulsar);
+        if(self->TID == estado_envio_mensaje){
+            if (ejecutar_protocolo_expulsion(self, i_mongo_store_fd_tripulante, mi_ram_hq_fd_tripulante) != EXIT_SUCCESS)
+                log_error(logger,"Error al intentar expulsar al tripulante %d",self->TID);
+        }
+        
+    }
+
+}
+
+//mueve al tripulante y retorna true cuando esta en posicion
+int tripulante_esta_en_posicion_rr(t_tripulante* tripulante, t_tarea tarea){
+
+	if(tripulante->posicion_X < atoi(tarea.pos_x)){
+		tripulante->posicion_X++;
+		printf("me movi a: %dx %dy\n",tripulante->posicion_X,tripulante->posicion_Y);
+
+		return 0;
+	}
+	if(tripulante->posicion_X > atoi(tarea.pos_x)){
+		tripulante->posicion_X--;
+		printf("me movi a: %dx %dy\n",tripulante->posicion_X,tripulante->posicion_Y);
+
+		return 0;
+	}
+	if(tripulante->posicion_Y < atoi(tarea.pos_y)){
+		tripulante->posicion_Y++;
+		printf("me movi a: %dx %dy\n",tripulante->posicion_X,tripulante->posicion_Y);
+
+		return 0;
+	}
+	if(tripulante->posicion_Y > atoi(tarea.pos_y)){
+		tripulante->posicion_Y--;
+		printf("me movi a: %dx %dy\n",tripulante->posicion_X,tripulante->posicion_Y);
+
+		return 0;
+	}
+	return 1;
+}
+
+int ejecutar_protocolo_expulsion(t_tripulante *tripulante, int i_mongo_store_fd_tripulante, int mi_ram_hq_fd_tripulante){
+	int estado_envio_mensaje;
+    log_debug(logger, "Solicitud de expulsion del TID: %d aceptada", tripulante->TID);
+
+    estado_envio_mensaje = enviar_op_expulsar_tripulante(mi_ram_hq_fd_tripulante);
+    if(estado_envio_mensaje != EXIT_SUCCESS){
+        log_error(logger, "No se pudo mandar el mensaje a Mi-Ram HQ");
+        sem_post(&sem_confirmar_expulsion_tripulante);
+        return EXIT_FAILURE;
+    }
+    /*
+    sem_wait(&sem_mutex_ejecutar_dispatcher);
+    if (dispatcher_eliminar_tripulante(tripulante->TID) != EXIT_SUCCESS){
+        log_error(logger,"No se pudo eliminar de la cola EXIT");
+        //sem_post(&sem_puede_expulsar_tripulante);
+        sem_post(&sem_mutex_ejecutar_dispatcher);
+
+        return EXIT_FAILURE;
+    }
+    //log_debug(logger,"Se elimino el tripulante %d exitosamente",tripulante->TID);
+    sem_post(&sem_mutex_ejecutar_dispatcher);
+    */
+    // Libero recursos
+    liberar_conexion(i_mongo_store_fd_tripulante);
+    liberar_conexion(mi_ram_hq_fd_tripulante);
+    //free(tripulante);
+
+    sem_post(&sem_confirmar_expulsion_tripulante);
+    
+    return EXIT_SUCCESS;
 }

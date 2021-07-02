@@ -43,7 +43,7 @@ int dispatcher(void *algor_planif){
 
     crear_colas();
 	
-    while(true){
+    while(estado_planificador != PLANIFICADOR_OFF){
         //log_debug(logger, "loop consultas");
         // Se admiten en el sistema cada uno de los tripulantes creados
         sem_wait(&sem_mutex_ejecutar_dispatcher);
@@ -93,12 +93,12 @@ int dispatcher(void *algor_planif){
 	}
 	//libero recursos:
     log_error(logger, "Desarmando todos los tripulantes de las colas por finalizacion");
-    list_destroy_and_destroy_elements(cola_new->elements,destructor_elementos_tripulante);
-    list_destroy_and_destroy_elements(cola_ready->elements,destructor_elementos_tripulante);
-	list_destroy_and_destroy_elements(cola_running->elements,destructor_elementos_tripulante);
-    list_destroy_and_destroy_elements(cola_bloqueado_io->elements,destructor_elementos_tripulante);
-    list_destroy_and_destroy_elements(cola_bloqueado_emergency->elements,destructor_elementos_tripulante);
-    list_destroy_and_destroy_elements(cola_exit->elements,destructor_elementos_tripulante);
+    queue_destroy_and_destroy_elements(cola_new,destructor_elementos_tripulante);
+    queue_destroy_and_destroy_elements(cola_ready,destructor_elementos_tripulante);
+	queue_destroy_and_destroy_elements(cola_running,destructor_elementos_tripulante);
+    queue_destroy_and_destroy_elements(cola_bloqueado_io,destructor_elementos_tripulante);
+    queue_destroy_and_destroy_elements(cola_bloqueado_emergency,destructor_elementos_tripulante);
+    queue_destroy_and_destroy_elements(cola_exit,destructor_elementos_tripulante);
     return 0;
 }
 
@@ -580,3 +580,16 @@ t_tripulante* iniciador_tripulante(int tid, int pid){
     queue_push(cola_new, nuevo);
     return nuevo;
 }
+
+/*
+int patota_todos_los_tripulantes_en_EXIT(int pid){
+    // Contar la cantidad de tripulantes en EXIT.
+    // Comparar si todos los tripulantes de una misma patota estan en EXIT.
+}
+*/
+
+/*
+bool patota_termina_proceso(int pid){
+    // TODO: se cumple cuando todos los tripulantes de una patota terminan sus tareas.
+}// Si se cumple con esta condicion -> Se eliminan de la cola EXIT a todos los tripulantes de esa patota.
+*/
