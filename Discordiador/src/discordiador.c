@@ -251,6 +251,13 @@ void leer_consola_y_procesar(int i_mongo_store_fd, int mi_ram_hq_fd) {
 			}
 			}break;
 		case INICIAR_PLANIFICACION:
+			
+			// Verificamos la cantidad de argumentos
+			if(cantidad_argumentos(argumentos) > 1){
+				log_error(logger, "INICIAR_PLANIFICACION: Sobran argumentos");
+				break;
+			}
+
             log_info(logger, "Iniciando planificacion");
 
 			// Habilito la planificacion para cada tripulante cuando se ejecuta por 1ra vez o si fue pausado:
@@ -433,8 +440,10 @@ int submodulo_tripulante(void* args) {
 
 	int ciclos_en_estado_actual;
 
-	int	tiempo_ejecutado = 0;
-	int primer_ejecucion = 1;
+	int	ciclos_ejecutando_tarea = 0;
+	bool llego_a_la_tarea = 1;
+
+	bool tripulante_finalizado = false;
 
 	log_info(logger, "Iniciando tripulante");
 
@@ -494,7 +503,7 @@ int submodulo_tripulante(void* args) {
 
 	log_info(logger, "Tripulante inicializado");
 		
-	while(status_discordiador != END && tripulante->estado != EXIT){
+	while(status_discordiador != END && !tripulante_finalizado){
 			
 		// Si la planificacion fue pausada, se bloquea el tripulante
 		if(estado_planificador != PLANIFICADOR_RUNNING){
@@ -519,18 +528,29 @@ int submodulo_tripulante(void* args) {
 				break;
 
 			case BLOCKED_IO:	// Solo hay que esperar los ciclos hasta que se libere
+				
+				// Me fijo si cumplio los ciclos de la tarea
+				if(ciclos_en_estado_actual == tarea->duracion){
+					// TODO: Le pide al planificador que lo agregue a la cola de ready
+					agregar_a_buffer_peticiones(buffer_peticiones_blocked_io_to_ready, tripulante);
+
+					// El tripulante espera hasta que el planificacor lo saque de la cola de ready
+					sem_wait(tripulante->sem_tripulante_dejo_blocked_io);
+					ciclos_en_estado_actual = 0;
+
+					// TODO: Avisa que finalizo la tarea
+					
+					log_debug(logger, "El tripulante %d completo tarea de %d ciclos exitosamente, pasando a estado READY", tripulante->TID, tarea->duracion);	
+					destruir_tarea(tarea);
+					tarea = NULL;
+					break;	// Salgo del switch
+				}
 
 				// Se crea un hilo aparte que termina despues de un ciclo
 				ciclo = crear_ciclo_cpu();	
 
 				ciclos_en_estado_actual++;
-
-				if(ciclos_en_estado_actual == tarea->duracion){
-					tripulante->estado = READY;	
-					// TODO: Avisa que finalizo la tarea
-					agregar_a_buffer_peticiones(buffer_peticiones_blocked_io_to_ready, tripulante->TID);
-					log_debug(logger, "El tripulante %d completo tarea de %d ciclos exitosamente, pasando a estado READY", tripulante->TID, tarea->duracion);	
-				}
+				log_error(logger,"EJECUTO UN CICLO DE LA TAREA EN BLOCKED IO");
 
 				// Se espera que termine el ciclo
 				esperar_fin_ciclo_de_cpu(ciclo);					
@@ -538,16 +558,22 @@ int submodulo_tripulante(void* args) {
 
 			case EXEC:
 
+				// PARA ROUND ROBIN
 				// Si al tripulante se le acabo el quantum => pasa a READY
 				if(!strcmp(algoritmo_planificador, "RR") && ciclos_en_estado_actual >= quantum){
-					tripulante->estado = READY;
+					log_debug(logger, "Por RR, comenzamos expulsion del tripulante %d de EXEC", tripulante->TID);
+					// TODO: Le pide al planificador que lo agregue a la cola de ready
+					queue_push(buffer_peticiones_exec_to_ready, tripulante);
+					sem_wait(tripulante->sem_tripulante_dejo_exec);
+					ciclos_en_estado_actual = 0;
+					log_debug(logger, "El tripulante %d sale de EXEC", tripulante->TID);
 					break;	// Salgo del switch
 				}
 
-				ciclos_en_estado_actual++;
+				ciclos_en_estado_actual++;	// Cuento 1 ciclo de cpu (para ROUND ROBIN)
 
 				// Inicio 1 ciclo de cpu
-				ciclo = crear_ciclo_cpu();
+				ciclo = crear_ciclo_cpu();	
 
 				// Si no inicie la tarea, la pido (consume 1 ciclo de cpu)
 				if(tarea == NULL){
@@ -570,54 +596,51 @@ int submodulo_tripulante(void* args) {
 						break;	// Salgo del switch
 					}
 
-					//cada while es 1 sleep/1 rafaga
-					tiempo_ejecutado = 0;
-					primer_ejecucion = 1;
+					// Seteo variables
+					ciclos_ejecutando_tarea = 0;	// Cuenta los ciclos en exec para la tarea
+					llego_a_la_tarea = false;
 
 					// Se espera que termine el ciclo
-					log_info(logger, "Espero que termine el ciclo");
 					esperar_fin_ciclo_de_cpu(ciclo);
-					log_info(logger, "Termino el ciclo");
 					break;	// Salgo del switch
 				}
 				
 				// Si la tarea fue iniciada pero no se termino
 
-				// Si el tripulante no esta en posicion
-				if(!tripulante_esta_en_posicion(tripulante, tarea, mi_ram_hq_fd_tripulante)){
-					// Espero que termine el ciclo de cpu
-					esperar_fin_ciclo_de_cpu(ciclo);
-					break;
-				}
+				// Si el tripulante no llego a la tarea, 
+				// muevo al tripulante y luego verifico si llego a la tarea
+				if(!llego_a_la_tarea && tripulante_esta_en_posicion(tripulante, tarea, mi_ram_hq_fd_tripulante)){
+					
+					llego_a_la_tarea = true;
 
-				// Si el tripulante esta en posicion y es el primer ciclo de la tarea
-				if(primer_ejecucion){
-					//printf("estoy en posicion\n");
+					// Si llego a la tarea:				
 					log_info(logger,"Comienzo a %s",tarea->nombre);
 					estado_envio_mensaje = enviar_operacion(i_mongo_store_fd_tripulante,COD_EJECUTAR_TAREA, tarea->string, strlen(tarea->string)+1);
 					
 					// Si la tarea es bloqueante, el tripulante se bloquea (TODO: tira error)
 					if (tarea->es_bloqueante){
-						agregar_a_buffer_peticiones(buffer_peticiones_exec_to_blocked_io, tripulante->TID);
+						agregar_a_buffer_peticiones(buffer_peticiones_exec_to_blocked_io, tripulante);
+						ciclos_en_estado_actual = 0;
+						sem_wait(tripulante->sem_tripulante_dejo_exec);
 						log_debug(logger, "El tripulante %d cambia a estado BLOCKED IO", tripulante->TID);
 					}
-
-					primer_ejecucion=0;
 
 					// Espero que termine el ciclo de cpu
 					esperar_fin_ciclo_de_cpu(ciclo);
 					break;
 				}
 
-				// Si el tripulante esta en posicion y NO es el primer ciclo de la tarea
+				// Si el tripulante llego la tarea 
+				if(llego_a_la_tarea){
+					ciclos_ejecutando_tarea++;
+					log_error(logger,"EJECUTO UN CICLO DE LA TAREA");
 				
-				tiempo_ejecutado++;
-				
-				if(tiempo_ejecutado == tarea->duracion){
-					printf("termine la tarea\n");
-					destruir_tarea(tarea);
-					tarea = NULL;
-				}	
+					if(ciclos_ejecutando_tarea == tarea->duracion){
+						printf("termine la tarea\n");
+						destruir_tarea(tarea);
+						tarea = NULL;
+					}	
+				}
 			
 				// Espero que termine el ciclo de cpu
 				esperar_fin_ciclo_de_cpu(ciclo);
@@ -627,36 +650,37 @@ int submodulo_tripulante(void* args) {
 				// TODO
 				break;
 
-			case EXIT:
-				// No hace nada, sale del while y se resuelve ahi (se podria mover aca?)
-				break;
+			case EXIT:	// HAY QUE REVISAR
+				// Se desarman las estructuras administrativas del tripulante por FINALIZACION:
+				estado_envio_mensaje = enviar_op_expulsar_tripulante(mi_ram_hq_fd_tripulante);
+				if(estado_envio_mensaje != EXIT_SUCCESS)
+					log_error(logger, "No se pudo mandar el mensaje a Mi-Ram HQ");
 
+				// Habilito al dispatcher a eliminar al tripulante
+				sem_wait(&sem_puede_expulsar_tripulante);
+				sem_wait(&sem_mutex_ejecutar_dispatcher);
+				sem_wait(&sem_mutex_ingreso_tripulantes_new);
+				if (dispatcher_expulsar_tripulante(tripulante->TID) != EXIT_SUCCESS)
+					log_error(logger,"NO se pudo expulsar tripulante %d por finalizacion", tripulante->TID);
+				if (dispatcher_eliminar_tripulante(tripulante->TID) != EXIT_SUCCESS)
+					log_error(logger,"No se pudo eliminar de la cola EXIT");
+				sem_post(&sem_mutex_ingreso_tripulantes_new);
+				sem_post(&sem_mutex_ejecutar_dispatcher);
+				sem_post(&sem_puede_expulsar_tripulante);
+				
+				tripulante_finalizado = true;
+				
+				log_debug(logger,"Se elimino por finalizacion el tripulante %d exitosamente",tripulante->TID);
+				break;
 			default:
 				log_error(logger, "ERROR. submodulo_tripulante: estado erroneo");
 				break;
 		}// FIN SWITCH
-	}
-
-	// Se desarman las estructuras administrativas del tripulante por FINALIZACION:
-
-	estado_envio_mensaje = enviar_op_expulsar_tripulante(mi_ram_hq_fd_tripulante);
-	if(estado_envio_mensaje != EXIT_SUCCESS)
-		log_error(logger, "No se pudo mandar el mensaje a Mi-Ram HQ");
-
-	// Habilito al dispatcher a eliminar al tripulante
-	sem_wait(&sem_puede_expulsar_tripulante);
-	sem_wait(&sem_mutex_ejecutar_dispatcher);
-	sem_wait(&sem_mutex_ingreso_tripulantes_new);
-	if (dispatcher_expulsar_tripulante(tripulante->TID) != EXIT_SUCCESS)
-		log_error(logger,"NO se pudo expulsar tripulante %d por finalizacion", tripulante->TID);
-	if (dispatcher_eliminar_tripulante(tripulante->TID) != EXIT_SUCCESS)
-		log_error(logger,"No se pudo eliminar de la cola EXIT");
-	sem_post(&sem_mutex_ingreso_tripulantes_new);
-	sem_post(&sem_mutex_ejecutar_dispatcher);
-	sem_post(&sem_puede_expulsar_tripulante);
-	log_debug(logger,"Se elimino por finalizacion el tripulante %d exitosamente",tripulante->TID);
+	}// FIN WHILE
 
 	// Libero recursos
+	if(tarea != NULL)
+		destruir_tarea(tarea);
 	liberar_conexion(i_mongo_store_fd_tripulante);
 	liberar_conexion(mi_ram_hq_fd_tripulante);
 
@@ -790,8 +814,8 @@ int generarNuevoTID() {
 	return nuevo_valor;
 }
 
-//mueve al tripulante y retorna true cuando esta en posicion
-int tripulante_esta_en_posicion(t_tripulante* tripulante, t_tarea* tarea, int mi_ram_hq_fd_tripulante){
+// mueve al tripulante y retorna true si luego de moverlo esta en posicion
+bool tripulante_esta_en_posicion(t_tripulante* tripulante, t_tarea* tarea, int mi_ram_hq_fd_tripulante){
 
 	// PIDO LA POSICION A MI RAM HQ
 	int estado_envio_mensaje = enviar_op_enviar_ubicacion_tripulante(mi_ram_hq_fd_tripulante);
@@ -802,55 +826,41 @@ int tripulante_esta_en_posicion(t_tripulante* tripulante, t_tarea* tarea, int mi
 	printf("Tripulante %d: Estoy en la posicion (%d,%d)\n", tripulante->TID, tripulante->posicion_X, tripulante->posicion_Y);
 	printf("Tripulante %d: La tarea esta en (%d,%d)\n", tripulante->TID, tarea->pos_x, tarea->pos_y);
 
-	if(tripulante->posicion_X < tarea->pos_x){
-		tripulante->posicion_X++;
+	// Si ya esta en la posicion
+	if((tripulante->posicion_X == tarea->pos_x) && (tripulante->posicion_Y == tarea->pos_y))
+		return true;
 
-		// Actualizo posicion en la memoria RAM
-		// Hay que ver si el servidor esta conectado?
-		estado_envio_mensaje = enviar_op_recibir_ubicacion_tripulante(mi_ram_hq_fd_tripulante, tripulante->posicion_X, tripulante->posicion_Y);
-		if(estado_envio_mensaje != EXIT_SUCCESS)
-			log_error(logger, "No se pudo mandar el mensaje a Mi-Ram HQ");
-
-		printf("me movi a: %dx %dy\n",tripulante->posicion_X,tripulante->posicion_Y);
-		return 0;
+	// Si no lo esta, lo desplazo una casilla
+	switch(1){
+		default:
+			if(tripulante->posicion_X < tarea->pos_x){
+				tripulante->posicion_X++;
+				break;
+			}
+			if(tripulante->posicion_X > tarea->pos_x){
+				tripulante->posicion_X--;
+				break;
+			}
+			if(tripulante->posicion_Y < tarea->pos_y){
+				tripulante->posicion_Y++;
+				break;
+			}
+			if(tripulante->posicion_Y > tarea->pos_y){
+				tripulante->posicion_Y--;
+				break;
+			}
 	}
-	if(tripulante->posicion_X > tarea->pos_x){
-		tripulante->posicion_X--;
+	
+	// Actualizo posicion en la memoria RAM
+	// Hay que ver si el servidor esta conectado?
+	estado_envio_mensaje = enviar_op_recibir_ubicacion_tripulante(mi_ram_hq_fd_tripulante, tripulante->posicion_X, tripulante->posicion_Y);
+	if(estado_envio_mensaje != EXIT_SUCCESS)
+		log_error(logger, "No se pudo mandar el mensaje a Mi-Ram HQ");
 
-		// Actualizo posicion en la memoria RAM
-		estado_envio_mensaje = enviar_op_recibir_ubicacion_tripulante(mi_ram_hq_fd_tripulante, tripulante->posicion_X, tripulante->posicion_Y);
-		if(estado_envio_mensaje != EXIT_SUCCESS)
-			log_error(logger, "No se pudo mandar el mensaje a Mi-Ram HQ");
+	printf("me movi a: %dx %dy\n",tripulante->posicion_X,tripulante->posicion_Y);
 
-		printf("me movi a: %dx %dy\n",tripulante->posicion_X,tripulante->posicion_Y);
-
-		return 0;
-	}
-	if(tripulante->posicion_Y < tarea->pos_y){
-		tripulante->posicion_Y++;
-
-		// Actualizo posicion en la memoria RAM
-		estado_envio_mensaje = enviar_op_recibir_ubicacion_tripulante(mi_ram_hq_fd_tripulante, tripulante->posicion_X, tripulante->posicion_Y);
-		if(estado_envio_mensaje != EXIT_SUCCESS)
-			log_error(logger, "No se pudo mandar el mensaje a Mi-Ram HQ");
-
-		printf("me movi a: %dx %dy\n",tripulante->posicion_X,tripulante->posicion_Y);
-
-		return 0;
-	}
-	if(tripulante->posicion_Y > tarea->pos_y){
-		tripulante->posicion_Y--;
-
-		// Actualizo posicion en la memoria RAM
-		estado_envio_mensaje = enviar_op_recibir_ubicacion_tripulante(mi_ram_hq_fd_tripulante, tripulante->posicion_X, tripulante->posicion_Y);
-		if(estado_envio_mensaje != EXIT_SUCCESS)
-			log_error(logger, "No se pudo mandar el mensaje a Mi-Ram HQ");
-
-		printf("me movi a: %dx %dy\n",tripulante->posicion_X,tripulante->posicion_Y);
-		
-		return 0;
-	}
-	return 1;
+	// Devuelvo si el tripulante llego o no a la posicion
+	return (tripulante->posicion_X == tarea->pos_x) && (tripulante->posicion_Y == tarea->pos_y);
 }
 
 // Funciones ciclo cpu

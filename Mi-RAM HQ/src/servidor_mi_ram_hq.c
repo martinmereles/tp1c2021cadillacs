@@ -237,5 +237,7 @@ int expulsar_tripulante(char* payload, void** tabla, uint32_t* direccion_logica_
 
     eliminar_tripulante(*tabla, *direccion_logica_TCB);
 
+    *tabla = NULL;
+
     return EXIT_SUCCESS;
 }

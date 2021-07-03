@@ -44,6 +44,7 @@ int dispatcher(void *algor_planif){
     crear_colas();
 	
     while(true){
+
         //log_debug(logger, "loop consultas");
         // Se admiten en el sistema cada uno de los tripulantes creados
         sem_wait(&sem_mutex_ejecutar_dispatcher);
@@ -59,7 +60,7 @@ int dispatcher(void *algor_planif){
         //hay_tarea = hay_tarea_a_realizar();
         sem_wait(&sem_mutex_ejecutar_dispatcher);
 		if( hay_espacio_disponible(grado_multiproc) && existe_tripulantes_en_cola(cola_ready) ){
-            log_debug(logger, "Atendiendo COLA EXEC");
+            log_debug(logger, "Atendiendo COLA READY");
             gestionar_exec(grado_multiproc);
 		}
         sem_post(&sem_mutex_ejecutar_dispatcher);
@@ -364,39 +365,28 @@ char *code_dispatcher_to_string(enum estado_tripulante code){
     sem_post(tripulante->sem_tripulante_dejo_ready);
 }
 
- void transicion_exec_to_blocked_io(t_tripulante *dato, enum algoritmo cod_algor){
-    t_tripulante *temp;
-    //temp = malloc(sizeof(t_tripulante));
-    //memcpy(temp, dato, sizeof(t_tripulante));
-    temp = dato;
-    temp->estado = BLOCKED_IO;
-    if(cod_algor == RR)
-        temp->quantum = 0;
-    queue_push(cola_bloqueado_io,temp);
+ void transicion_exec_to_blocked_io(t_tripulante *tripulante, enum algoritmo cod_algor){
+    tripulante->estado = BLOCKED_IO;
+    tripulante->quantum = quantum;      // Si es FIFO, se setea en 0
+    queue_push(cola_bloqueado_io, tripulante);
+    sem_post(tripulante->sem_tripulante_dejo_exec);
 }
 
- void transicion_blocked_io_to_ready(t_tripulante *dato, enum algoritmo cod_algor){
-    t_tripulante *temp;
-    //temp = malloc(sizeof(t_tripulante));
-    //memcpy(temp, dato, sizeof(t_tripulante));
-    temp = dato;
-    temp->estado = READY;
-    if(cod_algor == RR)
-        temp->quantum = quantum;
-    queue_push(cola_running,temp);
+void transicion_blocked_io_to_ready(t_tripulante *tripulante, enum algoritmo cod_algor){
+    tripulante->estado = READY;
+    tripulante->quantum = quantum;  // Si es FIFO, se setea en 0
+    queue_push(cola_ready, tripulante);
+    sem_post(tripulante->sem_tripulante_dejo_blocked_io);
 }
 
- void transicion_exec_to_ready(t_tripulante *dato){
-    t_tripulante *temp;
-    //temp = malloc(sizeof(t_tripulante));
-    //memcpy(temp, dato, sizeof(t_tripulante));
-    temp = dato;
-    temp->estado = READY;
-    temp->quantum = quantum;
-    queue_push(cola_ready,temp);
+void transicion_exec_to_ready(t_tripulante *tripulante){
+    tripulante->estado = READY;
+    tripulante->quantum = quantum;
+    queue_push(cola_ready, tripulante);
+    sem_post(tripulante->sem_tripulante_dejo_exec);
 }
 
- int bloquear_tripulantes_por_sabotaje(void){
+int bloquear_tripulantes_por_sabotaje(void){
 
     //Pasar todos los tripulantes a blocked_emerg SEGUN ORDEN (1-EXEC -> 2-READY ->3- BLOCKED_IO)
     t_queue *temporal;
@@ -464,9 +454,9 @@ char *code_dispatcher_to_string(enum estado_tripulante code){
 
  void gestionar_bloqueo_io(t_queue *peticiones_from_exec, t_queue *peticiones_to_ready, enum algoritmo code_algor){
     // Gestionando bloqueos_IO
-    if (get_buffer_peticiones_and_swap_exec_blocked_io(peticiones_from_exec, code_algor) != EXIT_SUCCESS )
+    if(get_buffer_peticiones_and_swap_exec_blocked_io(peticiones_from_exec, code_algor) != EXIT_SUCCESS)
         log_error(logger, "Error en atender peticiones EXEC to BLOCKED IO");
-    if (get_buffer_peticiones_and_swap_blocked_io_ready(peticiones_to_ready, code_algor) != EXIT_SUCCESS )
+    if(get_buffer_peticiones_and_swap_blocked_io_ready(peticiones_to_ready, code_algor) != EXIT_SUCCESS)
         log_error(logger, "Error en atender peticiones BLOCKED IO to READY");
 }
 
@@ -483,37 +473,31 @@ enum algoritmo string_to_code_algor(char *string_code){
         return FIFO;
 }// TODO: evaluar su aplicacion
 
-void agregar_a_buffer_peticiones(t_queue *peticiones_destino, int tid){
-    int *tid_ptr;
-    tid_ptr = malloc(sizeof(int));
-    *tid_ptr = tid;
-    queue_push(peticiones_destino, tid_ptr);
+void agregar_a_buffer_peticiones(t_queue *peticiones_destino, t_tripulante* tripulante){
+    queue_push(peticiones_destino, tripulante);
 }
 
- int get_buffer_peticiones_and_swap_exec_blocked_io(t_queue *peticiones_origen, enum algoritmo code_algor){
-    int *buffer;
-    t_tripulante *trip_transito;
+int get_buffer_peticiones_and_swap_exec_blocked_io(t_queue *peticiones_origen, enum algoritmo code_algor){
+    t_tripulante *tripulante;
     if ( queue_size(peticiones_origen) > 0){
         while( queue_size(peticiones_origen) > 0 ){
-            buffer = queue_pop(peticiones_origen);
-            trip_transito = obtener_tripulante_por_tid(cola_running, *buffer);
-            transicion_exec_to_blocked_io(trip_transito, code_algor);
-            free(buffer);
+            tripulante = queue_pop(peticiones_origen);
+            obtener_tripulante_por_tid(cola_running, tripulante->TID);
+            transicion_exec_to_blocked_io(tripulante, code_algor);
         }
         return EXIT_SUCCESS;
-    }else
+    }
+    else
         return EXIT_FAILURE;
 }
 
  int get_buffer_peticiones_and_swap_blocked_io_ready(t_queue *peticiones_origen, enum algoritmo code_algor){
-    int *buffer;
-    t_tripulante *trip_transito;
+    t_tripulante *tripulante;
     if ( queue_size(peticiones_origen) > 0){
         while( queue_size(peticiones_origen) > 0 ){
-            buffer = queue_pop(peticiones_origen);
-            trip_transito = obtener_tripulante_por_tid(cola_bloqueado_io, *buffer);
-            transicion_blocked_io_to_ready(trip_transito, code_algor);
-            free(buffer);
+            tripulante = queue_pop(peticiones_origen);
+            obtener_tripulante_por_tid(cola_bloqueado_io, tripulante->TID);
+            transicion_blocked_io_to_ready(tripulante, code_algor);
         }
         return EXIT_SUCCESS;
     }else
@@ -566,9 +550,18 @@ int dispatcher_eliminar_tripulante(int tid_eliminar){
     sem_destroy(tripulante->sem_planificacion_fue_reanudada);    
     sem_destroy(tripulante->sem_tripulante_dejo_ready);          
     sem_destroy(tripulante->sem_tripulante_dejo_new);            
+    sem_destroy(tripulante->sem_tripulante_dejo_blocked_io);           
+    sem_destroy(tripulante->sem_tripulante_dejo_blocked_emergency);           
+    sem_destroy(tripulante->sem_tripulante_dejo_exec);           
+    sem_destroy(tripulante->sem_tripulante_dejo_exit);    
+
     free(tripulante->sem_planificacion_fue_reanudada);         
     free(tripulante->sem_tripulante_dejo_ready);         
-    free(tripulante->sem_tripulante_dejo_new);
+    free(tripulante->sem_tripulante_dejo_new);        
+    free(tripulante->sem_tripulante_dejo_blocked_io);           
+    free(tripulante->sem_tripulante_dejo_blocked_emergency);           
+    free(tripulante->sem_tripulante_dejo_exec);           
+    free(tripulante->sem_tripulante_dejo_exit);    
 
     free(tripulante);   // Libero el struct
 
@@ -589,10 +582,19 @@ t_tripulante* iniciador_tripulante(int tid, int pid){
     nuevo -> sem_planificacion_fue_reanudada = malloc(sizeof(sem_t));
     nuevo -> sem_tripulante_dejo_ready = malloc(sizeof(sem_t));
     nuevo -> sem_tripulante_dejo_new = malloc(sizeof(sem_t));
+    nuevo -> sem_tripulante_dejo_blocked_io = malloc(sizeof(sem_t));
+    nuevo -> sem_tripulante_dejo_blocked_emergency = malloc(sizeof(sem_t));
+    nuevo -> sem_tripulante_dejo_exec = malloc(sizeof(sem_t));
+    nuevo -> sem_tripulante_dejo_exit = malloc(sizeof(sem_t));
 
-	sem_init(nuevo -> sem_planificacion_fue_reanudada, 0, 0);    // Inicializa en 0 a proposito
-    sem_init(nuevo -> sem_tripulante_dejo_ready, 0, 0);          // Inicializa en 0 a proposito
-    sem_init(nuevo -> sem_tripulante_dejo_new, 0, 0);            // Inicializa en 0 a proposito
+    // Todos inicializan en 0
+	sem_init(nuevo -> sem_planificacion_fue_reanudada, 0, 0);    
+    sem_init(nuevo -> sem_tripulante_dejo_ready, 0, 0);         
+    sem_init(nuevo -> sem_tripulante_dejo_new, 0, 0);        
+    sem_init(nuevo -> sem_tripulante_dejo_blocked_io, 0, 0);         
+    sem_init(nuevo -> sem_tripulante_dejo_blocked_emergency, 0, 0);           
+    sem_init(nuevo -> sem_tripulante_dejo_exec, 0, 0);          
+    sem_init(nuevo -> sem_tripulante_dejo_exit, 0, 0);   
 
     list_add(lista_tripulantes, nuevo); // Lo agrego a la lista global de tripulantes
     queue_push(cola_new, nuevo);

@@ -48,6 +48,10 @@ typedef struct dato_tripulante{
     sem_t* sem_planificacion_fue_reanudada;
     sem_t* sem_tripulante_dejo_ready;
     sem_t* sem_tripulante_dejo_new;
+    sem_t* sem_tripulante_dejo_blocked_io;
+    sem_t* sem_tripulante_dejo_blocked_emergency;
+    sem_t* sem_tripulante_dejo_exec;
+    sem_t* sem_tripulante_dejo_exit;  
 }t_tripulante;
 
 enum status_planificador {
@@ -79,7 +83,7 @@ char *code_dispatcher_to_string(enum estado_tripulante code);
 int dispatcher_expulsar_tripulante(int tid_tripulante);
 void dispatcher_pausar(void);
 enum algoritmo string_to_code_algor(char *string_algor);
-void agregar_a_buffer_peticiones(t_queue *buffer, int tid);
+void agregar_a_buffer_peticiones(t_queue *buffer, t_tripulante* tripulante);
 int dispatcher_eliminar_tripulante(int tid_eliminar);
 t_tripulante* iniciador_tripulante(int tid, int pid);
 
