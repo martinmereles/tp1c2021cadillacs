@@ -532,6 +532,8 @@ int submodulo_tripulante(void* args) {
 			log_error(logger, "No se pudo mandar el mensaje al i-Mongo-Store");
 		
 		if(strcmp(tarea,"FIN") == 0){
+			printf("duermo esperando a imongo");
+			sleep(5);
 			estado_tripulante = 'F';
 		}else{
 			//parseo la tarea
@@ -559,7 +561,7 @@ int submodulo_tripulante(void* args) {
 				sem_wait(&sem_planificacion_fue_iniciada);
 				sem_post(&sem_planificacion_fue_iniciada);
 				
-				if(tripulante_esta_en_posicion(&struct_iniciar_tripulante, st_tarea)){
+				if(tripulante_esta_en_posicion(&struct_iniciar_tripulante, st_tarea, i_mongo_store_fd_tripulante)){
 					if(primer_ejecucion){
 						//printf("estoy en posicion\n");
 						log_info(logger,"Comienzo a %s",nombre_parametros[0]);
@@ -573,7 +575,9 @@ int submodulo_tripulante(void* args) {
 					tiempo_ejecutado++;
 					if(tiempo_ejecutado==atoi(st_tarea.duracion)){
 					tarea_finalizada=1;
+					estado_envio_mensaje = enviar_operacion(i_mongo_store_fd_tripulante,COD_TERMINAR_TAREA, tarea,strlen(tarea)+1);
 					printf("termine la tarea\n");
+					
 					}
 				}	
 				//printf("ejecute 1 seg\n");		
@@ -744,24 +748,50 @@ int generarNuevoTID() {
 }
 
 //mueve al tripulante y retorna true cuando esta en posicion
-int tripulante_esta_en_posicion(iniciar_tripulante_t* tripulante, t_tarea tarea){
+int tripulante_esta_en_posicion(iniciar_tripulante_t* tripulante, t_tarea tarea, int i_mongo_store_fd_tripulante){
+	char * posicion= string_new();
+	string_append(&posicion,"Se mueve de ");
+	string_append(&posicion,string_itoa(tripulante->posicion_X));
+	string_append(&posicion,"|");
+	string_append(&posicion,string_itoa(tripulante->posicion_Y));
+	string_append(&posicion," a ");
 	if(tripulante->posicion_X < atoi(tarea.pos_x)){
 		tripulante->posicion_X++;
+		string_append(&posicion,string_itoa(tripulante->posicion_X));
+		string_append(&posicion,"|");
+		string_append(&posicion,string_itoa(tripulante->posicion_Y));
+		string_append(&posicion,"\n");
+		enviar_operacion(i_mongo_store_fd_tripulante,COD_MOVIMIENTO_TRIP, posicion,strlen(posicion)+1);
 		printf("me movi a: %dx %dy\n",tripulante->posicion_X,tripulante->posicion_Y);
 		return 0;
 	}
 	if(tripulante->posicion_X > atoi(tarea.pos_x)){
 		tripulante->posicion_X--;
+		string_append(&posicion,string_itoa(tripulante->posicion_X));
+		string_append(&posicion,"|");
+		string_append(&posicion,string_itoa(tripulante->posicion_Y));
+		string_append(&posicion,"\n");
+		enviar_operacion(i_mongo_store_fd_tripulante,COD_MOVIMIENTO_TRIP, posicion,strlen(posicion)+1);
 		printf("me movi a: %dx %dy\n",tripulante->posicion_X,tripulante->posicion_Y);
 		return 0;
 	}
 	if(tripulante->posicion_Y < atoi(tarea.pos_y)){
 		tripulante->posicion_Y++;
+		string_append(&posicion,string_itoa(tripulante->posicion_X));
+		string_append(&posicion,"|");
+		string_append(&posicion,string_itoa(tripulante->posicion_Y));
+		string_append(&posicion,"\n");
+		enviar_operacion(i_mongo_store_fd_tripulante,COD_MOVIMIENTO_TRIP, posicion,strlen(posicion)+1);
 		printf("me movi a: %dx %dy\n",tripulante->posicion_X,tripulante->posicion_Y);
 		return 0;
 	}
 	if(tripulante->posicion_Y > atoi(tarea.pos_y)){
 		tripulante->posicion_Y--;
+		string_append(&posicion,string_itoa(tripulante->posicion_X));
+		string_append(&posicion,"|");
+		string_append(&posicion,string_itoa(tripulante->posicion_Y));
+		string_append(&posicion,"\n");
+		enviar_operacion(i_mongo_store_fd_tripulante,COD_MOVIMIENTO_TRIP, posicion,strlen(posicion)+1);
 		printf("me movi a: %dx %dy\n",tripulante->posicion_X,tripulante->posicion_Y);
 		return 0;
 	}

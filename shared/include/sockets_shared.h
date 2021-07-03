@@ -32,7 +32,9 @@ enum op_code{
 
     // Codigos para servidor i-Mongo-Store: FALTA
     COD_EJECUTAR_TAREA,
-    COD_OBTENER_BITACORA
+    COD_OBTENER_BITACORA,
+    COD_TERMINAR_TAREA,
+    COD_MOVIMIENTO_TRIP
 };
 
 int recibir_operacion(int servidor_fd);

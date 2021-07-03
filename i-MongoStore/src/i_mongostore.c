@@ -189,6 +189,12 @@ bool leer_mensaje_cliente_y_procesar(int cliente_fd){
 		case COD_EJECUTAR_TAREA:
 			recibir_payload_y_ejecutar(cliente_fd, recibir_tarea);
 			break;
+		case COD_TERMINAR_TAREA:
+			recibir_payload_y_ejecutar(cliente_fd, terminar_tarea);
+			break;
+		case COD_MOVIMIENTO_TRIP:
+			recibir_payload_y_ejecutar(cliente_fd, movimiento_tripulante);
+			break;
 		case -1:
 			log_error(logger, "El cliente se desconecto.");
 			cliente_conectado = false;
