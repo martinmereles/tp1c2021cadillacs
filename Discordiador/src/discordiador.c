@@ -53,15 +53,14 @@ int main(void) {
 		log_info(logger, "El quantum es: %d", quantum);
     }
     else{
-	if(strcmp(algoritmo_planificador,"FIFO")==0){
-		log_info(logger, "El algoritmo de planificacion es: FIFO");
-		quantum = 0; // Variable global
-	}
-    else{
-		log_error(logger, "ERROR. Algoritmo de planificacion: %s. No es valido", algoritmo_planificador);
-		return EXIT_FAILURE;
-	}
-        
+		if(strcmp(algoritmo_planificador,"FIFO")==0){
+			log_info(logger, "El algoritmo de planificacion es: FIFO");
+			quantum = 0; // Variable global
+		}
+		else{
+			log_error(logger, "ERROR. Algoritmo de planificacion: %s. No es valido", algoritmo_planificador);
+			return EXIT_FAILURE;
+		}
     }
 
 	// Inicializo semaforo grado multitarea
@@ -425,7 +424,7 @@ int obtener_bitacora(char ** argumentos, int i_mongo_store_fd){
 int submodulo_tripulante(void* args) {
 	iniciar_tripulante_t struct_iniciar_tripulante = *((iniciar_tripulante_t*) args);
 	t_tripulante* tripulante;
-	t_tarea* tarea;
+	t_tarea* tarea = NULL;
 	ciclo_t* ciclo;
 
 	int mi_ram_hq_fd_tripulante;
@@ -497,16 +496,6 @@ int submodulo_tripulante(void* args) {
 		
 	while(status_discordiador != END && tripulante->estado != EXIT){
 			
-		/*
-		Estados tripulante:		    NEW,
-									READY,
-									EXEC,
-									BLOCKED_IO,
-									BLOCKED_EMERGENCY,
-									EXIT	
-									EXEC_EMERGENCY??
-											*/
-
 		// Si la planificacion fue pausada, se bloquea el tripulante
 		if(estado_planificador != PLANIFICADOR_RUNNING){
 			log_info(logger, "El tripulante %d pauso su planificacion", tripulante->TID);
@@ -523,8 +512,7 @@ int submodulo_tripulante(void* args) {
 				log_debug(logger, "El tripulante %d sale de NEW", tripulante->TID);
 				break;
 
-			case READY:
-				// Si la planificacion fue pausada no hay problema, se queda esperando aca
+			case READY:	// El tripulante espera hasta que el planificacor lo saque de la cola de ready
 				log_debug(logger, "El tripulante %d llega a READY", tripulante->TID);
 				sem_wait(tripulante->sem_tripulante_dejo_ready);
 				log_debug(logger, "El tripulante %d sale de READY", tripulante->TID);
@@ -540,6 +528,8 @@ int submodulo_tripulante(void* args) {
 				if(ciclos_en_estado_actual == tarea->duracion){
 					tripulante->estado = READY;	
 					// TODO: Avisa que finalizo la tarea
+					agregar_a_buffer_peticiones(buffer_peticiones_blocked_io_to_ready, tripulante->TID);
+					log_debug(logger, "El tripulante %d completo tarea de %d ciclos exitosamente, pasando a estado READY", tripulante->TID, tarea->duracion);	
 				}
 
 				// Se espera que termine el ciclo
@@ -554,6 +544,8 @@ int submodulo_tripulante(void* args) {
 					break;	// Salgo del switch
 				}
 
+				ciclos_en_estado_actual++;
+
 				// Inicio 1 ciclo de cpu
 				ciclo = crear_ciclo_cpu();
 
@@ -567,7 +559,7 @@ int submodulo_tripulante(void* args) {
 
 					tarea = leer_proxima_tarea_mi_ram_hq(mi_ram_hq_fd_tripulante);
 
-					log_info(logger,"La proxima tarea a ejecutar es:\n%s",tarea);
+					log_info(logger,"La proxima tarea a ejecutar es:\n%s",tarea->string);
 
 					// Si la tarea leida es la tarea "FIN"
 					if(strcmp(tarea->string, "FIN") == 0){
@@ -582,11 +574,10 @@ int submodulo_tripulante(void* args) {
 					tiempo_ejecutado = 0;
 					primer_ejecucion = 1;
 
-					//	tarea_comun = 1;	// es lo mismo que decir que no es bloqueante
-
-
 					// Se espera que termine el ciclo
+					log_info(logger, "Espero que termine el ciclo");
 					esperar_fin_ciclo_de_cpu(ciclo);
+					log_info(logger, "Termino el ciclo");
 					break;	// Salgo del switch
 				}
 				
@@ -604,10 +595,13 @@ int submodulo_tripulante(void* args) {
 					//printf("estoy en posicion\n");
 					log_info(logger,"Comienzo a %s",tarea->nombre);
 					estado_envio_mensaje = enviar_operacion(i_mongo_store_fd_tripulante,COD_EJECUTAR_TAREA, tarea->string, strlen(tarea->string)+1);
+					
+					// Si la tarea es bloqueante, el tripulante se bloquea (TODO: tira error)
 					if (tarea->es_bloqueante){
 						agregar_a_buffer_peticiones(buffer_peticiones_exec_to_blocked_io, tripulante->TID);
 						log_debug(logger, "El tripulante %d cambia a estado BLOCKED IO", tripulante->TID);
 					}
+
 					primer_ejecucion=0;
 
 					// Espero que termine el ciclo de cpu
@@ -624,12 +618,6 @@ int submodulo_tripulante(void* args) {
 					destruir_tarea(tarea);
 					tarea = NULL;
 				}	
-
-				// Hay que moverlo a otro lado
-				if (tarea->es_bloqueante){
-					agregar_a_buffer_peticiones(buffer_peticiones_blocked_io_to_ready, tripulante->TID);
-					log_debug(logger, "El tripulante %d completo tarea de %d ciclos exitosamente, pasando a estado READY", tripulante->TID, tarea->duracion);	
-				}
 			
 				// Espero que termine el ciclo de cpu
 				esperar_fin_ciclo_de_cpu(ciclo);
@@ -812,10 +800,10 @@ int tripulante_esta_en_posicion(t_tripulante* tripulante, t_tarea* tarea, int mi
 
 	leer_ubicacion_tripulante_mi_ram_hq(mi_ram_hq_fd_tripulante, &(tripulante->posicion_X), &(tripulante->posicion_Y));
 	printf("Tripulante %d: Estoy en la posicion (%d,%d)\n", tripulante->TID, tripulante->posicion_X, tripulante->posicion_Y);
+	printf("Tripulante %d: La tarea esta en (%d,%d)\n", tripulante->TID, tarea->pos_x, tarea->pos_y);
 
 	if(tripulante->posicion_X < tarea->pos_x){
 		tripulante->posicion_X++;
-		// printf("me movi a: %dx %dy\n",tripulante->posicion_X,tripulante->posicion_Y);
 
 		// Actualizo posicion en la memoria RAM
 		// Hay que ver si el servidor esta conectado?
@@ -823,38 +811,42 @@ int tripulante_esta_en_posicion(t_tripulante* tripulante, t_tarea* tarea, int mi
 		if(estado_envio_mensaje != EXIT_SUCCESS)
 			log_error(logger, "No se pudo mandar el mensaje a Mi-Ram HQ");
 
+		printf("me movi a: %dx %dy\n",tripulante->posicion_X,tripulante->posicion_Y);
 		return 0;
 	}
 	if(tripulante->posicion_X > tarea->pos_x){
 		tripulante->posicion_X--;
-		// printf("me movi a: %dx %dy\n",tripulante->posicion_X,tripulante->posicion_Y);
 
 		// Actualizo posicion en la memoria RAM
 		estado_envio_mensaje = enviar_op_recibir_ubicacion_tripulante(mi_ram_hq_fd_tripulante, tripulante->posicion_X, tripulante->posicion_Y);
 		if(estado_envio_mensaje != EXIT_SUCCESS)
 			log_error(logger, "No se pudo mandar el mensaje a Mi-Ram HQ");
+
+		printf("me movi a: %dx %dy\n",tripulante->posicion_X,tripulante->posicion_Y);
 
 		return 0;
 	}
 	if(tripulante->posicion_Y < tarea->pos_y){
 		tripulante->posicion_Y++;
-		// printf("me movi a: %dx %dy\n",tripulante->posicion_X,tripulante->posicion_Y);
 
 		// Actualizo posicion en la memoria RAM
 		estado_envio_mensaje = enviar_op_recibir_ubicacion_tripulante(mi_ram_hq_fd_tripulante, tripulante->posicion_X, tripulante->posicion_Y);
 		if(estado_envio_mensaje != EXIT_SUCCESS)
 			log_error(logger, "No se pudo mandar el mensaje a Mi-Ram HQ");
+
+		printf("me movi a: %dx %dy\n",tripulante->posicion_X,tripulante->posicion_Y);
 
 		return 0;
 	}
 	if(tripulante->posicion_Y > tarea->pos_y){
 		tripulante->posicion_Y--;
-		// printf("me movi a: %dx %dy\n",tripulante->posicion_X,tripulante->posicion_Y);
 
 		// Actualizo posicion en la memoria RAM
 		estado_envio_mensaje = enviar_op_recibir_ubicacion_tripulante(mi_ram_hq_fd_tripulante, tripulante->posicion_X, tripulante->posicion_Y);
 		if(estado_envio_mensaje != EXIT_SUCCESS)
 			log_error(logger, "No se pudo mandar el mensaje a Mi-Ram HQ");
+
+		printf("me movi a: %dx %dy\n",tripulante->posicion_X,tripulante->posicion_Y);
 		
 		return 0;
 	}
@@ -862,12 +854,11 @@ int tripulante_esta_en_posicion(t_tripulante* tripulante, t_tarea* tarea, int mi
 }
 
 // Funciones ciclo cpu
+void esperar_retardo_ciclo_cpu(){
+	sleep(retardo_ciclo_cpu);
+}
 
 ciclo_t* crear_ciclo_cpu(){
-	void esperar_retardo_ciclo_cpu(void* args){
-		sleep(retardo_ciclo_cpu);
-	}
-
 	ciclo_t* ciclo = malloc(sizeof(ciclo_t));
 	pthread_create(&(ciclo->hilo), NULL, (void*) esperar_retardo_ciclo_cpu, NULL);
 	return ciclo;

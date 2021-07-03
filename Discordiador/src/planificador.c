@@ -358,13 +358,10 @@ char *code_dispatcher_to_string(enum estado_tripulante code){
     }
 }
 
- void transicion_ready_to_exec(t_tripulante *dato){
-    t_tripulante *temp;
-    //temp = malloc(sizeof(t_tripulante));
-    //memcpy(temp, dato, sizeof(t_tripulante));
-    temp = dato;
-    temp->estado = EXEC;
-    queue_push(cola_running,temp);
+ void transicion_ready_to_exec(t_tripulante *tripulante){
+    tripulante->estado = EXEC;
+    queue_push(cola_running, tripulante);
+    sem_post(tripulante->sem_tripulante_dejo_ready);
 }
 
  void transicion_exec_to_blocked_io(t_tripulante *dato, enum algoritmo cod_algor){

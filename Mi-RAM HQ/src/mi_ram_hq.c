@@ -204,7 +204,8 @@ bool leer_mensaje_cliente_y_procesar(int cliente_fd, void** tabla_patota, uint32
 			break;
 		case -1:
 			log_error(logger, "El cliente se desconecto.");
-			expulsar_tripulante(payload, tabla_patota, dir_log);
+			if((*tabla_patota) != NULL)	// Si se desconecto un tripulante, lo expulso
+				expulsar_tripulante(payload, tabla_patota, dir_log);
 			cliente_conectado = false;
 			break;
 		default:

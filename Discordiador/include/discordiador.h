@@ -58,6 +58,7 @@ void destruir_tarea(t_tarea* tarea);
 
 // Funciones ciclo cpu
 ciclo_t* crear_ciclo_cpu();
+void esperar_retardo_ciclo_cpu();
 void esperar_fin_ciclo_de_cpu(ciclo_t* ciclo);
 
 // VARIABLES GLOBALES
