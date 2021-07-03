@@ -25,6 +25,9 @@ int enviar_op_iniciar_tripulante(int i_mongo_store_fd ,int mi_ram_hq_fd, iniciar
 int enviar_op_recibir_ubicacion_tripulante(int mi_ram_hq_fd, uint32_t posicion_X, uint32_t posicion_Y);
 int enviar_op_enviar_proxima_tarea(int mi_ram_hq_fd);
 int enviar_op_expulsar_tripulante(int mi_ram_hq_fd);
+int enviar_op_recibir_estado_tripulante(int mi_ram_hq_fd, char estado_trip);// Operacion nueva
+int enviar_op_enviar_ubicacion_tripulante(int mi_ram_hq_fd);// Operacion nueva
+int enviar_op_enviar_estado_tripulante(int mi_ram_hq_fd); // Operacion nueva
 
 t_log* logger;
 

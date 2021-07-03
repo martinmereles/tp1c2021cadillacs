@@ -119,7 +119,7 @@ int iniciar_dispatcher(char *algoritmo_planificador){
         sem_post(&sem_mutex_ejecutar_dispatcher);
         estado_planificador = PLANIFICADOR_RUNNING;
     }
-
+    
     return EXIT_SUCCESS;
 }
 
@@ -196,6 +196,14 @@ int dispatcher_expulsar_tripulante(int tid_buscado){
     estado = get_index_from_cola_by_tid(cola_bloqueado_io, tid_buscado);
     if(estado != -1){
         trip_expulsado = obtener_tripulante_por_tid(cola_bloqueado_io, tid_buscado);
+        
+        // desbloqueo semaforo
+        int valor_semaforo;
+        log_info(logger, "Reanudo planificacion del tripulante %d", trip_expulsado->TID);
+        sem_getvalue(&(trip_expulsado->sem_planificacion_fue_reanudada), &valor_semaforo);
+	    if(valor_semaforo == 0)
+        sem_post(&(trip_expulsado->sem_planificacion_fue_reanudada));
+        
         queue_push(cola_exit, trip_expulsado);
         //list_clean_and_destroy_elements(cola_exit->elements,destructor_elementos_tripulante);
     }
@@ -551,18 +559,32 @@ void dispatcher_pausar(){
 }
 
 int dispatcher_eliminar_tripulante(int tid_eliminar){
-    free(obtener_tripulante_por_tid(cola_exit, tid_eliminar));
+    t_tripulante* tripulante = obtener_tripulante_por_tid(cola_exit, tid_eliminar);
+    sem_destroy(&(tripulante->sem_planificacion_fue_reanudada));    // Destruyo su semaforo
+    bool tiene_TID_a_eliminar(void* args){
+        t_tripulante* tripulante_encontrado = (t_tripulante*) args;
+        return tripulante_encontrado->TID == tid_eliminar;
+    }
+    // Lo quito de la lista global de tripulantes
+    list_remove_by_condition(lista_tripulantes, tiene_TID_a_eliminar);
+    free(tripulante);   // Libero el struct
+
     if (dispatcher_expulsar_tripulante(tid_eliminar) != EXIT_SUCCESS)
         return EXIT_SUCCESS;
     else
         return EXIT_FAILURE;
 }
 
-void iniciador_tripulante(int tid, int pid){
+t_tripulante* iniciador_tripulante(int tid, int pid){
     t_tripulante *nuevo;
     nuevo = malloc(sizeof(t_tripulante));
     nuevo -> PID = pid;
     nuevo -> TID = tid;
     nuevo -> estado_previo = NEW;
+    // El tripulante tiene un semaforo para pausar/reanudar la planificacion
+	// Inicializamos el semaforo
+	sem_init(&(nuevo -> sem_planificacion_fue_reanudada), 0, 0);    // Inicializa en 0 a proposito
+    list_add(lista_tripulantes, nuevo); // Lo agrego a la lista global de tripulantes
     queue_push(cola_new, nuevo);
+    return nuevo;
 }

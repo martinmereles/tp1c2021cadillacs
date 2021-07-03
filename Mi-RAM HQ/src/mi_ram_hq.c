@@ -5,7 +5,7 @@ int main(void)
 	// inicializo semaforos
 	sem_init(&semaforo_aceptar_conexiones, 0, 0);
 
-	logger = log_create("./cfg/mi-ram-hq.log", "Mi-RAM HQ", 1, LOG_LEVEL_DEBUG);
+	logger = log_create("./cfg/mi-ram-hq.log", "Mi-RAM HQ", 0, LOG_LEVEL_DEBUG);
 
 	// Leo IP y PUERTO del config
 	t_config *config = config_create("./cfg/mi-ram-hq.config");
@@ -22,7 +22,6 @@ int main(void)
 	log_info(logger, "PID de Mi-RAM-HQ: %d",getpid());
 
 	mi_ram_hq(server_fd);
-
 
 	log_info(logger, "Cerrando socket servidor");
 	close(server_fd);
@@ -175,6 +174,24 @@ bool leer_mensaje_cliente_y_procesar(int cliente_fd, void** tabla_patota, uint32
 			recibir_ubicacion_tripulante(payload, tabla_patota, dir_log);
 			free(payload);
 			break;
+
+		// Nuevos mensajes
+		case COD_ENVIAR_UBICACION_TRIPULANTE:
+			payload = recibir_payload(cliente_fd);
+			enviar_ubicacion_tripulante(cliente_fd, payload, tabla_patota, dir_log);
+			free(payload);
+			break;
+		case COD_RECIBIR_ESTADO_TRIPULANTE:
+			payload = recibir_payload(cliente_fd);
+			recibir_estado_tripulante(payload, tabla_patota, dir_log);
+			free(payload);
+			break;
+		case COD_ENVIAR_ESTADO_TRIPULANTE:
+			payload = recibir_payload(cliente_fd);
+			enviar_estado_tripulante(cliente_fd, payload, tabla_patota, dir_log);
+			free(payload);
+			break;
+
 		case COD_ENVIAR_PROXIMA_TAREA:
 			payload = recibir_payload(cliente_fd);
 			enviar_proxima_tarea(cliente_fd, payload, tabla_patota, dir_log);

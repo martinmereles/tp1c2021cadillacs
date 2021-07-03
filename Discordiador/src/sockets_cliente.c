@@ -94,7 +94,7 @@ int enviar_op_iniciar_tripulante(int i_mongo_store_fd,int mi_ram_hq_fd, iniciar_
 	offset += sizeof(uint32_t);
 
 	exit_status = enviar_operacion(mi_ram_hq_fd, COD_INICIAR_TRIPULANTE, stream, longitud_stream);
-	exit_status = enviar_operacion(i_mongo_store_fd, COD_INICIAR_TRIPULANTE, stream, longitud_stream);
+	exit_status = enviar_operacion(i_mongo_store_fd, COD_INICIAR_TRIPULANTE_I_MONGO_STORE, stream, longitud_stream);
 	
 	free(stream);
 
@@ -117,6 +117,32 @@ int enviar_op_recibir_ubicacion_tripulante(int mi_ram_hq_fd, uint32_t posicion_X
 	free(stream);
 
 	return exit_status;
+}
+
+// Operacion nueva
+int enviar_op_recibir_estado_tripulante(int mi_ram_hq_fd, char estado_trip){
+	int exit_status;
+	uint32_t longitud_stream = sizeof(char);
+	char* stream = malloc(longitud_stream);
+	int offset = 0;
+
+	memcpy(stream + offset, &estado_trip, sizeof(char));
+	offset += sizeof(char);
+
+	exit_status = enviar_operacion(mi_ram_hq_fd, COD_RECIBIR_ESTADO_TRIPULANTE, stream, longitud_stream);
+	free(stream);
+
+	return exit_status;
+}
+
+// Operacion nueva
+int enviar_op_enviar_ubicacion_tripulante(int mi_ram_hq_fd){
+	return enviar_operacion(mi_ram_hq_fd, COD_ENVIAR_UBICACION_TRIPULANTE, NULL, 0);
+}
+
+// Operacion nueva
+int enviar_op_enviar_estado_tripulante(int mi_ram_hq_fd){
+	return enviar_operacion(mi_ram_hq_fd, COD_ENVIAR_ESTADO_TRIPULANTE, NULL, 0);
 }
 
 int enviar_op_enviar_proxima_tarea(int mi_ram_hq_fd){

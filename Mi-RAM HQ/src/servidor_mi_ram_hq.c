@@ -73,8 +73,11 @@ int iniciar_tripulante(char* payload, void** tabla, uint32_t* dir_log_tcb){
 	offset += sizeof(uint32_t);
     log_info(logger, "La posicion inicial del tripulante es: (%d,%d)",posicion_X,posicion_Y);
 
+    dibujar_tripulante_mapa(TID, posicion_X, posicion_Y);
+
     if(crear_tripulante(tabla, dir_log_tcb, PID, TID, posicion_X, posicion_Y) == EXIT_FAILURE){
         log_error(logger, "NO SE PUDO CREAR AL TRIPULANTE.");
+        borrar_tripulante_mapa(TID);
         return COD_INICIAR_TRIPULANTE_ERROR;
     }
 
@@ -82,23 +85,115 @@ int iniciar_tripulante(char* payload, void** tabla, uint32_t* dir_log_tcb){
 }
 
 int recibir_ubicacion_tripulante(char* payload, void** tabla, uint32_t* direccion_logica_TCB){
-    uint32_t posicion_X, posicion_Y;
+    uint32_t nueva_posicion_X, nueva_posicion_Y;
+    uint32_t actual_posicion_X, actual_posicion_Y;
+    uint32_t TID;
     int offset = 0;
-    
+
+    // Recibo la nueva posicion segun el submodulo tripulante    
     log_info(logger, "Recibiendo ubicacion de un tripulante");
 
-    memcpy(&posicion_X, payload + offset, sizeof(uint32_t));
+    memcpy(&nueva_posicion_X, payload + offset, sizeof(uint32_t));
 	offset += sizeof(uint32_t);
 
-    memcpy(&posicion_Y, payload + offset, sizeof(uint32_t));
+    memcpy(&nueva_posicion_Y, payload + offset, sizeof(uint32_t));
 	offset += sizeof(uint32_t);
+ 
+    // Leo la posicion actual y el TID en memoria RAM
+    leer_memoria_principal(*tabla, *direccion_logica_TCB, DESPL_POS_X, &actual_posicion_X, sizeof(uint32_t));
+    leer_memoria_principal(*tabla, *direccion_logica_TCB, DESPL_POS_Y, &actual_posicion_Y, sizeof(uint32_t));
+    leer_memoria_principal(*tabla, *direccion_logica_TCB, DESPL_TID, &TID, sizeof(uint32_t));
+    
+    // Intento desplazar al tripulante en el mapa
+    int desplazamiento_X = nueva_posicion_X - actual_posicion_X;
+    int desplazamiento_Y = nueva_posicion_Y - actual_posicion_Y;
 
-    log_info(logger, "Nueva ubicacion del tripulante: (%d,%d)",posicion_X,posicion_Y);
+    if(desplazar_tripulante_mapa(TID, desplazamiento_X, desplazamiento_Y) != EXIT_SUCCESS)
+        return EXIT_FAILURE;
 
-    escribir_memoria_principal(*tabla, *direccion_logica_TCB, DESPL_POS_X, &posicion_X, sizeof(uint32_t));
-    escribir_memoria_principal(*tabla, *direccion_logica_TCB, DESPL_POS_Y, &posicion_Y, sizeof(uint32_t));
+    // Si se desplazo con exito, escribo la nueva ubicacion del tripulante en memoria RAM
+    log_info(logger, "Nueva ubicacion del tripulante: (%d,%d)",nueva_posicion_X,nueva_posicion_Y);
+
+    escribir_memoria_principal(*tabla, *direccion_logica_TCB, DESPL_POS_X, &nueva_posicion_X, sizeof(uint32_t));
+    escribir_memoria_principal(*tabla, *direccion_logica_TCB, DESPL_POS_Y, &nueva_posicion_Y, sizeof(uint32_t));
 
     return EXIT_SUCCESS;
+}
+
+int enviar_ubicacion_tripulante(int tripulante_fd, char* payload, void** tabla, uint32_t* direccion_logica_TCB){
+    uint32_t posicion_X, posicion_Y;
+
+    log_info(logger, "Leyendo ubicacion");
+
+    // Leemos la ubicacion
+    leer_memoria_principal(*tabla, *direccion_logica_TCB, DESPL_POS_X, &posicion_X, sizeof(uint32_t));
+    leer_memoria_principal(*tabla, *direccion_logica_TCB, DESPL_POS_Y, &posicion_Y, sizeof(uint32_t));
+
+    log_info(logger, "Enviando posicion: (%d,%d)", posicion_X, posicion_Y);
+
+    // enviamos la ubicacion al submodulo tripulante
+    int exit_status;
+	uint32_t longitud_stream = sizeof(uint32_t) * 2;
+	char* stream = malloc(longitud_stream);
+	int offset = 0;
+
+	memcpy(stream + offset, &posicion_X, sizeof(uint32_t));
+	offset += sizeof(uint32_t);
+
+	memcpy(stream + offset, &posicion_Y, sizeof(uint32_t));
+	offset += sizeof(uint32_t);
+
+	exit_status = enviar_operacion(tripulante_fd, COD_UBICACION_TRIPULANTE, stream, longitud_stream);
+	free(stream);
+
+    if(exit_status != EXIT_SUCCESS)
+        log_error(logger, "ERROR. No se pudo enviar la ubicacion al submodulo tripulante");
+
+    return exit_status;
+}
+
+
+int recibir_estado_tripulante(char* payload, void** tabla, uint32_t* direccion_logica_TCB){
+    uint32_t estado_tripulante;
+    int offset = 0;
+    
+    log_info(logger, "Recibiendo estado de un tripulante");
+
+    memcpy(&estado_tripulante, payload + offset, sizeof(char));
+	offset += sizeof(char);
+
+    log_info(logger, "Nuevo estado del tripulante: %c", estado_tripulante);
+
+    escribir_memoria_principal(*tabla, *direccion_logica_TCB, DESPL_ESTADO, &estado_tripulante, sizeof(char));
+
+    return EXIT_SUCCESS;
+}
+
+int enviar_estado_tripulante(int tripulante_fd, char* payload, void** tabla, uint32_t* direccion_logica_TCB){
+    char estado_tripulante;
+
+    // Leemos el estado
+    log_info(logger, "Leyendo estado");
+    leer_memoria_principal(*tabla, *direccion_logica_TCB, DESPL_ESTADO, &estado_tripulante, sizeof(char));
+
+    log_info(logger, "Enviando estado: %c", estado_tripulante);
+
+    // Enviamos el estado al submodulo tripulante
+    int exit_status;
+	uint32_t longitud_stream = sizeof(char);
+	char* stream = malloc(longitud_stream);
+	int offset = 0;
+
+	memcpy(stream + offset, &estado_tripulante, sizeof(char));
+	offset += sizeof(char);
+
+	exit_status = enviar_operacion(tripulante_fd, COD_ESTADO_TRIPULANTE, stream, longitud_stream);
+	free(stream);
+
+    if(exit_status != EXIT_SUCCESS)
+        log_error(logger, "ERROR. No se pudo enviar el estado al submodulo tripulante");
+
+    return exit_status;
 }
 
 int enviar_proxima_tarea(int tripulante_fd, char* payload, void** tabla, uint32_t* dir_log_tcb){
@@ -132,6 +227,13 @@ int enviar_proxima_tarea(int tripulante_fd, char* payload, void** tabla, uint32_
 int expulsar_tripulante(char* payload, void** tabla, uint32_t* direccion_logica_TCB){
     
     log_info(logger,"Expulsando tripulante");
+
+    // Leemos el TID del tripulante en memoria principal para poder borrarlo del mapa
+    uint32_t TID;
+    leer_memoria_principal(*tabla, *direccion_logica_TCB, DESPL_TID, &TID, sizeof(uint32_t));
+
+    if(borrar_tripulante_mapa(TID) != EXIT_SUCCESS)
+        return EXIT_FAILURE;
 
     eliminar_tripulante(*tabla, *direccion_logica_TCB);
 

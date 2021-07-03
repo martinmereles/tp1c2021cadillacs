@@ -16,11 +16,18 @@ enum op_code{
 
     // Codigos para servidor Submodulo tripulante
     COD_PROXIMA_TAREA,
+    COD_ESTADO_TRIPULANTE,
+    COD_UBICACION_TRIPULANTE,
 
     // Codigos para servidor Mi-RAM HQ
     COD_INICIAR_PATOTA,
     COD_INICIAR_TRIPULANTE,
+    
     COD_RECIBIR_UBICACION_TRIPULANTE,
+    COD_ENVIAR_UBICACION_TRIPULANTE,
+    COD_RECIBIR_ESTADO_TRIPULANTE,
+    COD_ENVIAR_ESTADO_TRIPULANTE,
+
     COD_ENVIAR_PROXIMA_TAREA,
     COD_EXPULSAR_TRIPULANTE,
 
@@ -33,8 +40,12 @@ enum op_code{
     // Codigos para servidor i-Mongo-Store: FALTA
     COD_EJECUTAR_TAREA,
     COD_OBTENER_BITACORA,
+<<<<<<< HEAD
     COD_TERMINAR_TAREA,
     COD_MOVIMIENTO_TRIP
+=======
+    COD_INICIAR_TRIPULANTE_I_MONGO_STORE
+>>>>>>> 73d34d7827de38e948d2cb262cc7292837354b15
 };
 
 int recibir_operacion(int servidor_fd);

@@ -20,6 +20,9 @@ int inicializar_estructuras_memoria(t_config* config){
 	// Configuramos signal de dump
 	signal(SIGUSR1, signal_handler);
 
+    // Inicializo mapa
+    inicializar_mapa();
+
     return EXIT_SUCCESS;
 }
 
@@ -190,7 +193,8 @@ void liberar_estructuras_memoria(){
     bitarray_destroy(mapa_memoria_disponible);
     free(memoria_principal);
     fclose(memoria_virtual);
-    //remove(path_swap);
+    remove(path_swap);  // Deberia comentarlo??
+    finalizar_mapa();   // Finalizo mapa
 }
 
 void leer_tarea_memoria_principal(void* tabla, char** tarea, uint32_t id_prox_tarea){    
