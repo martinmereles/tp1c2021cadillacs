@@ -184,7 +184,7 @@ void escribir_bitacora(char* mensaje){
         eliminar_keys_bitacora(bitacora_config_file);
         config_set_value(bitacora_config_file,"SIZE",string_itoa(bitacora_config.size+string_length(mensaje)));
         config_set_value(bitacora_config_file,"BLOCK_COUNT",string_itoa(bitacora_config.block_count+cantidad_de_bloques));
-        printf("bloques a config antes de finalizar: %s\n", bloques_config);
+        printf("bloques a config antes de finalizar: %s\n", bloques_config_final);
         config_set_value(bitacora_config_file,"BLOCKS",bloques_config_final);
         config_save(bitacora_config_file);
     }
