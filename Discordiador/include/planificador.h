@@ -13,12 +13,7 @@
 #include <commons/temporal.h>
 
 // en ESTADO NEW: genera las estructuras administrativas , una vez generado todo --> pasa a READY.
-t_queue *cola_new;
-t_queue *cola_ready;
-t_queue *cola_running;
-t_queue *cola_bloqueado_io;
-t_queue *cola_bloqueado_emergency;
-t_queue *cola_exit;
+t_queue **cola;
 
 // agrego cola buffer que interactua con cada tripulante - estos contienen el TID respectivo
 t_queue *buffer_peticiones_exec_to_blocked_io;
@@ -29,13 +24,14 @@ t_queue *buffer_peticiones_ready_to_exec;
 enum status_planificador estado_planificador;
 
 // CODIGO ESTADO del Tripulante
-enum estado_tripulante{
-    NEW,
-    READY,
-    EXEC,
-    BLOCKED_IO,
-    BLOCKED_EMERGENCY,
-    EXIT
+enum estado_tripulante{ // Deben ir numerados desde 0 sin saltar numeros
+    NEW = 0,
+    READY = 1,
+    EXEC = 2,
+    BLOCKED_IO = 3,
+    BLOCKED_EMERGENCY = 4,
+    EXIT = 5,
+    COLA_ERROR = 6   // Debe ser siempre el ultimo
 };
 
 // Estructura de dato para colas del planificador / dispatcher
@@ -46,12 +42,8 @@ typedef struct dato_tripulante{
     int posicion_X;
     int posicion_Y;
     sem_t* sem_planificacion_fue_reanudada;
-    sem_t* sem_tripulante_dejo_ready;
-    sem_t* sem_tripulante_dejo_new;
-    sem_t* sem_tripulante_dejo_blocked_io;
-    sem_t* sem_tripulante_dejo_blocked_emergency;
-    sem_t* sem_tripulante_dejo_exec;
-    sem_t* sem_tripulante_dejo_exit;  
+    sem_t* sem_finalizo;
+    sem_t** sem_tripulante_dejo;
 }t_tripulante;
 
 enum status_planificador {
@@ -72,9 +64,7 @@ sem_t sem_mutex_buffer_exec_to_blocked_io;
 sem_t sem_mutex_ingreso_tripulantes_new;
 sem_t sem_mutex_ejecutar_dispatcher;
 sem_t sem_puede_expulsar_tripulante;
-sem_t sem_confirmar_expulsion_tripulante;
 sem_t sem_sabotaje_activado;
-sem_t sem_mutex_tripulante_a_expulsar;
 
 int iniciar_dispatcher(char *algoritmo_planificador);
 int listar_tripulantes(void);
@@ -86,6 +76,9 @@ enum algoritmo string_to_code_algor(char *string_algor);
 void agregar_a_buffer_peticiones(t_queue *buffer, t_tripulante* tripulante);
 int dispatcher_eliminar_tripulante(int tid_eliminar);
 t_tripulante* iniciador_tripulante(int tid, int pid);
+void crear_colas();
+
+bool existen_tripulantes_en_cola(t_queue *cola);
 
 // Lista global de tripulantes (sirve para pausar/reanudar la planificacion)
 t_list* lista_tripulantes;

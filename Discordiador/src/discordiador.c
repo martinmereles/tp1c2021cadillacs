@@ -5,12 +5,12 @@ int main(void) {
 	// Inicializo variables globales
 	status_discordiador = RUNNING;
     estado_planificador = PLANIFICADOR_OFF;
-	tripulante_a_expulsar = -1;
 
 	generadorPID = 0;
 	generadorTID = 0;
 
-	cola_new=queue_create();
+	// Creo las colas
+	crear_colas();
 
 	sem_init(&sem_generador_PID,0,1);
 	sem_init(&sem_generador_TID,0,1);
@@ -22,10 +22,7 @@ int main(void) {
     // Inicializo semaforos del dispatcher
     sem_init(&sem_mutex_ingreso_tripulantes_new,0,1);
     sem_init(&sem_mutex_ejecutar_dispatcher,0,1);
-	sem_init(&sem_puede_expulsar_tripulante,0,1);
-	sem_init(&sem_confirmar_expulsion_tripulante,0,0);
 	sem_init(&sem_sabotaje_activado,0,0);
-	sem_init(&sem_mutex_tripulante_a_expulsar,0,1);
 	
 	// Creo logger
 	logger = log_create("./cfg/discordiador.log", "Discordiador", 1, LOG_LEVEL_DEBUG);
@@ -175,7 +172,6 @@ void recibir_y_procesar_mensaje_i_mongo_store(int i_mongo_store_fd){
 }
 
 void leer_consola_y_procesar(int i_mongo_store_fd, int mi_ram_hq_fd) {
-	int estado_envio_mensaje;
 	enum comando_discordiador comando;
 	char** argumentos;
 	char linea_consola[TAM_CONSOLA];
@@ -224,32 +220,9 @@ void leer_consola_y_procesar(int i_mongo_store_fd, int mi_ram_hq_fd) {
 			}
 			
 			break;
-		case EXPULSAR_TRIPULANTE:{
-			log_info(logger, "Expulsando tripulante");
-			sem_wait(&sem_mutex_ejecutar_dispatcher);
-			sem_wait(&sem_mutex_tripulante_a_expulsar);
-			tripulante_a_expulsar = atoi(argumentos[1]);
-			sem_post(&sem_mutex_tripulante_a_expulsar);
-			estado_envio_mensaje = dispatcher_expulsar_tripulante( atoi(argumentos[1]) );
-			if (estado_envio_mensaje != EXIT_SUCCESS){
-				log_error(logger, "No se encontro el tripulante");
-				sem_wait(&sem_mutex_tripulante_a_expulsar);
-				tripulante_a_expulsar = -1;
-				sem_post(&sem_mutex_tripulante_a_expulsar);
-				sem_post(&sem_mutex_ejecutar_dispatcher);
-			}
-			else{
-				sem_post(&sem_mutex_ejecutar_dispatcher);
-
-				// Una vez que el hilo tripulante haya sido eliminado
-				sem_wait(&sem_confirmar_expulsion_tripulante);
-				log_debug(logger, "El hilo del tripulante fue eliminado/expulsado satisfactoriamente");
-				
-				sem_wait(&sem_mutex_tripulante_a_expulsar);
-				tripulante_a_expulsar = -1;
-				sem_post(&sem_mutex_tripulante_a_expulsar);
-			}
-			}break;
+		case EXPULSAR_TRIPULANTE:
+			expulsar_tripulante(argumentos);
+			break;
 		case INICIAR_PLANIFICACION:
 			
 			// Verificamos la cantidad de argumentos
@@ -517,13 +490,13 @@ int submodulo_tripulante(void* args) {
 
 			case NEW:	// El tripulante espera hasta que el planificacor lo saque de la cola de new
 				log_debug(logger, "El tripulante %d llega a NEW", tripulante->TID);
-				sem_wait(tripulante->sem_tripulante_dejo_new);
+				sem_wait(tripulante->sem_tripulante_dejo[NEW]);
 				log_debug(logger, "El tripulante %d sale de NEW", tripulante->TID);
 				break;
 
 			case READY:	// El tripulante espera hasta que el planificacor lo saque de la cola de ready
 				log_debug(logger, "El tripulante %d llega a READY", tripulante->TID);
-				sem_wait(tripulante->sem_tripulante_dejo_ready);
+				sem_wait(tripulante->sem_tripulante_dejo[READY]);
 				log_debug(logger, "El tripulante %d sale de READY", tripulante->TID);
 				break;
 
@@ -535,7 +508,7 @@ int submodulo_tripulante(void* args) {
 					agregar_a_buffer_peticiones(buffer_peticiones_blocked_io_to_ready, tripulante);
 
 					// El tripulante espera hasta que el planificacor lo saque de la cola de ready
-					sem_wait(tripulante->sem_tripulante_dejo_blocked_io);
+					sem_wait(tripulante->sem_tripulante_dejo[BLOCKED_IO]);
 					ciclos_en_estado_actual = 0;
 
 					// TODO: Avisa que finalizo la tarea
@@ -564,7 +537,7 @@ int submodulo_tripulante(void* args) {
 					log_debug(logger, "Por RR, comenzamos expulsion del tripulante %d de EXEC", tripulante->TID);
 					// TODO: Le pide al planificador que lo agregue a la cola de ready
 					queue_push(buffer_peticiones_exec_to_ready, tripulante);
-					sem_wait(tripulante->sem_tripulante_dejo_exec);
+					sem_wait(tripulante->sem_tripulante_dejo[EXEC]);
 					ciclos_en_estado_actual = 0;
 					log_debug(logger, "El tripulante %d sale de EXEC", tripulante->TID);
 					break;	// Salgo del switch
@@ -621,7 +594,7 @@ int submodulo_tripulante(void* args) {
 					if (tarea->es_bloqueante){
 						agregar_a_buffer_peticiones(buffer_peticiones_exec_to_blocked_io, tripulante);
 						ciclos_en_estado_actual = 0;
-						sem_wait(tripulante->sem_tripulante_dejo_exec);
+						sem_wait(tripulante->sem_tripulante_dejo[EXEC]);
 						log_debug(logger, "El tripulante %d cambia a estado BLOCKED IO", tripulante->TID);
 					}
 
@@ -650,27 +623,9 @@ int submodulo_tripulante(void* args) {
 				// TODO
 				break;
 
-			case EXIT:	// HAY QUE REVISAR
-				// Se desarman las estructuras administrativas del tripulante por FINALIZACION:
-				estado_envio_mensaje = enviar_op_expulsar_tripulante(mi_ram_hq_fd_tripulante);
-				if(estado_envio_mensaje != EXIT_SUCCESS)
-					log_error(logger, "No se pudo mandar el mensaje a Mi-Ram HQ");
-
-				// Habilito al dispatcher a eliminar al tripulante
-				sem_wait(&sem_puede_expulsar_tripulante);
-				sem_wait(&sem_mutex_ejecutar_dispatcher);
-				sem_wait(&sem_mutex_ingreso_tripulantes_new);
-				if (dispatcher_expulsar_tripulante(tripulante->TID) != EXIT_SUCCESS)
-					log_error(logger,"NO se pudo expulsar tripulante %d por finalizacion", tripulante->TID);
-				if (dispatcher_eliminar_tripulante(tripulante->TID) != EXIT_SUCCESS)
-					log_error(logger,"No se pudo eliminar de la cola EXIT");
-				sem_post(&sem_mutex_ingreso_tripulantes_new);
-				sem_post(&sem_mutex_ejecutar_dispatcher);
-				sem_post(&sem_puede_expulsar_tripulante);
-				
-				tripulante_finalizado = true;
-				
-				log_debug(logger,"Se elimino por finalizacion el tripulante %d exitosamente",tripulante->TID);
+			case EXIT:
+				// El tripulante espera a que lo quiten de la cola de EXIT		
+				sem_wait(tripulante->sem_tripulante_dejo[EXIT]);								
 				break;
 			default:
 				log_error(logger, "ERROR. submodulo_tripulante: estado erroneo");
@@ -678,13 +633,39 @@ int submodulo_tripulante(void* args) {
 		}// FIN SWITCH
 	}// FIN WHILE
 
+	// CUANDO SALE DE EXIT:
+
+	// Se le pide a la RAM que elimine las estructuras del tripulante
+	estado_envio_mensaje = enviar_op_expulsar_tripulante(mi_ram_hq_fd_tripulante);
+	if(estado_envio_mensaje != EXIT_SUCCESS)
+		log_error(logger, "No se pudo mandar el mensaje a Mi-Ram HQ");
+
 	// Libero recursos
 	if(tarea != NULL)
 		destruir_tarea(tarea);
 	liberar_conexion(i_mongo_store_fd_tripulante);
 	liberar_conexion(mi_ram_hq_fd_tripulante);
 
+	// Habilita al dispatcher a eliminar sus estructuras del Discordiador
+	sem_post(tripulante->sem_finalizo);
+
 	return EXIT_SUCCESS;
+}
+
+int expulsar_tripulante(char** argumentos){
+	// Verificamos la cantidad de argumentos
+	if(cantidad_argumentos(argumentos) > 2){
+		log_error(logger, "EXPULSAR_TRIPULANTE: Sobran argumentos");
+		return EXIT_FAILURE;
+	}
+
+	if(cantidad_argumentos(argumentos) < 2){
+		log_error(logger, "EXPULSAR_TRIPULANTE: Faltan argumentos");
+		return EXIT_FAILURE;
+	}
+
+	// Buscar tripulante y moverlo a la cola de exit
+	return dispatcher_expulsar_tripulante(atoi(argumentos[1]));
 }
 
 t_tarea* leer_proxima_tarea_mi_ram_hq(int mi_ram_hq_fd_tripulante){

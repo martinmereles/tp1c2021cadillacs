@@ -42,6 +42,7 @@ void leer_fds(int, int);
 enum comando_discordiador string_to_comando_discordiador(char*);
 int cantidad_argumentos(char** argumentos);
 int iniciar_patota(char** argumentos, int);
+int expulsar_tripulante(char** argumentos);
 int submodulo_tripulante();
 int generarNuevoPID();
 int generarNuevoTID();
@@ -72,7 +73,6 @@ char* algoritmo_planificador;
 //grado_multitarea = grado multiprocesamiento
 int duracion_sabotaje; // expresado como cantidad en ciclos CPU
 int retardo_ciclo_cpu; // tiempo de espera por c/ciclo CPU
-int tripulante_a_expulsar;
 
 enum status_discordiador status_discordiador;
 
