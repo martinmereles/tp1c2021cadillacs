@@ -802,7 +802,6 @@ int tripulante_esta_en_posicion(t_tripulante* tripulante, t_tarea tarea, int mi_
 	int estado_envio_mensaje = enviar_op_enviar_ubicacion_tripulante(mi_ram_hq_fd_tripulante);
 	if(estado_envio_mensaje != EXIT_SUCCESS)
 		log_error(logger, "No se pudo mandar el mensaje a Mi-Ram HQ");
-
 	leer_ubicacion_tripulante_mi_ram_hq(mi_ram_hq_fd_tripulante, &(tripulante->posicion_X), &(tripulante->posicion_Y));
 	printf("Tripulante %d: Estoy en la posicion (%d,%d)\n", tripulante->TID, tripulante->posicion_X, tripulante->posicion_Y);
 
@@ -814,6 +813,7 @@ int tripulante_esta_en_posicion(t_tripulante* tripulante, t_tarea tarea, int mi_
 		string_append(&posicion,"|");
 		string_append(&posicion,string_itoa(tripulante->posicion_Y));
 		string_append(&posicion,"\n");
+		printf("%s\n",posicion);
 		enviar_operacion(i_mongo_store_fd_tripulante,COD_MOVIMIENTO_TRIP, posicion,strlen(posicion)+1);
 		// Actualizo posicion en la memoria RAM
 		// Hay que ver si el servidor esta conectado?
@@ -831,6 +831,7 @@ int tripulante_esta_en_posicion(t_tripulante* tripulante, t_tarea tarea, int mi_
 		string_append(&posicion,"|");
 		string_append(&posicion,string_itoa(tripulante->posicion_Y));
 		string_append(&posicion,"\n");
+		printf("%s\n",posicion);
 		enviar_operacion(i_mongo_store_fd_tripulante,COD_MOVIMIENTO_TRIP, posicion,strlen(posicion)+1);
 		// Actualizo posicion en la memoria RAM
 		estado_envio_mensaje = enviar_op_recibir_ubicacion_tripulante(mi_ram_hq_fd_tripulante, tripulante->posicion_X, tripulante->posicion_Y);
@@ -847,6 +848,7 @@ int tripulante_esta_en_posicion(t_tripulante* tripulante, t_tarea tarea, int mi_
 		string_append(&posicion,"|");
 		string_append(&posicion,string_itoa(tripulante->posicion_Y));
 		string_append(&posicion,"\n");
+		printf("%s\n",posicion);
 		enviar_operacion(i_mongo_store_fd_tripulante,COD_MOVIMIENTO_TRIP, posicion,strlen(posicion)+1);
 		// Actualizo posicion en la memoria RAM
 		estado_envio_mensaje = enviar_op_recibir_ubicacion_tripulante(mi_ram_hq_fd_tripulante, tripulante->posicion_X, tripulante->posicion_Y);
@@ -863,6 +865,7 @@ int tripulante_esta_en_posicion(t_tripulante* tripulante, t_tarea tarea, int mi_
 		string_append(&posicion,"|");
 		string_append(&posicion,string_itoa(tripulante->posicion_Y));
 		string_append(&posicion,"\n");
+		printf("%s\n",posicion);
 		enviar_operacion(i_mongo_store_fd_tripulante,COD_MOVIMIENTO_TRIP, posicion,strlen(posicion)+1);
 		// Actualizo posicion en la memoria RAM
 		estado_envio_mensaje = enviar_op_recibir_ubicacion_tripulante(mi_ram_hq_fd_tripulante, tripulante->posicion_X, tripulante->posicion_Y);

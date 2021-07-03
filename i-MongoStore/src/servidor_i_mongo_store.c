@@ -50,7 +50,7 @@ void iniciar_tripulante(char* payload){
     //string_append(&mensaje, "\n");
     char* path_relativo= string_new();
     string_append(&path_relativo, "/Files/Bitacoras/Tripulante");
-    string_append(&path_relativo, string_itoa(tripulante.TID));
+    string_append(&path_relativo, string_itoa(TID));
     string_append(&path_relativo, ".ims");
     path_bitacora= crear_path_absoluto(path_relativo);
     //escribir_bitacora(mensaje);
@@ -201,7 +201,7 @@ char * leer_bitacora(char* payload){
     string_append(&path_relativo,id_tripulante);
     string_append(&path_relativo,".ims");
     char * path_absoluto = crear_path_absoluto(path_relativo);
-    //printf("path: %s\n", path_absoluto);
+    printf("path: %s\n", path_absoluto);
     if(existe_archivo(path_absoluto)){
         bitacora_config_file=config_create(path_absoluto);
         leer_bitacora_config(bitacora_config_file);
