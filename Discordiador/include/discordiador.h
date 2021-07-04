@@ -42,7 +42,7 @@ void leer_fds(int, int);
 enum comando_discordiador string_to_comando_discordiador(char*);
 int cantidad_argumentos(char** argumentos);
 int iniciar_patota(char** argumentos, int);
-int expulsar_tripulante(char** argumentos);
+int expulsar_tripulante(int argumentos);
 int submodulo_tripulante();
 int generarNuevoPID();
 int generarNuevoTID();

@@ -2,6 +2,10 @@
 
 int main(void) {
 
+	// Creo logger
+	logger = log_create("./cfg/discordiador.log", "Discordiador", 1, LOG_LEVEL_DEBUG);
+	log_info(logger, "Inicializando el Discordiador");
+
 	// Inicializo variables globales
 	status_discordiador = RUNNING;
     estado_planificador = PLANIFICADOR_OFF;
@@ -23,10 +27,7 @@ int main(void) {
     sem_init(&sem_mutex_ingreso_tripulantes_new,0,1);
     sem_init(&sem_mutex_ejecutar_dispatcher,0,1);
 	sem_init(&sem_sabotaje_activado,0,0);
-	
-	// Creo logger
-	logger = log_create("./cfg/discordiador.log", "Discordiador", 1, LOG_LEVEL_DEBUG);
-	log_info(logger, "Inicializando el Discordiador");
+
 
 	int i_mongo_store_fd;
 	int mi_ram_hq_fd;
@@ -221,7 +222,18 @@ void leer_consola_y_procesar(int i_mongo_store_fd, int mi_ram_hq_fd) {
 			
 			break;
 		case EXPULSAR_TRIPULANTE:
-			expulsar_tripulante(argumentos);
+			// Verificamos la cantidad de argumentos
+			if(cantidad_argumentos(argumentos) > 2){
+				log_error(logger, "EXPULSAR_TRIPULANTE: Sobran argumentos");
+				break;
+			}
+
+			if(cantidad_argumentos(argumentos) < 2){
+				log_error(logger, "EXPULSAR_TRIPULANTE: Faltan argumentos");
+				break;
+			}
+
+			expulsar_tripulante(atoi(argumentos[1]));
 			break;
 		case INICIAR_PLANIFICACION:
 			
@@ -489,15 +501,11 @@ int submodulo_tripulante(void* args) {
 		switch(tripulante->estado){
 
 			case NEW:	// El tripulante espera hasta que el planificacor lo saque de la cola de new
-				log_debug(logger, "El tripulante %d llega a NEW", tripulante->TID);
 				sem_wait(tripulante->sem_tripulante_dejo[NEW]);
-				log_debug(logger, "El tripulante %d sale de NEW", tripulante->TID);
 				break;
 
-			case READY:	// El tripulante espera hasta que el planificacor lo saque de la cola de ready
-				log_debug(logger, "El tripulante %d llega a READY", tripulante->TID);
+			case READY:	// El tripulante espera hasta que el planificacor lo saque de la cola de ready	
 				sem_wait(tripulante->sem_tripulante_dejo[READY]);
-				log_debug(logger, "El tripulante %d sale de READY", tripulante->TID);
 				break;
 
 			case BLOCKED_IO:	// Solo hay que esperar los ciclos hasta que se libere
@@ -539,7 +547,6 @@ int submodulo_tripulante(void* args) {
 					queue_push(buffer_peticiones_exec_to_ready, tripulante);
 					sem_wait(tripulante->sem_tripulante_dejo[EXEC]);
 					ciclos_en_estado_actual = 0;
-					log_debug(logger, "El tripulante %d sale de EXEC", tripulante->TID);
 					break;	// Salgo del switch
 				}
 
@@ -562,9 +569,7 @@ int submodulo_tripulante(void* args) {
 
 					// Si la tarea leida es la tarea "FIN"
 					if(strcmp(tarea->string, "FIN") == 0){
-						destruir_tarea(tarea);
-						tarea = NULL;
-						tripulante->estado = EXIT;
+						expulsar_tripulante(tripulante->TID);
 						esperar_fin_ciclo_de_cpu(ciclo);	// Se espera que termine el ciclo
 						break;	// Salgo del switch
 					}
@@ -595,7 +600,6 @@ int submodulo_tripulante(void* args) {
 						agregar_a_buffer_peticiones(buffer_peticiones_exec_to_blocked_io, tripulante);
 						ciclos_en_estado_actual = 0;
 						sem_wait(tripulante->sem_tripulante_dejo[EXEC]);
-						log_debug(logger, "El tripulante %d cambia a estado BLOCKED IO", tripulante->TID);
 					}
 
 					// Espero que termine el ciclo de cpu
@@ -625,7 +629,8 @@ int submodulo_tripulante(void* args) {
 
 			case EXIT:
 				// El tripulante espera a que lo quiten de la cola de EXIT		
-				sem_wait(tripulante->sem_tripulante_dejo[EXIT]);								
+				sem_wait(tripulante->sem_tripulante_dejo[EXIT]);
+				tripulante_finalizado = true;								
 				break;
 			default:
 				log_error(logger, "ERROR. submodulo_tripulante: estado erroneo");
@@ -652,20 +657,15 @@ int submodulo_tripulante(void* args) {
 	return EXIT_SUCCESS;
 }
 
-int expulsar_tripulante(char** argumentos){
-	// Verificamos la cantidad de argumentos
-	if(cantidad_argumentos(argumentos) > 2){
-		log_error(logger, "EXPULSAR_TRIPULANTE: Sobran argumentos");
-		return EXIT_FAILURE;
-	}
-
-	if(cantidad_argumentos(argumentos) < 2){
-		log_error(logger, "EXPULSAR_TRIPULANTE: Faltan argumentos");
-		return EXIT_FAILURE;
-	}
-
-	// Buscar tripulante y moverlo a la cola de exit
-	return dispatcher_expulsar_tripulante(atoi(argumentos[1]));
+int expulsar_tripulante(int numero_tid){
+	// Creo un hilo que se encarga de buscar al tripulante y moverlo a la cola de EXIT
+	int* TID = malloc(sizeof(int));
+	*TID = numero_tid; 
+    log_info(logger, "Creando rutina para expulsar tripulante %d", *TID);
+	pthread_t hilo_expulsar_tripulante;
+	pthread_create(&hilo_expulsar_tripulante, NULL, (void*) rutina_expulsar_tripulante, TID);
+	pthread_detach(hilo_expulsar_tripulante);
+	return EXIT_SUCCESS;
 }
 
 t_tarea* leer_proxima_tarea_mi_ram_hq(int mi_ram_hq_fd_tripulante){

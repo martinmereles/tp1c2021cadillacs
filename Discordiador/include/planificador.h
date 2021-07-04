@@ -12,8 +12,11 @@
 #include <semaphore.h>
 #include <commons/temporal.h>
 
+#define CANT_COLAS 6
+
 // en ESTADO NEW: genera las estructuras administrativas , una vez generado todo --> pasa a READY.
 t_queue **cola;
+sem_t ** mutex_cola;
 
 // agrego cola buffer que interactua con cada tripulante - estos contienen el TID respectivo
 t_queue *buffer_peticiones_exec_to_blocked_io;
@@ -30,8 +33,7 @@ enum estado_tripulante{ // Deben ir numerados desde 0 sin saltar numeros
     EXEC = 2,
     BLOCKED_IO = 3,
     BLOCKED_EMERGENCY = 4,
-    EXIT = 5,
-    COLA_ERROR = 6   // Debe ser siempre el ultimo
+    EXIT = 5
 };
 
 // Estructura de dato para colas del planificador / dispatcher
@@ -70,7 +72,7 @@ int iniciar_dispatcher(char *algoritmo_planificador);
 int listar_tripulantes(void);
 char *code_dispatcher_to_string(enum estado_tripulante code);
 
-int dispatcher_expulsar_tripulante(int tid_tripulante);
+int rutina_expulsar_tripulante(void* args);
 void dispatcher_pausar(void);
 enum algoritmo string_to_code_algor(char *string_algor);
 void agregar_a_buffer_peticiones(t_queue *buffer, t_tripulante* tripulante);
