@@ -41,11 +41,13 @@ enum estado_tripulante{
 // Estructura de dato para colas del planificador / dispatcher
 typedef struct dato_tripulante{
     int PID, TID;
-    enum estado_tripulante estado_previo;
+    enum estado_tripulante estado;
     int quantum;
     int posicion_X;
     int posicion_Y;
-    sem_t sem_planificacion_fue_reanudada;
+    sem_t* sem_planificacion_fue_reanudada;
+    sem_t* sem_tripulante_dejo_ready;
+    sem_t* sem_tripulante_dejo_new;
 }t_tripulante;
 
 enum status_planificador {
@@ -79,9 +81,12 @@ void dispatcher_pausar(void);
 enum algoritmo string_to_code_algor(char *string_algor);
 void agregar_a_buffer_peticiones(t_queue *buffer, int tid);
 int dispatcher_eliminar_tripulante(int tid_eliminar);
-t_tripulante* iniciador_tripulante(int tid, int pid);
+t_tripulante* iniciador_tripulante(int tid, int pid, int pos_x, int pos_y);
+void destructor_elementos_tripulante(void *data);
 
 // Lista global de tripulantes (sirve para pausar/reanudar la planificacion)
 t_list* lista_tripulantes;
+int sabotaje_activo;
+
 
 #endif

@@ -3,8 +3,8 @@
 
 
 void handler(int num){
-	printf("le envio la señal al discord");
-	char * payload = "TEST";
+	printf("le envio la señal al discord\n");
+	char * payload = "4|5";
 	enviar_operacion(discordiador_fd,COD_MANEJAR_SABOTAJE,payload,strlen(payload)+1);
 }
 
@@ -62,23 +62,37 @@ void leer_config(){
 	fs_config.posiciones_sabotaje = config_get_string_value(config, "TIEMPO_SINCRONIZACION");
 }
 
-void i_mongo_store(int servidor_fd) {
+void sighandler(int signum) {
+    (void)signum;
+}
+
+int i_mongo_store(int servidor_fd) {
 	// Declaramos variables
 	status_servidor = RUNNING;
 	pthread_t *hilo_atender_cliente;
+	//
+	int signal_fd;
+	sigset_t sigset;
+	struct signalfd_siginfo siginfo;
+	sigemptyset(&sigset);
+    sigaddset(&sigset, SIGUSR1);
+    sigprocmask(SIG_SETMASK, &sigset, NULL);
 
 	// Inicializamos pollfd
-	struct pollfd pfds[2];
+	struct pollfd pfds[3];
 	pfds[0].fd = servidor_fd;	
 	pfds[0].events = POLLIN;	// Avisa cuando llega un mensaje en el socket de escucha
 	pfds[1].fd = 0;
 	pfds[1].events = POLLIN;	// Avisa cuando llega un mensaje por consola
+	signal_fd = signalfd(-1, &sigset, 0);
+	pfds[2].fd = signal_fd;
+    pfds[2].events = POLLIN;
+
 	int num_events;
 
 	while(status_servidor != END){
 		// Revisamos si hay algun evento
 		num_events = poll(pfds, 2, 2500);
-
 		// Si ocurrio un evento
 		if(num_events != 0){
 			// Si llego un mensaje en el socket de escucha
@@ -102,13 +116,19 @@ void i_mongo_store(int servidor_fd) {
 				}
 				// Si ocurrio un evento inesperado
 				else{
-					log_error(logger, "Evento inesperado en los file descriptor: %s", strerror(pfds[0].revents));
-					log_error(logger, "Evento inesperado en los file descriptor: %s", strerror(pfds[1].revents));
-					status_servidor = END;
+					if((pfds[2].revents & POLLIN)){
+						// Leemos la consola y procesamos el mensaje
+						printf("ignore la signal\n");
+					}else{
+						log_error(logger, "Evento inesperado en los file descriptor: %s", strerror(pfds[0].revents));
+						log_error(logger, "Evento inesperado en los file descriptor: %s", strerror(pfds[1].revents));
+						status_servidor = END;	
+					}
 				}
 			}
 		}
 	}
+	return 0;
 }
 
 void atender_cliente(void *args){

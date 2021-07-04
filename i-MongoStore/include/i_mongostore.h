@@ -14,6 +14,7 @@
 #include <semaphore.h>
 #include "servidor_i_mongo_store.h"
 #include "i_filesystem.h"
+#include <sys/signalfd.h>
 
 //estructura archivo config
 typedef struct {
@@ -31,7 +32,7 @@ enum server_status{
 };
 
 void leer_consola_y_procesar();
-void i_mongo_store(int);
+int i_mongo_store(int);
 int comunicacion_cliente(int cliente_fd);
 void atender_cliente(void *args);
 bool leer_mensaje_cliente_y_procesar(int);
