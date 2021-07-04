@@ -513,7 +513,7 @@ int submodulo_tripulante(void* args) {
 				// Me fijo si cumplio los ciclos de la tarea
 				if(ciclos_en_estado_actual == tarea->duracion){
 					// TODO: Le pide al planificador que lo agregue a la cola de ready
-					agregar_a_buffer_peticiones(buffer_peticiones_blocked_io_to_ready, tripulante);
+					encolar(BLOCKED_IO_TO_READY, tripulante);
 
 					// El tripulante espera hasta que el planificacor lo saque de la cola de ready
 					sem_wait(tripulante->sem_tripulante_dejo[BLOCKED_IO]);
@@ -597,7 +597,7 @@ int submodulo_tripulante(void* args) {
 					
 					// Si la tarea es bloqueante, el tripulante se bloquea (TODO: tira error)
 					if (tarea->es_bloqueante){
-						agregar_a_buffer_peticiones(buffer_peticiones_exec_to_blocked_io, tripulante);
+						encolar(EXEC_TO_BLOCKED_IO, tripulante);
 						ciclos_en_estado_actual = 0;
 						sem_wait(tripulante->sem_tripulante_dejo[EXEC]);
 					}
