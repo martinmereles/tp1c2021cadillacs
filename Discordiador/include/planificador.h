@@ -29,7 +29,7 @@ enum peticion_transicion{
     EXEC_TO_BLOCKED_IO = 6,
     BLOCKED_IO_TO_READY = 7,
     EXEC_TO_READY = 8
-}
+};
 
 // Estructura de dato para colas del planificador / dispatcher
 typedef struct dato_tripulante{
@@ -64,19 +64,12 @@ enum algoritmo string_to_code_algor(char *string_algor);
 int dispatcher_eliminar_tripulante(int tid_eliminar);
 t_tripulante* iniciador_tripulante(int tid, int pid);
 void crear_colas();
-bool existen_tripulantes_en_cola(t_queue *cola);
 void encolar(int tipo_cola, t_tripulante* tripulante);
+t_tripulante* desencolar(int tipo_cola);
 
 // VARIABLES GLOBALES
-
-
-sem_t sem_mutex_buffer_blocked_io_to_ready;
-sem_t sem_mutex_buffer_exec_to_ready;
-sem_t sem_mutex_buffer_exec_to_blocked_io;
-
 sem_t sem_mutex_ingreso_tripulantes_new;
 sem_t sem_mutex_ejecutar_dispatcher;
-sem_t sem_puede_expulsar_tripulante;
 sem_t sem_sabotaje_activado;
 
 // en ESTADO NEW: genera las estructuras administrativas , una vez generado todo --> pasa a READY.

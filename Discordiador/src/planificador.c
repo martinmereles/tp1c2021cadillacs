@@ -2,7 +2,8 @@
 
 void gestionar_tripulantes_en_exit();
 int transicion(t_tripulante *tripulante, enum estado_tripulante estado_inicial, enum estado_tripulante estado_final);
-bool existen_tripulantes_en_cola(t_queue *cola);
+bool existen_tripulantes_en_cola(int tipo_cola);
+int cantidad_tripulantes_en_cola(int tipo_cola);
 void pasar_todos_new_to_ready(enum algoritmo cod_algor);
  int hay_espacio_disponible(int grado_multiprocesamiento);
  void imprimir_info_elemento(void *data);
@@ -12,14 +13,12 @@ void pasar_todos_new_to_ready(enum algoritmo cod_algor);
  int bloquear_tripulantes_por_sabotaje(void);
  int termino_sabotaje(void);
  void desbloquear_tripulantes_tras_sabotaje(void);
- int get_buffer_peticiones_and_swap_exec_blocked_io(t_queue *peticiones_origen, enum algoritmo code_algor);
- int get_buffer_peticiones_and_swap_blocked_io_ready(t_queue *peticiones_origen, enum algoritmo code_algor);
  void gestionar_exec(int grado_multiprocesamiento);
- int get_index_from_cola_by_tid(t_queue *src_list, int tid_buscado);
- t_tripulante *obtener_tripulante_por_tid(t_queue *cola_src, int tid_buscado);
- int hay_tripulantes_sin_quantum();
- void gestionar_tripulantes_sin_quantum();
+ t_tripulante *desencolar_tripulante_por_tid(t_queue *cola_src, int tid_buscado);
  int hay_tarea_a_realizar(void);
+int estado_from(enum peticion_transicion tipo_peticion);
+int estado_to(enum peticion_transicion tipo_peticion);
+int get_buffer_peticiones_and_swap(enum peticion_transicion tipo_peticion);
 
 int dispatcher(void *algor_planif){
 /*
@@ -39,7 +38,7 @@ int dispatcher(void *algor_planif){
         // Se admiten en el sistema cada uno de los tripulantes creados
         sem_wait(&sem_mutex_ejecutar_dispatcher);
         sem_wait(&sem_mutex_ingreso_tripulantes_new);
-		if( existen_tripulantes_en_cola(cola[NEW]) > 0){
+		if( existen_tripulantes_en_cola(NEW) ){
             log_debug(logger, "Atendiendo COLA NEW");
             pasar_todos_new_to_ready(code_algor);
         }
@@ -49,7 +48,7 @@ int dispatcher(void *algor_planif){
         //espacio_disponible = hay_espacio_disponible();
         //hay_tarea = hay_tarea_a_realizar();
         sem_wait(&sem_mutex_ejecutar_dispatcher);
-		if( hay_espacio_disponible(grado_multiproc) && existen_tripulantes_en_cola(cola[READY]) ){
+		if( hay_espacio_disponible(grado_multiproc) && existen_tripulantes_en_cola(READY) ){
             log_debug(logger, "Atendiendo COLA READY");
             gestionar_exec(grado_multiproc);
 		}
@@ -57,17 +56,16 @@ int dispatcher(void *algor_planif){
 
         // Consulto si hay que atender Bloqueos IO
         sem_wait(&sem_mutex_ejecutar_dispatcher);
-        if(existen_tripulantes_en_cola(buffer_peticiones_blocked_io_to_ready)){
-            log_debug(logger, "Atendiendo COLA BLOCKED IO");
-            get_buffer_peticiones_and_swap_blocked_io_ready(buffer_peticiones_blocked_io_to_ready, code_algor);
-
+        if(existen_tripulantes_en_cola(BLOCKED_IO_TO_READY)){
+            log_debug(logger, "Atendiendo COLA BLOCKED IO TO READY");
+            get_buffer_peticiones_and_swap(BLOCKED_IO_TO_READY);
         }
         sem_post(&sem_mutex_ejecutar_dispatcher);
 
         sem_wait(&sem_mutex_ejecutar_dispatcher);
-        if(existen_tripulantes_en_cola(buffer_peticiones_exec_to_blocked_io)){
-            log_debug(logger, "Atendiendo COLA BLOCKED IO");
-            get_buffer_peticiones_and_swap_exec_blocked_io(buffer_peticiones_exec_to_blocked_io, code_algor);
+        if(existen_tripulantes_en_cola(EXEC_TO_BLOCKED_IO)){
+            log_debug(logger, "Atendiendo COLA EXEC TO BLOCKED IO");
+            get_buffer_peticiones_and_swap(EXEC_TO_BLOCKED_IO);
         }
         sem_post(&sem_mutex_ejecutar_dispatcher);
 
@@ -85,13 +83,15 @@ int dispatcher(void *algor_planif){
 		}
         sem_post(&sem_mutex_ejecutar_dispatcher);
 
+        // Si hay tripulantes que se quedaron sin quantum (transicion EXEC_TO_READY)
         sem_wait(&sem_mutex_ejecutar_dispatcher);
-		if( hay_tripulantes_sin_quantum() )
-            gestionar_tripulantes_sin_quantum();
+		if( existen_tripulantes_en_cola(EXEC_TO_READY) )
+            get_buffer_peticiones_and_swap(EXEC_TO_READY);
         sem_post(&sem_mutex_ejecutar_dispatcher);
 
+        // Si hay tripulantes en EXIT
         sem_wait(&sem_mutex_ejecutar_dispatcher);
-		while( existen_tripulantes_en_cola(cola[EXIT]) )
+		while( existen_tripulantes_en_cola(EXIT) )
             gestionar_tripulantes_en_exit();
         sem_post(&sem_mutex_ejecutar_dispatcher);
     }
@@ -115,7 +115,7 @@ void gestionar_tripulantes_en_exit(){
     log_error(logger, "Iniciando gestion de cola EXIT");
 
     // Saco el primer tripulante de la lista de exit
-    t_tripulante *tripulante = queue_pop(cola[EXIT]);
+    t_tripulante *tripulante = desencolar(EXIT);
     int tid = tripulante->TID;
 
     log_error(logger, "Iniciando expulsion tripulante %d", tripulante->TID);
@@ -165,12 +165,6 @@ int iniciar_dispatcher(char *algoritmo_planificador){
         mutex_cola[i] = malloc(sizeof(sem_t));
         sem_init(mutex_cola[i], 0, 1);
     }
-    
-    /*
-    buffer_peticiones_exec_to_blocked_io = queue_create();
-    buffer_peticiones_blocked_io_to_ready = queue_create();
-    buffer_peticiones_exec_to_ready = queue_create();
-    */
 }
 
  void pasar_todos_new_to_ready(enum algoritmo cod_algor){
@@ -178,7 +172,7 @@ int iniciar_dispatcher(char *algoritmo_planificador){
     t_tripulante *transito;
     
     for (int i = cant_cola; i > 0; i--){
-        transito = queue_pop(cola[NEW]); 
+        transito = desencolar(NEW); 
         transicion(transito, NEW, READY);
     }
 }
@@ -195,8 +189,8 @@ int transicion(t_tripulante *tripulante, enum estado_tripulante estado_inicial, 
     return EXIT_SUCCESS;
 }
 
-bool existen_tripulantes_en_cola(t_queue *cola){
-    return (queue_size(cola) > 0)? true: false;
+bool existen_tripulantes_en_cola(int tipo_cola){
+    return (queue_size(cola[tipo_cola]) > 0)? true: false;
 }
 
  int hay_espacio_disponible(int grado_multiprocesamiento){
@@ -212,7 +206,6 @@ int hay_tarea_a_realizar(void){
 int rutina_expulsar_tripulante(void* args){
     int tid_buscado = *((int*) args);
     free(args);
-    int estado = -1;
     t_tripulante *trip_expulsado;
 
     if ( estado_planificador == PLANIFICADOR_OFF ){
@@ -222,11 +215,10 @@ int rutina_expulsar_tripulante(void* args){
 
     sem_wait(&sem_mutex_ejecutar_dispatcher);
 
-    for(int estado = 0; estado < CANT_ESTADOS; estado++){
-        estado = get_index_from_cola_by_tid(cola[estado], tid_buscado);
-        if(estado != -1){
-            trip_expulsado = obtener_tripulante_por_tid(cola[estado], tid_buscado);
-            transicion(trip_expulsado, estado, EXIT);
+    for(int estado_cola = 0; estado_cola < CANT_ESTADOS; estado_cola++){
+        trip_expulsado = desencolar_tripulante_por_tid(cola[estado_cola], tid_buscado);
+        if(trip_expulsado != NULL){
+            transicion(trip_expulsado, estado_cola, EXIT);
 	        sem_post(&sem_mutex_ejecutar_dispatcher);
             return EXIT_SUCCESS;
         }
@@ -304,31 +296,32 @@ char *code_dispatcher_to_string(enum estado_tripulante code){
 int bloquear_tripulantes_por_sabotaje(void){
 
     //Pasar todos los tripulantes a blocked_emerg SEGUN ORDEN (1-EXEC -> 2-READY ->3- BLOCKED_IO)
-    t_queue *temporal;
-    temporal = queue_create();
-    //TODO
-    //OBS: el UNICO tripulante que debe permanecer en EXEC es quien TRABAJA/ATIENDE el SABOTAJE.
 
-    // Pasar desde cola EXEC/RUNNING
-    while(existen_tripulantes_en_cola(cola[EXEC]))
-        list_add_sorted(cola[BLOCKED_EMERGENCY]->elements,queue_pop(cola[EXEC]),tripulante_tid_es_menor_que);
+    // Ordeno la cola de EXEC por TID
+    list_sort(cola[EXEC]->elements, tripulante_tid_es_menor_que);
+    // Muevo uno por uno los tripulantes a la cola BLOCKED_EMERGENCY
+    while(existen_tripulantes_en_cola(EXEC))
+        encolar(BLOCKED_EMERGENCY, desencolar(EXEC));
 
-    // Pasar desde cola READY
-    while(existen_tripulantes_en_cola(cola[READY])){
-        list_add_sorted(temporal->elements,queue_pop(cola[READY]),tripulante_tid_es_menor_que);        
-        encolar(BLOCKED_EMERGENCY, queue_pop(temporal));
-    }
+    // Ordeno la cola de READY por TID
+    list_sort(cola[READY]->elements, tripulante_tid_es_menor_que);
+    // Muevo uno por uno los tripulantes a la cola BLOCKED_EMERGENCY
+    while(existen_tripulantes_en_cola(READY))
+        encolar(BLOCKED_EMERGENCY, desencolar(READY));
 
-    // Pasar desde cola BLOCKED_IO
-    while(existen_tripulantes_en_cola(cola[BLOCKED_IO])){
-        list_add_sorted(temporal->elements,queue_pop(cola[BLOCKED_IO]),tripulante_tid_es_menor_que);
-        encolar(BLOCKED_EMERGENCY, queue_pop(temporal));
-    }
+    // Ordeno la cola de BLOCKED_IO por TID
+    list_sort(cola[BLOCKED_IO]->elements, tripulante_tid_es_menor_que);
+    // Muevo uno por uno los tripulantes a la cola BLOCKED_EMERGENCY
+    while(existen_tripulantes_en_cola(BLOCKED_IO))
+        encolar(BLOCKED_EMERGENCY, desencolar(BLOCKED_IO));
 
-    queue_destroy(temporal);
-
-    if (!existen_tripulantes_en_cola(cola[BLOCKED_EMERGENCY]))
+    if (!existen_tripulantes_en_cola(BLOCKED_EMERGENCY))
         return EXIT_FAILURE;
+
+    // Si hay algun tripulante en la cola de BLOCKED_EMERGENCY:
+    //TODO
+    //OBS: se debe mover un UNICO tripulante a EXEC que es quien TRABAJA/ATIENDE el SABOTAJE.
+
     return EXIT_SUCCESS;
 }
 
@@ -338,35 +331,19 @@ int bloquear_tripulantes_por_sabotaje(void){
 }
 
  bool tripulante_tid_es_menor_que(void *data1, void *data2){
-    t_tripulante *temp1;
-    t_tripulante *temp2;
-    temp1 = data1;
-    temp2 = data2;
+    t_tripulante *temp1 = data1;
+    t_tripulante *temp2 = data2;
     return (temp1->TID <= temp2->TID)? true: false;
-}
-
- int get_index_from_cola_by_tid(t_queue *src_list, int tid_buscado){
-    t_list_iterator *iterador_nuevo;
-    iterador_nuevo = list_iterator_create(src_list->elements);
-    t_tripulante *tripulante_buscado;
-    int index_buscado = -1;
-
-    // Busqueda del tripulante por TID y retornar su index
-    while( list_iterator_has_next(iterador_nuevo) ){
-        tripulante_buscado = list_iterator_next(iterador_nuevo);
-        if(tripulante_buscado->TID == tid_buscado){
-            index_buscado = iterador_nuevo->index;
-            break;
-        }
-    }
-    list_iterator_destroy(iterador_nuevo);
-    return index_buscado;
 }
 
 // Revisar (no van todos a ready)
  void desbloquear_tripulantes_tras_sabotaje(void){
-    while(existen_tripulantes_en_cola(cola[BLOCKED_EMERGENCY])){
-        encolar(READY, queue_pop(cola[BLOCKED_EMERGENCY]));
+
+    // Deberia guardarse el estado anterior antes del bloqueo
+    // Asi al desbloquearse vuelven a donde estaban
+
+    while(existen_tripulantes_en_cola(BLOCKED_EMERGENCY)){
+        encolar(READY, desencolar(BLOCKED_EMERGENCY));
     }
 }
 
@@ -377,38 +354,43 @@ enum algoritmo string_to_code_algor(char *string_code){
         return FIFO;
 }// TODO: evaluar su aplicacion
 
-int get_buffer_peticiones_and_swap_exec_blocked_io(t_queue *peticiones_origen, enum algoritmo code_algor){
+int get_buffer_peticiones_and_swap(enum peticion_transicion tipo_peticion){
     t_tripulante *tripulante;
-    if ( queue_size(peticiones_origen) > 0){
-        while( queue_size(peticiones_origen) > 0 ){
-            tripulante = queue_pop(peticiones_origen);
-            obtener_tripulante_por_tid(cola[EXEC], tripulante->TID);
-            transicion(tripulante, EXEC, BLOCKED_IO);
-        }
-        return EXIT_SUCCESS;
+    while( queue_size(cola[tipo_peticion]) > 0 ){
+        tripulante = desencolar(tipo_peticion);
+        desencolar_tripulante_por_tid(cola[estado_from(tipo_peticion)], tripulante->TID);
+        transicion(tripulante, estado_from(tipo_peticion), estado_to(tipo_peticion));
     }
-    else
-        return EXIT_FAILURE;
+    return EXIT_SUCCESS;
 }
 
- int get_buffer_peticiones_and_swap_blocked_io_ready(t_queue *peticiones_origen, enum algoritmo code_algor){
-    t_tripulante *tripulante;
-    if ( queue_size(peticiones_origen) > 0){
-        while( queue_size(peticiones_origen) > 0 ){
-            tripulante = queue_pop(peticiones_origen);
-            obtener_tripulante_por_tid(cola[BLOCKED_IO], tripulante->TID);
-            transicion(tripulante, BLOCKED_IO, READY);
-        }
-        return EXIT_SUCCESS;
-    }else
-        return EXIT_FAILURE;
+int estado_from(enum peticion_transicion tipo_peticion){
+    switch(tipo_peticion){
+        case EXEC_TO_BLOCKED_IO:
+        case EXEC_TO_READY:
+            return EXEC;
+        case BLOCKED_IO_TO_READY:
+            return BLOCKED_IO;
+    }
+    return -1;
+}
+
+int estado_to(enum peticion_transicion tipo_peticion){
+    switch(tipo_peticion){
+        case EXEC_TO_BLOCKED_IO:
+            return BLOCKED_IO;
+        case EXEC_TO_READY:
+        case BLOCKED_IO_TO_READY:
+            return READY;
+    }
+    return -1;
 }
 
  void gestionar_exec(int grado_multiprocesamiento){
-    t_tripulante *temp;
-    while( queue_size(cola[EXEC]) < grado_multiprocesamiento && existen_tripulantes_en_cola(cola[READY]) ){
-        temp = queue_pop(cola[READY]);
-        transicion(temp, READY, EXEC);
+    t_tripulante *tripulante;
+    while( queue_size(cola[EXEC]) < grado_multiprocesamiento && existen_tripulantes_en_cola(READY) ){
+        tripulante = desencolar(READY);
+        transicion(tripulante, READY, EXEC);
     }
 }
 
@@ -417,22 +399,14 @@ void dispatcher_pausar(){
     sem_wait(&sem_mutex_ejecutar_dispatcher);
 }
 
-t_tripulante *obtener_tripulante_por_tid(t_queue *cola_src, int tid_buscado){
-    int index;
-    index = get_index_from_cola_by_tid(cola_src, tid_buscado);
-    return list_remove(cola_src->elements, index);
-}
+t_tripulante *desencolar_tripulante_por_tid(t_queue *cola_src, int tid_buscado){
 
-int hay_tripulantes_sin_quantum(){
-    return existen_tripulantes_en_cola(buffer_peticiones_exec_to_ready);
-}
-
-void gestionar_tripulantes_sin_quantum(){
-    int *buffer;
-    while( hay_tripulantes_sin_quantum() ){
-        buffer = queue_pop(buffer_peticiones_exec_to_ready);
-        transicion(obtener_tripulante_por_tid(cola[EXEC], *buffer), EXEC, READY);
+    bool tiene_TID_a_desencolar(void* args){
+        t_tripulante* tripulante_encontrado = (t_tripulante*) args;
+        return tripulante_encontrado->TID == tid_buscado;
     }
+
+    return list_remove_by_condition(cola_src->elements, tiene_TID_a_desencolar);
 }
 
 t_tripulante* iniciador_tripulante(int tid, int pid){
@@ -456,7 +430,7 @@ t_tripulante* iniciador_tripulante(int tid, int pid){
 
     // Lo agrego a la lista global de tripulantes ordenado por TID
     list_add_sorted(lista_tripulantes, nuevo, tripulante_tid_es_menor_que);
-    queue_push(cola[NEW], nuevo);
+    encolar(NEW, nuevo);
     return nuevo;
 }
 
@@ -464,4 +438,12 @@ void encolar(int tipo_cola, t_tripulante* tripulante){
     sem_wait(mutex_cola[tipo_cola]);
     queue_push(cola[tipo_cola], tripulante);
     sem_post(mutex_cola[tipo_cola]); 
+}
+
+t_tripulante* desencolar(int tipo_cola){
+    t_tripulante* tripulante;
+    sem_wait(mutex_cola[tipo_cola]);
+    tripulante = queue_pop(cola[tipo_cola]);
+    sem_post(mutex_cola[tipo_cola]); 
+    return tripulante;
 }

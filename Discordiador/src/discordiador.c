@@ -544,7 +544,7 @@ int submodulo_tripulante(void* args) {
 				if(!strcmp(algoritmo_planificador, "RR") && ciclos_en_estado_actual >= quantum){
 					log_debug(logger, "Por RR, comenzamos expulsion del tripulante %d de EXEC", tripulante->TID);
 					// TODO: Le pide al planificador que lo agregue a la cola de ready
-					queue_push(buffer_peticiones_exec_to_ready, tripulante);
+					encolar(EXEC_TO_READY, tripulante);
 					sem_wait(tripulante->sem_tripulante_dejo[EXEC]);
 					ciclos_en_estado_actual = 0;
 					break;	// Salgo del switch
