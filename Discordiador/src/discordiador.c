@@ -165,6 +165,10 @@ void recibir_y_procesar_mensaje_i_mongo_store(int i_mongo_store_fd){
 				log_info(logger, lista_bitacora[i]);
 			}*/
 			break;
+		case COD_MANEJAR_SABOTAJE:
+			printf("manejar sabotaje");
+			
+			break;
 		case -1:
 			log_error(logger, "El i-Mongo-Store se desconecto. Terminando Discordiador");
 			status_discordiador = END;

@@ -42,7 +42,8 @@ enum op_code{
     COD_OBTENER_BITACORA,
     COD_INICIAR_TRIPULANTE_I_MONGO_STORE,
     COD_TERMINAR_TAREA,
-    COD_MOVIMIENTO_TRIP
+    COD_MOVIMIENTO_TRIP,
+    COD_MANEJAR_SABOTAJE
 };
 
 int recibir_operacion(int servidor_fd);

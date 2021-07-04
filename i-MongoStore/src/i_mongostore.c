@@ -2,10 +2,19 @@
 
 
 
+void handler(int num){
+	printf("le envio la señal al discord");
+	char * payload = "TEST";
+	enviar_operacion(discordiador_fd,COD_MANEJAR_SABOTAJE,payload,strlen(payload)+1);
+}
+
 int main(void)
 {
+	primer_conexion_discordiador=1;
+	//signal para sabotaje
+	signal(SIGUSR1, handler);
+
 	// inicializo semaforos
-	
 	iniciar_semaforos_fs();
 
 	logger = log_create("./cfg/i-mongostore.log", "I-MongoStore", 1, LOG_LEVEL_DEBUG);
@@ -108,12 +117,15 @@ void atender_cliente(void *args){
 	struct sockaddr_in dir_cliente;					// auxiliar
 	int tam_direccion = sizeof(struct sockaddr_in);	// auxiliar
 	int cliente_fd;
-
+	
 	// Aceptamos la conexion
 	cliente_fd = accept(servidor_fd, (void*) &dir_cliente, (socklen_t*) &tam_direccion);
 	fcntl(cliente_fd, F_SETFL, O_NONBLOCK);
 	log_info(logger, "Se conecto un cliente!");
-
+	if(primer_conexion_discordiador){
+		discordiador_fd = cliente_fd;
+		primer_conexion_discordiador=0;
+	}
 	// Posteamos en el semaforo
 	sem_post(&semaforo_aceptar_conexiones);
 

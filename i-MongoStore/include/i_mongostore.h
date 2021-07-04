@@ -37,7 +37,10 @@ void atender_cliente(void *args);
 bool leer_mensaje_cliente_y_procesar(int);
 void leer_config();
 void iniciar_semaforos_fs();
+void handler(int num);
 
+int primer_conexion_discordiador;
+int discordiador_fd;
 int status_servidor;
 sem_t semaforo_aceptar_conexiones;
 t_config *config;
