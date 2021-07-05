@@ -47,12 +47,13 @@ void leer_fds(int, int);
 enum comando_discordiador string_to_comando_discordiador(char*);
 int cantidad_argumentos(char** argumentos);
 int iniciar_patota(char** argumentos, int);
+int expulsar_tripulante(int argumentos);
 int submodulo_tripulante();
 int generarNuevoPID();
 int generarNuevoTID();
 void recibir_y_procesar_mensaje_i_mongo_store(int i_mongo_store_fd);
 void leer_ubicacion_tripulante_mi_ram_hq(int mi_ram_hq_fd_tripulante, int* posicion_X, int* posicion_Y);
-int tripulante_esta_en_posicion(t_tripulante* tripulante, t_tarea * tarea, int mi_ram_hq_fd_tripulante, int i_mongo_store_fd_tripulante);
+bool tripulante_esta_en_posicion(t_tripulante* tripulante, t_tarea* tarea, int mi_ram_hq_fd_tripulante, int i_mongo_store_fd_tripulante);
 int obtener_bitacora(char ** argumentos, int i_mongo_store_fd);
 void reanudar_planificacion();
 t_tarea* leer_proxima_tarea_mi_ram_hq(int mi_ram_hq_fd_tripulante);
@@ -79,7 +80,6 @@ char* algoritmo_planificador;
 //grado_multitarea = grado multiprocesamiento
 int duracion_sabotaje; // expresado como cantidad en ciclos CPU
 int retardo_ciclo_cpu; // tiempo de espera por c/ciclo CPU
-int tripulante_a_expulsar;
 
 enum status_discordiador status_discordiador;
 
