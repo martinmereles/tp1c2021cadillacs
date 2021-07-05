@@ -55,6 +55,8 @@ char* leer_bitacora(char* payload);
 void iniciar_tripulante(char* payload);
 void leer_bitacora_config(t_config * bitacora_config_file);
 void eliminar_keys_bitacora(t_config * bitacora_config_file);
+int terminar_tarea(char * payload);
+int movimiento_tripulante(char * payload);
 
 
 

@@ -162,6 +162,10 @@ void recibir_y_procesar_mensaje_i_mongo_store(int i_mongo_store_fd){
 				log_info(logger, lista_bitacora[i]);
 			}*/
 			break;
+		case COD_MANEJAR_SABOTAJE:
+			printf("manejar sabotaje");
+			
+			break;
 		case -1:
 			log_error(logger, "El i-Mongo-Store se desconecto. Terminando Discordiador");
 			status_discordiador = END;
@@ -522,6 +526,7 @@ int submodulo_tripulante(void* args) {
 					// TODO: Avisa que finalizo la tarea
 					
 					log_debug(logger, "El tripulante %d completo tarea de %d ciclos exitosamente, pasando a estado READY", tripulante->TID, tarea->duracion);	
+					enviar_operacion(i_mongo_store_fd_tripulante, COD_TERMINAR_TAREA, tarea->string, strlen(tarea->string)+1);
 					destruir_tarea(tarea);
 					tarea = NULL;
 					break;	// Salgo del switch
@@ -587,7 +592,7 @@ int submodulo_tripulante(void* args) {
 
 				// Si el tripulante no llego a la tarea, 
 				// muevo al tripulante y luego verifico si llego a la tarea
-				if(!llego_a_la_tarea && tripulante_esta_en_posicion(tripulante, tarea, mi_ram_hq_fd_tripulante)){
+				if(!llego_a_la_tarea && tripulante_esta_en_posicion(tripulante, tarea, mi_ram_hq_fd_tripulante, i_mongo_store_fd_tripulante)){
 					
 					llego_a_la_tarea = true;
 
@@ -614,6 +619,7 @@ int submodulo_tripulante(void* args) {
 				
 					if(ciclos_ejecutando_tarea == tarea->duracion){
 						printf("termine la tarea\n");
+						enviar_operacion(i_mongo_store_fd_tripulante, COD_TERMINAR_TAREA, tarea->string, strlen(tarea->string)+1);
 						destruir_tarea(tarea);
 						tarea = NULL;
 					}	
@@ -796,13 +802,11 @@ int generarNuevoTID() {
 }
 
 // mueve al tripulante y retorna true si luego de moverlo esta en posicion
-bool tripulante_esta_en_posicion(t_tripulante* tripulante, t_tarea* tarea, int mi_ram_hq_fd_tripulante){
-
+bool tripulante_esta_en_posicion(t_tripulante* tripulante, t_tarea* tarea, int mi_ram_hq_fd_tripulante, int i_mongo_store_fd_tripulante){
 	// PIDO LA POSICION A MI RAM HQ
 	int estado_envio_mensaje = enviar_op_enviar_ubicacion_tripulante(mi_ram_hq_fd_tripulante);
 	if(estado_envio_mensaje != EXIT_SUCCESS)
 		log_error(logger, "No se pudo mandar el mensaje a Mi-Ram HQ");
-
 	leer_ubicacion_tripulante_mi_ram_hq(mi_ram_hq_fd_tripulante, &(tripulante->posicion_X), &(tripulante->posicion_Y));
 	printf("Tripulante %d: Estoy en la posicion (%d,%d)\n", tripulante->TID, tripulante->posicion_X, tripulante->posicion_Y);
 	printf("Tripulante %d: La tarea esta en (%d,%d)\n", tripulante->TID, tarea->pos_x, tarea->pos_y);
@@ -810,6 +814,9 @@ bool tripulante_esta_en_posicion(t_tripulante* tripulante, t_tarea* tarea, int m
 	// Si ya esta en la posicion
 	if((tripulante->posicion_X == tarea->pos_x) && (tripulante->posicion_Y == tarea->pos_y))
 		return true;
+
+	//MENSAJE PARA IMONGO
+	char * mensaje_i_mongo = string_from_format("Se mueve de %d|%d a ", tripulante->posicion_X, tripulante->posicion_Y);
 
 	// Si no lo esta, lo desplazo una casilla
 	switch(1){
@@ -837,6 +844,15 @@ bool tripulante_esta_en_posicion(t_tripulante* tripulante, t_tarea* tarea, int m
 	estado_envio_mensaje = enviar_op_recibir_ubicacion_tripulante(mi_ram_hq_fd_tripulante, tripulante->posicion_X, tripulante->posicion_Y);
 	if(estado_envio_mensaje != EXIT_SUCCESS)
 		log_error(logger, "No se pudo mandar el mensaje a Mi-Ram HQ");
+
+
+	//ENVIO MENSAJE A IMONGO
+	char* mensaje_i_mongo_2 = string_from_format("%d|%d\n", tripulante->posicion_X, tripulante->posicion_Y);
+	string_append(&mensaje_i_mongo, mensaje_i_mongo_2);
+	printf("El mensaje para el i-mongo es: %s", mensaje_i_mongo);
+	enviar_operacion(i_mongo_store_fd_tripulante, COD_MOVIMIENTO_TRIP, mensaje_i_mongo, strlen(mensaje_i_mongo)+1);
+	free(mensaje_i_mongo);
+	free(mensaje_i_mongo_2);
 
 	printf("me movi a: %dx %dy\n",tripulante->posicion_X,tripulante->posicion_Y);
 

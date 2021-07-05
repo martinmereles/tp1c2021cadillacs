@@ -266,7 +266,7 @@ void destructor_elementos_tripulante(void *data){
     sem_destroy(tripulante->sem_finalizo); 
     free(tripulante->sem_finalizo);        
 
-    for(int i = 0;i < CANT_COLAS;i++){
+    for(int i = 0;i < CANT_ESTADOS;i++){
         sem_destroy(tripulante->sem_tripulante_dejo[i]); 
         free(tripulante->sem_tripulante_dejo[i]);
     }

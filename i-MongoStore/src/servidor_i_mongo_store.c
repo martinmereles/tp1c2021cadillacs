@@ -50,7 +50,7 @@ void iniciar_tripulante(char* payload){
     //string_append(&mensaje, "\n");
     char* path_relativo= string_new();
     string_append(&path_relativo, "/Files/Bitacoras/Tripulante");
-    string_append(&path_relativo, string_itoa(tripulante.TID));
+    string_append(&path_relativo, string_itoa(TID));
     string_append(&path_relativo, ".ims");
     path_bitacora= crear_path_absoluto(path_relativo);
     //escribir_bitacora(mensaje);
@@ -179,10 +179,13 @@ void escribir_bitacora(char* mensaje){
         sem_wait(&sem_mutex_blocks);
         msync(blocksmap, blocks_stat.st_size, MS_SYNC);
         sem_post(&sem_mutex_blocks);
+        char * bloques_config_final = string_new();
+        string_append(&bloques_config_final,bloques_config);
         eliminar_keys_bitacora(bitacora_config_file);
         config_set_value(bitacora_config_file,"SIZE",string_itoa(bitacora_config.size+string_length(mensaje)));
         config_set_value(bitacora_config_file,"BLOCK_COUNT",string_itoa(bitacora_config.block_count+cantidad_de_bloques));
-        config_set_value(bitacora_config_file,"BLOCKS",bloques_config);
+        printf("bloques a config antes de finalizar: %s\n", bloques_config_final);
+        config_set_value(bitacora_config_file,"BLOCKS",bloques_config_final);
         config_save(bitacora_config_file);
     }
     
@@ -197,7 +200,7 @@ char * leer_bitacora(char* payload){
     string_append(&path_relativo,id_tripulante);
     string_append(&path_relativo,".ims");
     char * path_absoluto = crear_path_absoluto(path_relativo);
-    //printf("path: %s\n", path_absoluto);
+    printf("path: %s\n", path_absoluto);
     if(existe_archivo(path_absoluto)){
         bitacora_config_file=config_create(path_absoluto);
         leer_bitacora_config(bitacora_config_file);
@@ -229,7 +232,18 @@ char * leer_bitacora(char* payload){
     return bitacora;
 }
 
+int movimiento_tripulante(char * payload){
+    escribir_bitacora(payload);
+    return EXIT_SUCCESS;
+}
 
+int terminar_tarea(char * payload){
+    char * mensaje = string_new();
+    string_append(&mensaje,"Se termino la tarea :");
+    string_append(&mensaje,payload);
+    escribir_bitacora(mensaje);
+    return EXIT_SUCCESS;
+}
 
 int recibir_tarea(char* payload){
     
@@ -621,7 +635,7 @@ void generar_recurso(char* path, char caracter_llenado,char* parametro){
             bloques_usables = bits_libres(&bitmap,cantidad_de_bloques);
             sem_post(&sem_mutex_bitmap);
             printf("bloque usable 1: %s  2:%s\n ", bloques_usables[0], bloques_usables[1]);
-            printf("ultimo bloque anterior: %s\n ", lista_bloques[tarea_config.block_count-1]);
+            //printf("ultimo bloque anterior: %s\n ", lista_bloques[tarea_config.block_count-1]);
             //une la lista de bloques del config con los bloques nuevos a usar
             bloques_config=array_two_block_to_string(lista_bloques,bloques_usables,tarea_config.block_count);
             printf("bloques recurso %s a config: %s\n", caracter_llenado, bloques_config);
