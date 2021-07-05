@@ -217,3 +217,40 @@ bool leer_mensaje_cliente_y_procesar(int cliente_fd){
 	}
 	return cliente_conectado;
 }
+//funcion para obtener el tamanio del superbloque
+int leer_tamanio_block(File* archivo){}
+int tamanio_file_superbloque (File* superbloque){
+	FILE* sp;
+	sp= fopen("/Superbloque.ims", r);
+	int tamanio = leer_tamanio_blocks;
+
+	return tamanio
+
+}
+
+bool check_blocks_usados(){}
+bool check_archivos(){}
+
+void fsck(){
+	void reparar_superbloque(){
+		if (superbloque.blocks == tamanio_file_superbloque(/"/Superbloque.ims"))
+		printf ("el tamanio de los bloques coincide");
+		return 0;
+		else {
+			void ecribir_en_blocks(){}
+
+		}
+
+	}
+	void reparar_bitmap(){
+	if(check_blocks_usados && check_archivos){
+
+			printf("el bitmap esta ok");
+			return 0;
+	}
+	else {
+		void corregir_blocks();
+	}
+
+	}
+}
