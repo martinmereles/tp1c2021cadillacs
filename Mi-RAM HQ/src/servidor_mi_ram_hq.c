@@ -33,22 +33,24 @@ int iniciar_patota(char* payload){
     tareas = malloc(longitud_tareas);
     memcpy(tareas, payload + offset, longitud_tareas);
     offset += sizeof(longitud_tareas);
-    log_info(logger, "La lista de tareas del proceso es: %s",tareas);
+    // log_info(logger, "La lista de tareas del proceso es: %s",tareas);
 
     // Revisamos si hay espacio suficiente en memoria para la patota
     uint32_t espacio_necesario = TAMANIO_PCB + cantidad_tripulantes * TAMANIO_TCB + longitud_tareas;
 
     if(espacio_necesario > espacio_disponible()){
         log_error(logger, "ERROR: iniciar_patota. No hay espacio en memoria suficiente para crear la patota");
+        free(tareas);
         return COD_INICIAR_PATOTA_ERROR;
     }
         
     // Creamos la patota
     if(crear_patota(PID, longitud_tareas, tareas) == EXIT_FAILURE){
         log_error(logger, "NO SE PUDO CREAR LA PATOTA.");
+        free(tareas);
         return COD_INICIAR_PATOTA_ERROR;
     }
-
+    free(tareas);
     return COD_INICIAR_PATOTA_OK; 
 }   
 

@@ -9,6 +9,10 @@
     }
 
 int inicializar_mapa(){
+
+    if(!dibujar_mapa)
+        return EXIT_SUCCESS;
+
     // Creo el mapa
     nivel_gui_inicializar();
 
@@ -27,12 +31,19 @@ int inicializar_mapa(){
 }
 
 int finalizar_mapa(){
+    if(!dibujar_mapa)
+        return EXIT_SUCCESS;
+
     nivel_destruir(nivel);
     nivel_gui_terminar();
     return EXIT_SUCCESS;
 }
 
 int dibujar_tripulante_mapa(int TID, int posicion_X, int posicion_Y){
+
+    if(!dibujar_mapa)
+        return EXIT_SUCCESS;
+
 
     if( posicion_X < 0 || posicion_maxima_X < posicion_X ){
         log_error(logger, "ERROR. Posicion X: %d. No se puede dibujar en el mapa", posicion_X);
@@ -54,6 +65,10 @@ int dibujar_tripulante_mapa(int TID, int posicion_X, int posicion_Y){
 }
 
 int borrar_tripulante_mapa(int TID){
+
+    if(!dibujar_mapa)
+        return EXIT_SUCCESS;
+
     int error = item_borrar(nivel, caracter_tripulante(TID));
     // Redibujo el nivel
     nivel_gui_dibujar(nivel);
@@ -65,6 +80,10 @@ int borrar_tripulante_mapa(int TID){
 }
 
 int desplazar_tripulante_mapa(int TID, int desplazamiento_X, int desplazamiento_Y){
+
+    if(!dibujar_mapa)
+        return EXIT_SUCCESS;
+
     /*int error;
     switch(desplazamiento){
         case ARRIBA:

@@ -2,13 +2,22 @@
 
 int main(void)
 {
+	// Inicializo config
+	t_config *config = config_create("./cfg/mi-ram-hq.config");
+	
+	dibujar_mapa = strcmp(config_get_string_value(config, "DIBUJAR_MAPA"),"ON") == 0;
+
 	// inicializo semaforos
 	sem_init(&semaforo_aceptar_conexiones, 0, 0);
 
-	logger = log_create("./cfg/mi-ram-hq.log", "Mi-RAM HQ", 0, LOG_LEVEL_DEBUG);
+	if(dibujar_mapa)
+		logger = log_create("./cfg/mi-ram-hq.log", "Mi-RAM HQ", 0, LOG_LEVEL_DEBUG);
+	else
+		logger = log_create("./cfg/mi-ram-hq.log", "Mi-RAM HQ", 1, LOG_LEVEL_DEBUG);
+
+
 
 	// Leo IP y PUERTO del config
-	t_config *config = config_create("./cfg/mi-ram-hq.config");
 	char* puerto_escucha = config_get_string_value(config, "PUERTO");
 	char* ip = "127.0.0.1";
 
@@ -25,9 +34,9 @@ int main(void)
 
 	log_info(logger, "Cerrando socket servidor");
 	close(server_fd);
-	liberar_estructuras_memoria();
+	liberar_estructuras_memoria(config);
 	log_destroy(logger);
-
+	config_destroy(config);
 	return EXIT_SUCCESS;
 }
 
@@ -71,10 +80,14 @@ void mi_ram_hq(int servidor_fd) {
 				}
 				// Si ocurrio un evento inesperado
 				else{
-					if(strcmp(strerror(pfds[0].revents),"Success")!=0)
+					if(strcmp(strerror(pfds[0].revents),"Success")!=0){
 						log_error(logger, "Evento inesperado en los file descriptor: %s", strerror(pfds[0].revents));
-					if(strcmp(strerror(pfds[1].revents),"Success")!=0)
+						status_servidor = END;
+					}	
+					if(strcmp(strerror(pfds[1].revents),"Success")!=0){
 						log_error(logger, "Evento inesperado en los file descriptor: %s", strerror(pfds[1].revents));
+						status_servidor = END;
+					}
 				}
 			}
 		}
@@ -140,8 +153,10 @@ int comunicacion_cliente(int cliente_fd) {
 			// Si hay un mensaje del cliente
 			if(pfds[0].revents & POLLIN)
 				cliente_conectado = leer_mensaje_cliente_y_procesar(cliente_fd, &tabla_patota, &dir_log);
-			else
+			else{
 				log_error(logger, "Evento inesperado en file descriptor del cliente: %s", strerror(pfds[0].revents));
+				status_servidor = END;
+			}	
 		}
 	}
 	return EXIT_SUCCESS;
@@ -205,7 +220,7 @@ bool leer_mensaje_cliente_y_procesar(int cliente_fd, void** tabla_patota, uint32
 		case -1:
 			log_error(logger, "El cliente se desconecto.");
 			if((*tabla_patota) != NULL)	// Si se desconecto un tripulante, lo expulso
-				expulsar_tripulante(payload, tabla_patota, dir_log);
+				expulsar_tripulante(NULL, tabla_patota, dir_log);
 			cliente_conectado = false;
 			break;
 		default:

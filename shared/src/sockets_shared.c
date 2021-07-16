@@ -17,15 +17,17 @@ int recibir_payload_y_ejecutar(int socket_fd, int(*funcion_a_ejecutar)(char*)){
 	return exit_status;
 }
 
+int recibir_longitud_payload(int socket_emisor){
+	int longitud_payload = 0;
+	recv(socket_emisor, &longitud_payload, sizeof(int), MSG_WAITALL);
+	return longitud_payload;
+}
+
 char* recibir_payload(int socket_emisor)
 {
-	char* payload;
-	int longitud_payload;
-
-	recv(socket_emisor, &longitud_payload, sizeof(int), MSG_WAITALL);
-	payload = malloc(longitud_payload);
+	int longitud_payload = recibir_longitud_payload(socket_emisor);
+	char* payload = malloc(longitud_payload);
 	recv(socket_emisor, payload, longitud_payload, MSG_WAITALL);
-
 	return payload;
 }
 

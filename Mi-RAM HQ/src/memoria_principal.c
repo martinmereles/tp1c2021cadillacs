@@ -64,6 +64,9 @@ int inicializar_esquema_memoria(t_config* config){
         // Configuramos signal de compactacion
 	    signal(SIGINT, signal_handler);
 
+        // Inicializo otras varialbes globales
+        memoria_virtual = NULL;
+
         log_info(logger, "El tamanio del mapa de memoria disponible es: %d",bitarray_get_max_bit(mapa_memoria_disponible));
 
         return EXIT_SUCCESS;
@@ -186,14 +189,16 @@ int inicializar_esquema_memoria(t_config* config){
     return EXIT_FAILURE;
 }
    
-void liberar_estructuras_memoria(){
+void liberar_estructuras_memoria(t_config* config){
     log_info(logger, "Liberando estructuras administrativas de la memoria principal");
     list_destroy_and_destroy_elements(tablas_de_patotas, destruir_tabla_segmentos);
     free(bitarray_mapa_memoria_disponible);
     bitarray_destroy(mapa_memoria_disponible);
     free(memoria_principal);
-    fclose(memoria_virtual);
-    remove(path_swap);  // Deberia comentarlo??
+    if(strcmp(config_get_string_value(config, "ESQUEMA_MEMORIA"),"PAGINACION")==0){
+        fclose(memoria_virtual);
+        remove(path_swap);  // Deberia comentarlo??
+    } 
     finalizar_mapa();   // Finalizo mapa
 }
 
@@ -209,10 +214,10 @@ void leer_tarea_memoria_principal(void* tabla, char** tarea, uint32_t id_prox_ta
     log_info(logger,"La direccion logica de las tareas es: %x",dir_log_tareas);
 
     // Leemos la lista de tareas completa
-    char* tareas = malloc(tamanio);
+    char* tareas = malloc(tamanio + 1);
     leer_memoria_principal(tabla, dir_log_tareas, 0, tareas, tamanio);
+    tareas[tamanio] = '\0';
     log_info(logger,"La lista de tareas es:\n %s",tareas);
-
     log_info(logger,"El ID de la proxima tarea es: %d",id_prox_tarea);
 
     // Obtenemos el array de tareas

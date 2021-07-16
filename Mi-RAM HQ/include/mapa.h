@@ -24,5 +24,6 @@ char caracter_tripulante(int TID);
 NIVEL* nivel;
 int posicion_maxima_X;
 int posicion_maxima_Y;
+bool dibujar_mapa;
 
 #endif
