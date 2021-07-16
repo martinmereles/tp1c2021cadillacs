@@ -77,8 +77,8 @@ void mapear_blocks(){
 
 void crear_filesystem(){
 	char * puntomontaje = crear_path_absoluto("/SuperBloque.ims");
-	super_bloque.blocksize = 50;
-	super_bloque.blocks = 560;
+	super_bloque.blocksize = 64;
+	super_bloque.blocks = 1024;
 	super_bloque.bitarray = calloc(super_bloque.blocks/8, sizeof(char));
 	int sizeStruct = sizeof(super_bloque.blocksize)+sizeof(super_bloque.blocks)+super_bloque.blocks/8+1;
 	sbfile = open(puntomontaje, O_RDWR | O_CREAT , S_IRUSR | S_IWUSR);

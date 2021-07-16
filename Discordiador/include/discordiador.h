@@ -52,6 +52,8 @@ bool tripulante_esta_en_posicion(t_tripulante* tripulante, t_tarea* tarea, int m
 int obtener_bitacora(char ** argumentos, int i_mongo_store_fd);
 void reanudar_planificacion();
 t_tarea* leer_proxima_tarea_mi_ram_hq(int mi_ram_hq_fd_tripulante);
+char leer_estado_mi_ram_hq(int mi_ram_hq_fd_tripulante);
+void leer_estado_tripulante_mi_ram_hq(int mi_ram_hq_fd_tripulante, t_tripulante* tripulante);
 
 // Funciones para crear/destruir una tarea
 t_tarea* crear_tarea(char* string);
@@ -69,6 +71,7 @@ char* puerto_i_Mongo_Store;
 char* direccion_IP_Mi_RAM_HQ;
 char* puerto_Mi_RAM_HQ;
 char* algoritmo_planificador;
+char* path_tareas;
 
 //grado_multitarea = grado multiprocesamiento
 int duracion_sabotaje; // expresado como cantidad en ciclos CPU

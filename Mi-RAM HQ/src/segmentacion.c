@@ -3,13 +3,13 @@
 // ALGORITMOS DE UBICACION
 
 int inicializar_algoritmo_de_ubicacion(t_config* config){
-    char* string_algoritmo_ubicacion = config_get_string_value(config, "ALGORITMO_UBICACION");
-    if(strcmp(string_algoritmo_ubicacion,"FIRST_FIT")==0){
+    char* string_algoritmo_ubicacion = config_get_string_value(config, "CRITERIO_SELECCION");
+    if(strcmp(string_algoritmo_ubicacion,"FF")==0){
         log_info(logger,"El algoritmo de ubicacion es: First Fit");
         algoritmo_de_ubicacion = &first_fit;
         return EXIT_SUCCESS;
     }
-    if(strcmp(string_algoritmo_ubicacion,"BEST_FIT")==0){
+    if(strcmp(string_algoritmo_ubicacion,"BF")==0){
         log_info(logger,"El algoritmo de ubicacion es: Best Fit");
         algoritmo_de_ubicacion = &best_fit;
         return EXIT_SUCCESS;
@@ -158,7 +158,7 @@ void destruir_tabla_segmentos(void* args){
     list_destroy_and_destroy_elements(tabla->filas, destruir_fila);
     free(tabla->semaforo);
     free(tabla);
-    ejecutar_rutina(dump_memoria);  // Para test
+    // ejecutar_rutina(dump_memoria);  // Para test
 }
 
 void quitar_y_destruir_fila(tabla_segmentos_t* tabla, int numero_seg){
@@ -236,7 +236,7 @@ int crear_patota_segmentacion(uint32_t PID, uint32_t longitud_tareas, char* tare
     escribir_memoria_principal(tabla_patota, direccion_logica_tareas, 0, tareas, longitud_tareas);
     log_info(logger, "Estructuras de la patota inicializadas exitosamente");
 
-    ejecutar_rutina(dump_memoria);
+    // ejecutar_rutina(dump_memoria);
     return EXIT_SUCCESS;
 }
 
@@ -272,7 +272,7 @@ int crear_tripulante_segmentacion(void** tabla, uint32_t* dir_log_tcb,
     escribir_memoria_principal(*tabla, *dir_log_tcb, DESPL_PROX_INSTR, &id_proxima_instruccion, sizeof(uint32_t));
     escribir_memoria_principal(*tabla, *dir_log_tcb, DESPL_DIR_PCB, &dir_log_pcb, sizeof(uint32_t));
 
-    ejecutar_rutina(dump_memoria);
+    // ejecutar_rutina(dump_memoria);
     return EXIT_SUCCESS;
 }
 
@@ -496,7 +496,7 @@ void compactacion(){
     sem_post(&reservar_liberar_memoria_mutex);
 
     // PARA PRUEBAS
-    ejecutar_rutina(dump_memoria);
+    // ejecutar_rutina(dump_memoria);
 }
 
 void compactar_segmento(void* args){

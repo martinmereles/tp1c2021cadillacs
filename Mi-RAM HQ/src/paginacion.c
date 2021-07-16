@@ -550,7 +550,7 @@ int actualizar_reloj(marco_t* pagina){
 void proceso_swap(marco_t* pagina_necesitada){
 
     log_info(logger, "INICIANDO PROCESO SWAP");
-    ejecutar_rutina(dump_memoria);
+    // ejecutar_rutina(dump_memoria);
 
     // Bloquear con semaforos las paginas
     sem_wait(pagina_necesitada->semaforo);
@@ -628,7 +628,7 @@ void proceso_swap(marco_t* pagina_necesitada){
 
     log_info(logger, "FINALIZANDO SWAP");
     log_info(logger, "DESBLOQUEO MARCOs NUMERO %d %d", pagina_necesitada->numero_marco, pagina_victima->numero_marco);
-    ejecutar_rutina(dump_memoria);
+    // ejecutar_rutina(dump_memoria);
 }
 
 char* leer_marco(marco_t* marco){

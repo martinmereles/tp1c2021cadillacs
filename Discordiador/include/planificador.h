@@ -40,6 +40,7 @@ typedef struct dato_tripulante{
     int posicion_Y;
     sem_t* sem_planificacion_fue_reanudada;
     sem_t* sem_finalizo;
+    sem_t* sem_puede_usar_dispositivo_io;
     sem_t** sem_tripulante_dejo;
 }t_tripulante;
 
@@ -66,6 +67,8 @@ t_tripulante* iniciador_tripulante(int tid, int pid);
 void crear_colas();
 void encolar(int tipo_cola, t_tripulante* tripulante);
 t_tripulante* desencolar(int tipo_cola);
+t_tripulante* ojear_cola(int tipo_cola);
+int cantidad_tripulantes_en_cola(int tipo_cola);
 
 // VARIABLES GLOBALES
 sem_t sem_mutex_ingreso_tripulantes_new;

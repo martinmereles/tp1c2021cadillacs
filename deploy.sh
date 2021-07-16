@@ -20,6 +20,12 @@ make all
 sudo make install
 cd $CWD
 
+# Repositorio con scripts para los tests
+cd Discordiador
+git clone https://github.com/sisoputnfrba/a-mongos-pruebas.git
+cd $CWD
+
+
 echo -e "\n\nBuilding projects...\n\n"
 cd $PWD
 make -C ./Discordiador

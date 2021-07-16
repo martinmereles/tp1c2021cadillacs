@@ -29,7 +29,8 @@ int dispatcher(void *algor_planif){
     int hay_block_io = 0;
     int hay_sabot = 0;
     int listado_de_tripulantes_solicitado = 0;
-*/
+*/  
+    t_tripulante* primer_tripulante;
     int code_algor = string_to_code_algor(algor_planif);
 	
     while(true){
@@ -39,7 +40,7 @@ int dispatcher(void *algor_planif){
         sem_wait(&sem_mutex_ejecutar_dispatcher);
         sem_wait(&sem_mutex_ingreso_tripulantes_new);
 		if( existen_tripulantes_en_cola(NEW) ){
-            log_debug(logger, "Atendiendo COLA NEW");
+            //log_debug(logger, "Atendiendo COLA NEW");
             pasar_todos_new_to_ready(code_algor);
         }
         sem_post(&sem_mutex_ingreso_tripulantes_new);
@@ -49,7 +50,7 @@ int dispatcher(void *algor_planif){
         //hay_tarea = hay_tarea_a_realizar();
         sem_wait(&sem_mutex_ejecutar_dispatcher);
 		if( hay_espacio_disponible(grado_multiproc) && existen_tripulantes_en_cola(READY) ){
-            log_debug(logger, "Atendiendo COLA READY");
+            //log_debug(logger, "Atendiendo COLA READY");
             gestionar_exec(grado_multiproc);
 		}
         sem_post(&sem_mutex_ejecutar_dispatcher);
@@ -57,15 +58,30 @@ int dispatcher(void *algor_planif){
         // Consulto si hay que atender Bloqueos IO
         sem_wait(&sem_mutex_ejecutar_dispatcher);
         if(existen_tripulantes_en_cola(BLOCKED_IO_TO_READY)){
-            log_debug(logger, "Atendiendo COLA BLOCKED IO TO READY");
+            //log_debug(logger, "Atendiendo COLA BLOCKED IO TO READY");
             get_buffer_peticiones_and_swap(BLOCKED_IO_TO_READY);
+
+            // Si quedo algun tripulante en la cola, al primero le dejo usar el dispositivo de E/S
+            primer_tripulante = ojear_cola(BLOCKED_IO);
+            if(primer_tripulante != NULL)
+                sem_post(primer_tripulante->sem_puede_usar_dispositivo_io);
         }
         sem_post(&sem_mutex_ejecutar_dispatcher);
 
         sem_wait(&sem_mutex_ejecutar_dispatcher);
         if(existen_tripulantes_en_cola(EXEC_TO_BLOCKED_IO)){
-            log_debug(logger, "Atendiendo COLA EXEC TO BLOCKED IO");
+            //log_debug(logger, "Atendiendo COLA EXEC TO BLOCKED IO");
+
+            int cant_tripulantes = cantidad_tripulantes_en_cola(BLOCKED_IO);
+
             get_buffer_peticiones_and_swap(EXEC_TO_BLOCKED_IO);
+
+            // Si la cola estaba vacia, al tripulante agregado (si hay) le dejo usar el dispositivo de E/S
+            if(cant_tripulantes == 0){
+                primer_tripulante = ojear_cola(BLOCKED_IO);
+                if(primer_tripulante != NULL)
+                    sem_post(primer_tripulante->sem_puede_usar_dispositivo_io);  
+            }
         }
         sem_post(&sem_mutex_ejecutar_dispatcher);
 
@@ -168,7 +184,7 @@ int iniciar_dispatcher(char *algoritmo_planificador){
 }
 
  void pasar_todos_new_to_ready(enum algoritmo cod_algor){
-    int cant_cola = queue_size(cola[NEW]);
+    int cant_cola = cantidad_tripulantes_en_cola(NEW);
     t_tripulante *transito;
     
     for (int i = cant_cola; i > 0; i--){
@@ -190,11 +206,11 @@ int transicion(t_tripulante *tripulante, enum estado_tripulante estado_inicial, 
 }
 
 bool existen_tripulantes_en_cola(int tipo_cola){
-    return (queue_size(cola[tipo_cola]) > 0)? true: false;
+    return (cantidad_tripulantes_en_cola(tipo_cola) > 0)? true: false;
 }
 
  int hay_espacio_disponible(int grado_multiprocesamiento){
-    return (queue_size(cola[EXEC]) < grado_multiprocesamiento)? 1: 0;
+    return (cantidad_tripulantes_en_cola(EXEC) < grado_multiprocesamiento)? 1: 0;
 }
 
 int hay_tarea_a_realizar(void){
@@ -356,7 +372,7 @@ enum algoritmo string_to_code_algor(char *string_code){
 
 int get_buffer_peticiones_and_swap(enum peticion_transicion tipo_peticion){
     t_tripulante *tripulante;
-    while( queue_size(cola[tipo_peticion]) > 0 ){
+    while( cantidad_tripulantes_en_cola(tipo_peticion) > 0 ){
         tripulante = desencolar(tipo_peticion);
         desencolar_tripulante_por_tid(cola[estado_from(tipo_peticion)], tripulante->TID);
         transicion(tripulante, estado_from(tipo_peticion), estado_to(tipo_peticion));
@@ -388,7 +404,7 @@ int estado_to(enum peticion_transicion tipo_peticion){
 
  void gestionar_exec(int grado_multiprocesamiento){
     t_tripulante *tripulante;
-    while( queue_size(cola[EXEC]) < grado_multiprocesamiento && existen_tripulantes_en_cola(READY) ){
+    while( cantidad_tripulantes_en_cola(EXEC) < grado_multiprocesamiento && existen_tripulantes_en_cola(READY) ){
         tripulante = desencolar(READY);
         transicion(tripulante, READY, EXEC);
     }
@@ -421,6 +437,8 @@ t_tripulante* iniciador_tripulante(int tid, int pid){
 	sem_init(nuevo -> sem_planificacion_fue_reanudada, 0, 0);    
     nuevo -> sem_finalizo = malloc(sizeof(sem_t));
 	sem_init(nuevo -> sem_finalizo, 0, 0);    
+    nuevo -> sem_puede_usar_dispositivo_io = malloc(sizeof(sem_t));
+    sem_init(nuevo -> sem_puede_usar_dispositivo_io, 0, 0);
 
     nuevo -> sem_tripulante_dejo = malloc(sizeof(sem_t*) * 6);
     for(int i = 0;i < CANT_ESTADOS;i++){
@@ -437,7 +455,7 @@ t_tripulante* iniciador_tripulante(int tid, int pid){
 void encolar(int tipo_cola, t_tripulante* tripulante){
     sem_wait(mutex_cola[tipo_cola]);
     queue_push(cola[tipo_cola], tripulante);
-    sem_post(mutex_cola[tipo_cola]); 
+    sem_post(mutex_cola[tipo_cola]);
 }
 
 t_tripulante* desencolar(int tipo_cola){
@@ -446,4 +464,22 @@ t_tripulante* desencolar(int tipo_cola){
     tripulante = queue_pop(cola[tipo_cola]);
     sem_post(mutex_cola[tipo_cola]); 
     return tripulante;
+}
+
+t_tripulante* ojear_cola(int tipo_cola){
+    if(cantidad_tripulantes_en_cola(tipo_cola) == 0)
+        return NULL;
+    t_tripulante* tripulante;
+    sem_wait(mutex_cola[tipo_cola]);
+    tripulante = queue_peek(cola[tipo_cola]);
+    sem_post(mutex_cola[tipo_cola]); 
+    return tripulante;
+}
+
+int cantidad_tripulantes_en_cola(int tipo_cola){
+    int cant_tripulantes;
+    sem_wait(mutex_cola[tipo_cola]);
+    cant_tripulantes = queue_size(cola[tipo_cola]);
+    sem_post(mutex_cola[tipo_cola]); 
+    return cant_tripulantes;
 }
