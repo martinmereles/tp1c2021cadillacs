@@ -46,6 +46,8 @@ t_list* tablas_de_patotas;
 
 // Semaforos
 sem_t reservar_liberar_memoria_mutex;
+sem_t mutex_proceso_swap;
+sem_t mutex_temporal;
 
 // PUNTEROS A FUNCIONES GLOBALES
 // Sirven para apuntar a las funciones que implementan segmentacion o paginacion, segun la configuracion

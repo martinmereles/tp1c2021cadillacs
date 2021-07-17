@@ -16,6 +16,8 @@ int inicializar_estructuras_memoria(t_config* config){
 
     // Inicializo semaforos
     sem_init(&reservar_liberar_memoria_mutex, 0, 1);
+    sem_init(&mutex_proceso_swap, 0, 1);
+    sem_init(&mutex_temporal, 0, 1);
 
 	// Configuramos signal de dump
 	signal(SIGUSR1, signal_handler);
@@ -28,6 +30,7 @@ int inicializar_estructuras_memoria(t_config* config){
 
 int inicializar_esquema_memoria(t_config* config){
     char* string_algoritmo_ubicacion = config_get_string_value(config, "ESQUEMA_MEMORIA");
+
     if(strcmp(string_algoritmo_ubicacion,"SEGMENTACION")==0){
         log_info(logger,"El esquema de memoria es: SEGMENTACION");
 
@@ -61,11 +64,11 @@ int inicializar_esquema_memoria(t_config* config){
         eliminar_tripulante = &eliminar_tripulante_segmentacion;
         espacio_disponible = &espacio_disponible_segmentacion;
 
+        // Inicializo varialbes globales
+        memoria_virtual = NULL;
+
         // Configuramos signal de compactacion
 	    signal(SIGINT, signal_handler);
-
-        // Inicializo otras varialbes globales
-        memoria_virtual = NULL;
 
         log_info(logger, "El tamanio del mapa de memoria disponible es: %d",bitarray_get_max_bit(mapa_memoria_disponible));
 
@@ -98,6 +101,7 @@ int inicializar_esquema_memoria(t_config* config){
         path_swap = config_get_string_value(config, "PATH_SWAP");
         log_info(logger,"El path de swap es: %s", path_swap);
 
+    
         // Abrimos el archivo
         memoria_virtual = fopen(path_swap,"w+");
         truncate(path_swap, tamanio_swap);

@@ -27,6 +27,8 @@ void eliminar_patota(tabla_paginas_t* tabla_a_eliminar){
 void destruir_tabla_paginas(void* args){
     tabla_paginas_t* tabla = (tabla_paginas_t*) args;
     list_destroy_and_destroy_elements(tabla->paginas, liberar_marco);
+    sem_destroy(tabla->semaforo);
+    free(tabla->semaforo);
     free(tabla);
 }
 
@@ -352,13 +354,21 @@ int leer_memoria_principal_paginacion(void* args, uint32_t inicio_logico, uint32
 // TABLAS DE PAGINACION
 
 tabla_paginas_t* obtener_tabla_patota_paginacion(int PID_buscado){
+    /*
     bool tiene_PID(void* args){
         tabla_paginas_t* tabla = (tabla_paginas_t*) args;
         uint32_t PID_tabla;
         leer_memoria_principal(tabla, DIR_LOG_PCB, DESPL_PID, &PID_tabla, sizeof(uint32_t));
         log_info(logger,"EL PID ENCONTRADO ES: %d",PID_tabla);
         return PID_tabla == PID_buscado;
+    }*/
+
+    bool tiene_PID(void* args){
+        tabla_paginas_t* tabla = (tabla_paginas_t*) args;        
+        log_info(logger,"EL PID ENCONTRADO ES: %d",tabla->PID);
+        return tabla->PID == PID_buscado;
     }
+
     return list_find(tablas_de_patotas, tiene_PID);
 }
 
@@ -465,10 +475,10 @@ void dump_marco(void* args, FILE* archivo_dump){
     // Marco:0	Estado:Ocupado	Proceso: 1	Pagina: 2
     char* info_marco;                                    
     if(marco->estado == MARCO_OCUPADO)
-        info_marco = string_from_format("\nMarco: %3d Estado: Ocupado Proceso: %3d Pagina: %3d",
-                                         marco->numero_marco,marco->PID,marco->numero_pagina);
+        info_marco = string_from_format("\nMarco: %3d Estado: Ocupado Proceso: %3d Pagina: %3d Ultimo uso: %s",
+                                         marco->numero_marco,marco->PID,marco->numero_pagina,marco->timestamp);
     else
-        info_marco = string_from_format("\nMarco: %3d Estado: Libre   Proceso:  -  Pagina:  - ",
+        info_marco = string_from_format("\nMarco: %3d Estado: Libre   Proceso:  -  Pagina:  -  Ultimo uso: - ",
                                          marco->numero_marco);       
     
     fwrite(info_marco, sizeof(char), strlen(info_marco), archivo_dump);
@@ -481,7 +491,9 @@ void dump_marco(void* args, FILE* archivo_dump){
 // LRU
 void actualizar_timestamp(marco_t* pagina){
     free(pagina->timestamp);
+    sem_wait(&mutex_temporal);
     pagina->timestamp = temporal_get_string_time("%y%m%d%H%M%S");
+    sem_post(&mutex_temporal);
 }
 
 // ALGORITMOS DE REEMPLAZO
@@ -526,6 +538,9 @@ marco_t* algoritmo_lru(){
 
     pagina_victima = (marco_t*) list_get_minimum(paginas_presentes, pagina_menos_recientemente_usada);
     list_destroy(paginas_presentes);
+    log_error(logger,"PAGINA VICTIMA POR LRU ES:");
+    log_error(logger,"%d",pagina_victima->numero_pagina);
+
     return pagina_victima;
 }
 
@@ -573,6 +588,8 @@ void destruir_reloj(){
 }
 
 void proceso_swap(marco_t* pagina_necesitada){
+
+    sem_wait(&mutex_proceso_swap);
 
     log_info(logger, "INICIANDO PROCESO SWAP");
     // ejecutar_rutina(dump_memoria);
@@ -654,11 +671,13 @@ void proceso_swap(marco_t* pagina_necesitada){
     log_info(logger, "FINALIZANDO SWAP");
     log_info(logger, "DESBLOQUEO MARCOs NUMERO %d %d", pagina_necesitada->numero_marco, pagina_victima->numero_marco);
     // ejecutar_rutina(dump_memoria);
+
+    sem_post(&mutex_proceso_swap);
 }
 
 char* leer_marco(marco_t* marco){
     char* informacion = malloc(tamanio_pagina);
-    uint32_t direccion_fisica;
+    uint32_t direccion_fisica = 0;
 
     // Si el marco esta en memoria principal
     if(marco->numero_marco < cantidad_marcos_memoria_principal){

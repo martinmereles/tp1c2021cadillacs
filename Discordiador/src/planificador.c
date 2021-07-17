@@ -223,6 +223,8 @@ int rutina_expulsar_tripulante(void* args){
     int tid_buscado = *((int*) args);
     free(args);
     t_tripulante *trip_expulsado;
+    int resultado_exit = EXIT_FAILURE;
+    int estado_cola;
 
     if ( estado_planificador == PLANIFICADOR_OFF ){
         log_error(logger,"ERROR. rutina_expulsar_tripulante: El planificador esta apagado");
@@ -231,18 +233,26 @@ int rutina_expulsar_tripulante(void* args){
 
     sem_wait(&sem_mutex_ejecutar_dispatcher);
 
-    for(int estado_cola = 0; estado_cola < CANT_ESTADOS; estado_cola++){
+    // Busco en cual cola de estado esta el tripulante y lo saco
+    for(estado_cola = 0; estado_cola < CANT_ESTADOS; estado_cola++){
         trip_expulsado = desencolar_tripulante_por_tid(cola[estado_cola], tid_buscado);
         if(trip_expulsado != NULL){
             transicion(trip_expulsado, estado_cola, EXIT);
-	        sem_post(&sem_mutex_ejecutar_dispatcher);
-            return EXIT_SUCCESS;
+            resultado_exit = EXIT_SUCCESS;
+            break;
         }
     }
+
+    // Limpio de los buffers de peticiones al tripulante
+    for(estado_cola = CANT_ESTADOS; estado_cola < CANT_COLAS; estado_cola++)
+        trip_expulsado = desencolar_tripulante_por_tid(cola[estado_cola], tid_buscado);
 	
-    log_error(logger,"El tripulante %d no existe", tid_buscado);
-	sem_post(&sem_mutex_ejecutar_dispatcher);
-    return EXIT_FAILURE;
+    if(resultado_exit == EXIT_FAILURE)
+        log_error(logger,"El tripulante %d no existe", tid_buscado);
+
+    sem_post(&sem_mutex_ejecutar_dispatcher);
+    
+    return resultado_exit;
 }
 
  int hay_sabotaje(void){
