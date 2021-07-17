@@ -191,14 +191,22 @@ int inicializar_esquema_memoria(t_config* config){
    
 void liberar_estructuras_memoria(t_config* config){
     log_info(logger, "Liberando estructuras administrativas de la memoria principal");
-    list_destroy_and_destroy_elements(tablas_de_patotas, destruir_tabla_segmentos);
-    free(bitarray_mapa_memoria_disponible);
-    bitarray_destroy(mapa_memoria_disponible);
-    free(memoria_principal);
-    if(strcmp(config_get_string_value(config, "ESQUEMA_MEMORIA"),"PAGINACION")==0){
-        fclose(memoria_virtual);
-        remove(path_swap);  // Deberia comentarlo??
+
+    if(strcmp(config_get_string_value(config, "ESQUEMA_MEMORIA"),"SEGMENTACION")==0){
+        list_destroy_and_destroy_elements(tablas_de_patotas, destruir_tabla_segmentos);
+        free(bitarray_mapa_memoria_disponible);
+        bitarray_destroy(mapa_memoria_disponible);
     } 
+
+    if(strcmp(config_get_string_value(config, "ESQUEMA_MEMORIA"),"PAGINACION")==0){
+        list_destroy_and_destroy_elements(tablas_de_patotas, destruir_tabla_paginas);
+        list_destroy_and_destroy_elements(lista_de_marcos, destruir_marco);
+        destruir_reloj();
+        fclose(memoria_virtual);
+        remove(path_swap);
+    } 
+
+    free(memoria_principal);
     finalizar_mapa();   // Finalizo mapa
 }
 

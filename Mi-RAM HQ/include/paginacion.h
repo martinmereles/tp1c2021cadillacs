@@ -48,6 +48,7 @@ typedef struct hora hora_t;
 int crear_patota_paginacion(uint32_t PID, uint32_t longitud_tareas, char* tareas);
 int crear_tripulante_paginacion(void**, uint32_t*, uint32_t, uint32_t, uint32_t, uint32_t);
 void eliminar_tripulante_paginacion(void* args, uint32_t direccion_logica_TCB);
+void destruir_tabla_paginas(void* args);
 int tamanio_tareas_paginacion(void* args);
 
 // Escritura/Lectura
@@ -70,6 +71,7 @@ int cantidad_paginas(tabla_paginas_t* tabla_patota);
 void eliminar_patota(tabla_paginas_t* tabla_patota);
 void liberar_marco(void*);
 uint32_t espacio_disponible_paginacion();
+void destruir_marco(void* args);
 
 // Dump
 void dump_memoria_paginacion();
@@ -85,6 +87,7 @@ int inicializar_algoritmo_de_reemplazo(t_config* config);
 marco_t*  (*algoritmo_de_reemplazo)(void);
 marco_t*  algoritmo_lru(void);
 marco_t*  algoritmo_clock(void);
+void destruir_reloj();
 
 // LRU
 void actualizar_timestamp(marco_t* pagina);

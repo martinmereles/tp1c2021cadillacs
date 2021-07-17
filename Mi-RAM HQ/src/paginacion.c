@@ -1,7 +1,15 @@
 #include "paginacion.h"
 
 // PATOTAS Y TRIPULANTES
- 
+
+void destruir_marco(void* args){
+    marco_t* marco = (marco_t*) args;
+    sem_destroy(marco->semaforo);
+    free(marco->semaforo);
+    free(marco->timestamp);
+    free(marco);
+}
+
 void eliminar_patota(tabla_paginas_t* tabla_a_eliminar){
     
     bool tiene_PID(void* args){
@@ -11,15 +19,15 @@ void eliminar_patota(tabla_paginas_t* tabla_a_eliminar){
         return PID_tabla == tabla_a_eliminar->PID;
     }
 
-    // DESTRUIMOS LA TABLA DE PAGINAS Y LIBERAMOS LOS MARCOS (Los marcos no se destruyen)
-    void destruir_tabla_patota(void* args){
-        tabla_paginas_t* tabla = (tabla_paginas_t*) args;
-        list_destroy_and_destroy_elements(tabla->paginas, liberar_marco);
-        free(tabla);
-    }
-
     // QUITAMOS LA PATOTA DE LA LISTA DE PATOTAS Y LA DESTRUIMOS
-    list_remove_and_destroy_by_condition(tablas_de_patotas, tiene_PID, destruir_tabla_patota);
+    list_remove_and_destroy_by_condition(tablas_de_patotas, tiene_PID, destruir_tabla_paginas);
+}
+
+// DESTRUYE LA TABLA DE PAGINAS Y LIBERA LOS MARCOS (Los marcos no se destruyen)
+void destruir_tabla_paginas(void* args){
+    tabla_paginas_t* tabla = (tabla_paginas_t*) args;
+    list_destroy_and_destroy_elements(tabla->paginas, liberar_marco);
+    free(tabla);
 }
 
 void liberar_marco(void* args){
@@ -545,6 +553,23 @@ int actualizar_reloj(marco_t* pagina){
     }
     aguja_reloj = aguja_reloj->siguiente;   // El reloj apunta al marco siguiente de la pagina creada
     return EXIT_SUCCESS;
+}
+
+void destruir_reloj(){
+    // Guardo la direccion de la primera hora a borrar
+    hora_t* primera_hora_borrada = aguja_reloj;     
+    hora_t* hora_siguiente;
+
+    do{
+        // borrada , aguja_reloj y hora_siguiente (sin borrar), ...
+        hora_siguiente = aguja_reloj->siguiente;
+        // borrada , aguja_reloj (sin borrar), hora_siguiente (no se sabe), ...
+        free(aguja_reloj);
+        // borrada , aguja_reloj (borrada), hora_siguiente (no se sabe), ...
+        aguja_reloj = hora_siguiente;
+        // borrada , borrada, aguja_reloj y hora_siguiente (no se sabe), ...
+    }while(aguja_reloj != primera_hora_borrada);
+    // Mientras la aguja del reloj no apunte a la primera hora borrada
 }
 
 void proceso_swap(marco_t* pagina_necesitada){
