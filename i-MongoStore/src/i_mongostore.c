@@ -1,6 +1,8 @@
 #include "i_mongostore.h"
+#define handle_error(msg) \
+		do { perror(msg); exit(EXIT_FAILURE); } while (0)
 
-
+int server_fd;
 
 void handler(int num){
 	printf("le envio la señal al discord\n");
@@ -19,29 +21,34 @@ int main(void)
 
 	logger = log_create("./cfg/i-mongostore.log", "I-MongoStore", 1, LOG_LEVEL_DEBUG);
 	
-	// Leo IP y PUERTO del config
-	config = config_create("./cfg/i-mongo-store.config");
-	
-	char* puerto_escucha = config_get_string_value(config, "PUERTO");
+	// Leo IP y PUERTO del config y datos base de SUPERBLOQUE
 	char* ip = "127.0.0.1";
 	leer_config();
 	//Levanto/Creo el Filesystem
 	iniciar_filesystem();
 
-	int server_fd = iniciar_servidor(ip, puerto_escucha);
+	server_fd = iniciar_servidor(ip, fs_config.puerto);
 	log_info(logger, "I-MongoStore listo para recibir al Discordiador");
 
 	i_mongo_store(server_fd);
 
 	log_info(logger, "Cerrando socket servidor");
-	close(server_fd);
-	log_destroy(logger);
+	liberar_recursos();
+	
+	return EXIT_SUCCESS;
+}
+
+void liberar_recursos(){
 	munmap(superbloquemap, superbloque_stat.st_size);
 	munmap(blocksmap, blocks_stat.st_size);
+	bitarray_destroy(&bitmap);
+	free(super_bloque.bitarray);
+	config_destroy(config);
+	config_destroy(config_superbloque);
+	log_destroy(logger);
+	close(server_fd);
 	close(sbfile);
 	close(bfile);
-	free(super_bloque.bitarray);
-	return EXIT_SUCCESS;
 }
 
 void iniciar_semaforos_fs(){
@@ -60,6 +67,9 @@ void leer_config(){
 	fs_config.punto_montaje = config_get_string_value(config,"PUNTO_MONTAJE");
 	fs_config.tiempo_sincro = config_get_int_value(config, "TIEMPO_SINCRONIZACION");
 	fs_config.posiciones_sabotaje = config_get_string_value(config, "TIEMPO_SINCRONIZACION");
+	config_superbloque = config_create("./cfg/superbloque.config");
+	sb_config.blocks = config_get_int_value(config_superbloque,"BLOCKS");
+	sb_config.blocksize = config_get_int_value(config_superbloque,"BLOCKSIZE");
 }
 
 void sighandler(int signum) {
@@ -71,12 +81,19 @@ int i_mongo_store(int servidor_fd) {
 	status_servidor = RUNNING;
 	pthread_t *hilo_atender_cliente;
 	//
-	int signal_fd;
-	sigset_t sigset;
-	struct signalfd_siginfo siginfo;
-	sigemptyset(&sigset);
-    sigaddset(&sigset, SIGUSR1);
-    sigprocmask(SIG_SETMASK, &sigset, NULL);
+	sigset_t mask;
+	int sfd;
+	struct signalfd_siginfo fdsi;
+	ssize_t s;
+
+	sigemptyset(&mask);
+	sigaddset(&mask, SIGUSR1);
+	sigaddset(&mask, SIGQUIT);
+
+	/* Block signals so that they aren't handled
+		according to their default dispositions. */
+
+	sfd = signalfd(-1, &mask, 0);
 
 	// Inicializamos pollfd
 	struct pollfd pfds[3];
@@ -84,15 +101,14 @@ int i_mongo_store(int servidor_fd) {
 	pfds[0].events = POLLIN;	// Avisa cuando llega un mensaje en el socket de escucha
 	pfds[1].fd = 0;
 	pfds[1].events = POLLIN;	// Avisa cuando llega un mensaje por consola
-	signal_fd = signalfd(-1, &sigset, 0);
-	pfds[2].fd = signal_fd;
+	pfds[2].fd = sfd;
     pfds[2].events = POLLIN;
 
 	int num_events;
 
 	while(status_servidor != END){
 		// Revisamos si hay algun evento
-		num_events = poll(pfds, 2, 2500);
+		num_events = poll(pfds, 3, 2500);
 		// Si ocurrio un evento
 		if(num_events != 0){
 			// Si llego un mensaje en el socket de escucha
@@ -117,8 +133,10 @@ int i_mongo_store(int servidor_fd) {
 				// Si ocurrio un evento inesperado
 				else{
 					if((pfds[2].revents & POLLIN)){
-						// Leemos la consola y procesamos el mensaje
-						printf("ignore la signal\n");
+						if (read(sfd, &fdsi, sizeof(fdsi)) != sizeof(fdsi)) {
+							handle_error("read siginfo");
+						}
+						break;
 					}else{
 						log_error(logger, "Evento inesperado en los file descriptor: %s", strerror(pfds[0].revents));
 						log_error(logger, "Evento inesperado en los file descriptor: %s", strerror(pfds[1].revents));
@@ -216,6 +234,7 @@ bool leer_mensaje_cliente_y_procesar(int cliente_fd){
 			char* bitacora = leer_bitacora(payload);
 			enviar_operacion(cliente_fd,COD_OBTENER_BITACORA,bitacora,strlen(bitacora)+1);
 			free(bitacora);
+			free(payload);
 			log_info(logger,"bitacora enviada");
 			break;
 		case COD_EJECUTAR_TAREA:
@@ -226,6 +245,10 @@ bool leer_mensaje_cliente_y_procesar(int cliente_fd){
 			break;
 		case COD_MOVIMIENTO_TRIP:
 			recibir_payload_y_ejecutar(cliente_fd, movimiento_tripulante);
+			break;
+		case COD_MANEJAR_SABOTAJE:;
+			char * payload = recibir_payload(cliente_fd);
+			printf("el trip %s intentara resolver el sabotaje\n",payload);
 			break;
 		case -1:
 			log_error(logger, "El cliente se desconecto.");

@@ -24,7 +24,10 @@ typedef struct {
     char* posiciones_sabotaje;
 }filesystem_config;
 
-
+typedef struct {
+	uint32_t blocks;
+	uint32_t blocksize;
+}superbloque_config;
 
 enum server_status{
     RUNNING,
@@ -39,13 +42,16 @@ bool leer_mensaje_cliente_y_procesar(int);
 void leer_config();
 void iniciar_semaforos_fs();
 void handler(int num);
+void liberar_recursos();
 
 int primer_conexion_discordiador;
 int discordiador_fd;
 int status_servidor;
 sem_t semaforo_aceptar_conexiones;
 t_config *config;
+t_config *config_superbloque;
 filesystem_config fs_config;
+superbloque_config sb_config;
 t_bitarray bitmap;
 void* superbloquemap;
 char * blocksmap;

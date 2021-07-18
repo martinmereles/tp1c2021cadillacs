@@ -57,6 +57,7 @@ void leer_bitacora_config(t_config * bitacora_config_file);
 void eliminar_keys_bitacora(t_config * bitacora_config_file);
 int terminar_tarea(char * payload);
 int movimiento_tripulante(char * payload);
+void liberar_char_array (char** array);
 
 
 

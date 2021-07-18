@@ -27,8 +27,8 @@ void existe_directorio(char * path){
 }
 
 void verificar_punto_montaje(){
-	char* punto_montaje = string_new();
-	char** directorios = string_split(fs_config.punto_montaje,"/");
+	char * punto_montaje = string_new();
+	char ** directorios = string_split(fs_config.punto_montaje,"/");
 	printf("primer directorio : %s\n",directorios[1]);
 	string_append(&punto_montaje,"/");
 	for(int i = 1; directorios[i]!=NULL;i++){
@@ -36,6 +36,8 @@ void verificar_punto_montaje(){
 		existe_directorio(punto_montaje);
 		string_append(&punto_montaje,"/");
 	}
+	liberar_char_array(directorios);
+	free(punto_montaje);
 }
 
 void mapear_blocks(){
@@ -77,8 +79,8 @@ void mapear_blocks(){
 
 void crear_filesystem(){
 	char * puntomontaje = crear_path_absoluto("/SuperBloque.ims");
-	super_bloque.blocksize = 50;
-	super_bloque.blocks = 560;
+	super_bloque.blocksize = config_get_int_value(config_superbloque, "BLOCKSIZE");
+	super_bloque.blocks = config_get_int_value(config_superbloque, "BLOCKSIZE");
 	super_bloque.bitarray = calloc(super_bloque.blocks/8, sizeof(char));
 	int sizeStruct = sizeof(super_bloque.blocksize)+sizeof(super_bloque.blocks)+super_bloque.blocks/8+1;
 	sbfile = open(puntomontaje, O_RDWR | O_CREAT , S_IRUSR | S_IWUSR);
@@ -137,12 +139,14 @@ void crear_directorios(){
 	mkdir(pathFiles, 0777);
 	string_append(&pathFiles, "/Bitacoras");
 	mkdir(pathFiles, 0777);
+	free(pathFiles);
 }
 
 char* crear_path_absoluto(char * pathRelativo){
 	char * pathAbsoluto = string_new();
 	string_append(&pathAbsoluto, fs_config.punto_montaje);
 	string_append(&pathAbsoluto, pathRelativo);
+	free(pathAbsoluto);
 	return pathAbsoluto;
 }
 

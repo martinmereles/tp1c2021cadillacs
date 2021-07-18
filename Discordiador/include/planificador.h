@@ -13,7 +13,7 @@
 #include <commons/temporal.h>
 
 #define CANT_ESTADOS 6
-#define CANT_COLAS 9
+#define CANT_COLAS 11
 
 // CODIGO ESTADO del Tripulante
 enum estado_tripulante{ // Deben ir numerados desde 0 sin saltar numeros
@@ -23,12 +23,14 @@ enum estado_tripulante{ // Deben ir numerados desde 0 sin saltar numeros
     BLOCKED_IO = 3,
     BLOCKED_EMERGENCY = 4,
     EXIT = 5,
+    READY_TEMPORAL = 6,
+    EXEC_TEMPORAL = 7,
 };
 
 enum peticion_transicion{
-    EXEC_TO_BLOCKED_IO = 6,
-    BLOCKED_IO_TO_READY = 7,
-    EXEC_TO_READY = 8
+    EXEC_TO_BLOCKED_IO = 8,
+    BLOCKED_IO_TO_READY = 9,
+    EXEC_TO_READY = 10
 };
 
 // Estructura de dato para colas del planificador / dispatcher
@@ -42,6 +44,11 @@ typedef struct dato_tripulante{
     sem_t* sem_finalizo;
     sem_t** sem_tripulante_dejo;
 }t_tripulante;
+
+typedef struct {
+    int pos_x;    
+    int pos_y;
+}t_sabotaje;
 
 enum status_planificador {
     PLANIFICADOR_OFF,
@@ -67,10 +74,26 @@ void crear_colas();
 void encolar(int tipo_cola, t_tripulante* tripulante);
 t_tripulante* desencolar(int tipo_cola);
 
+int transicion(t_tripulante *tripulante, enum estado_tripulante estado_inicial, enum estado_tripulante estado_final);
+void destructor_elementos_tripulante(void *data);
+void desbloquear_tripulantes_tras_sabotaje(void);
+int bloquear_tripulantes_por_sabotaje(void);
+t_tripulante *desencolar_tripulante_por_tid(t_queue *cola_src, int tid_buscado);
+
 // VARIABLES GLOBALES
+t_tripulante * tripulante_sabotaje;
+t_tripulante * tripulante_elegido;
+t_sabotaje posicion_sabotaje;
 sem_t sem_mutex_ingreso_tripulantes_new;
 sem_t sem_mutex_ejecutar_dispatcher;
-sem_t sem_sabotaje_activado;
+sem_t sem_sabotaje_mutex;
+sem_t sem_sabotaje_finalizado;
+sem_t sem_sabotaje_tripulante;
+
+
+int grado_multiproc;
+int quantum;
+
 
 // en ESTADO NEW: genera las estructuras administrativas , una vez generado todo --> pasa a READY.
 t_queue **cola;
