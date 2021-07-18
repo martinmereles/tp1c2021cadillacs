@@ -16,12 +16,10 @@ int main(void) {
 	// Creo las colas
 	crear_colas();
 
-	sem_init(&sem_generador_PID,0,1);
-	sem_init(&sem_generador_TID,0,1);
-	sem_init(&sem_struct_iniciar_tripulante,0,0);
-
-	// Inicializo semaforo de Planificacion
-	// sem_init(&sem_planificacion_fue_iniciada,0,0);
+	sem_init(&sem_generador_PID, 0, 1);
+	sem_init(&sem_generador_TID, 0, 1);
+	sem_init(&sem_struct_iniciar_tripulante, 0, 0);
+	sem_init(&sem_hay_evento_planificable, 0, 0);
 
     // Inicializo semaforos del dispatcher
     sem_init(&sem_mutex_ingreso_tripulantes_new,0,1);
@@ -180,6 +178,7 @@ void recibir_y_procesar_mensaje_i_mongo_store(int i_mongo_store_fd){
 void leer_consola_y_procesar(int i_mongo_store_fd, int mi_ram_hq_fd) {
 	enum comando_discordiador comando;
 	char** argumentos;
+
 	char linea_consola[TAM_CONSOLA];
 	fgets(linea_consola,TAM_CONSOLA,stdin);
 	linea_consola[strlen(linea_consola)-1]='\0';	// Le saco el \n
@@ -509,12 +508,14 @@ int submodulo_tripulante(void* args) {
 			case NEW:	// El tripulante espera hasta que el planificador lo saque de la cola de new
 				enviar_op_recibir_estado_tripulante(mi_ram_hq_fd_tripulante, 'N');
 				leer_estado_tripulante_mi_ram_hq(mi_ram_hq_fd_tripulante, tripulante);
+				sem_post(&sem_hay_evento_planificable);
 				sem_wait(tripulante->sem_tripulante_dejo[NEW]);
 				break;
 
 			case READY:	// El tripulante espera hasta que el planificacor lo saque de la cola de ready
 				enviar_op_recibir_estado_tripulante(mi_ram_hq_fd_tripulante, 'R');	
 				leer_estado_tripulante_mi_ram_hq(mi_ram_hq_fd_tripulante, tripulante);
+				sem_post(&sem_hay_evento_planificable);
 				sem_wait(tripulante->sem_tripulante_dejo[READY]);
 				break;
 
@@ -525,9 +526,9 @@ int submodulo_tripulante(void* args) {
 					enviar_op_recibir_estado_tripulante(mi_ram_hq_fd_tripulante, 'B');
 					leer_estado_tripulante_mi_ram_hq(mi_ram_hq_fd_tripulante, tripulante);
 					// Espera hasta que se libere el dispositivo de entrada salida
-					log_info(logger,"T%d: Esperando disp. E/S", tripulante->TID);	
+					log_info(logger,"T%2d: Esperando disp. E/S", tripulante->TID);	
 					sem_wait(tripulante->sem_puede_usar_dispositivo_io);
-					log_info(logger,"T%d: Ocupando disp. E/S", tripulante->TID);
+					log_info(logger,"T%2d: Ocupando disp. E/S", tripulante->TID);
 				}
 
 				// Me fijo si cumplio los ciclos de la tarea
@@ -536,12 +537,13 @@ int submodulo_tripulante(void* args) {
 					encolar(BLOCKED_IO_TO_READY, tripulante);
 
 					// El tripulante espera hasta que el planificacor lo saque de la cola de BLOCKED IO
+					sem_post(&sem_hay_evento_planificable);
 					sem_wait(tripulante->sem_tripulante_dejo[BLOCKED_IO]);
 					ciclos_en_estado_actual = 0;
 
 					// TODO: Avisa que finalizo la tarea
 					
-					log_debug(logger, "T%d: Tarea completada: Total %d ciclos", tripulante->TID, tarea->duracion);	
+					log_error(logger, "T%2d: Tarea completada: Total %d ciclos", tripulante->TID, tarea->duracion);	
 					enviar_operacion(i_mongo_store_fd_tripulante, COD_TERMINAR_TAREA, tarea->string, strlen(tarea->string)+1);
 					destruir_tarea(tarea);
 					tarea = NULL;
@@ -550,7 +552,7 @@ int submodulo_tripulante(void* args) {
 
 				// Se crea un hilo aparte que termina despues de un ciclo
 				ciclo = crear_ciclo_cpu();	
-				log_error(logger,"T%d: Ciclo Tarea I/O: Quedan %d", tripulante->TID, tarea->duracion - ciclos_en_estado_actual);			
+				log_error(logger,"T%2d: Ciclo Tarea I/O: Quedan %d", tripulante->TID, tarea->duracion - ciclos_en_estado_actual);			
 
 				ciclos_en_estado_actual++;
 				
@@ -563,9 +565,10 @@ int submodulo_tripulante(void* args) {
 				// PARA ROUND ROBIN
 				// Si al tripulante se le acabo el quantum => pasa a READY
 				if(!strcmp(algoritmo_planificador, "RR") && ciclos_en_estado_actual >= quantum){
-					log_debug(logger, "Por RR, comenzamos expulsion del tripulante %d de EXEC", tripulante->TID);
+					// log_debug(logger, "T%2d: Expul. CPU: Fin de quantum", tripulante->TID);
 					// TODO: Le pide al planificador que lo agregue a la cola de ready
 					encolar(EXEC_TO_READY, tripulante);
+					sem_post(&sem_hay_evento_planificable);
 					sem_wait(tripulante->sem_tripulante_dejo[EXEC]);
 					ciclos_en_estado_actual = 0;
 					break;	// Salgo del switch
@@ -586,7 +589,7 @@ int submodulo_tripulante(void* args) {
 
 					tarea = leer_proxima_tarea_mi_ram_hq(mi_ram_hq_fd_tripulante);
 
-					log_info(logger,"T%d: Prox. tarea: %s", tripulante->TID, tarea->string);
+					log_info(logger,"T%2d: Prox. tarea: %s", tripulante->TID, tarea->string);
 
 					// Si la tarea leida es la tarea "FIN"
 					if(strcmp(tarea->string, "FIN") == 0){
@@ -619,29 +622,30 @@ int submodulo_tripulante(void* args) {
 				// Si el tripulante llego a la tarea y no la inicio
 				if(ciclos_ejecutando_tarea == 0){			
 					estado_envio_mensaje = enviar_operacion(i_mongo_store_fd_tripulante,COD_EJECUTAR_TAREA, tarea->string, strlen(tarea->string)+1);
-					log_info(logger,"T%d: Iniciando tarea: %s", tripulante->TID, tarea->string);
+					log_info(logger,"T%2d: Iniciando tarea: %s", tripulante->TID, tarea->string);
 				}
 
 				// Si el tripulante esta en la posicion de la tarea y es bloqueante
 				// El tripulante se bloquea, iniciar peticion de E/S (consume 1 ciclo de CPU)
 				if (tarea->es_bloqueante){
-					log_info(logger, "T%d: Iniciando peticion de E/S", tripulante->TID);
+					log_info(logger, "T%2d: Iniciando peticion de E/S", tripulante->TID);
 					esperar_fin_ciclo_de_cpu(ciclo);
 					encolar(EXEC_TO_BLOCKED_IO, tripulante);
 					ciclos_en_estado_actual = 0;
+					sem_post(&sem_hay_evento_planificable);
 					sem_wait(tripulante->sem_tripulante_dejo[EXEC]);
 					break;
 				}
 
 				// Si el tripulante llego la tarea y no es bloqueante
-				log_error(logger,"T%d: Ciclo Tarea CPU: Quedan %d", tripulante->TID, tarea->duracion - ciclos_ejecutando_tarea);
+				log_error(logger,"T%2d: Ciclo Tarea CPU: Quedan %d", tripulante->TID, tarea->duracion - ciclos_ejecutando_tarea);
 				ciclos_ejecutando_tarea++;	
 
 				// Espero que termine el ciclo de cpu	
 				esperar_fin_ciclo_de_cpu(ciclo);
 
 				if(ciclos_ejecutando_tarea == tarea->duracion){
-					log_error(logger,"T%d: Ciclo Tarea CPU: Tarea finalizada", tripulante->TID, tarea->duracion - ciclos_ejecutando_tarea);
+					log_error(logger,"T%2d: Ciclo Tarea CPU: Tarea finalizada", tripulante->TID, tarea->duracion - ciclos_ejecutando_tarea);
 					enviar_operacion(i_mongo_store_fd_tripulante, COD_TERMINAR_TAREA, tarea->string, strlen(tarea->string)+1);
 					destruir_tarea(tarea);
 					tarea = NULL;
@@ -655,6 +659,7 @@ int submodulo_tripulante(void* args) {
 
 			case EXIT:
 				// El tripulante espera a que lo quiten de la cola de EXIT		
+				sem_post(&sem_hay_evento_planificable);
 				sem_wait(tripulante->sem_tripulante_dejo[EXIT]);
 				tripulante_finalizado = true;								
 				break;
@@ -704,7 +709,7 @@ t_tarea* proxima_tarea(int mi_ram_hq_fd_tripulante, t_tripulante* tripulante){
 
 	t_tarea* tarea = leer_proxima_tarea_mi_ram_hq(mi_ram_hq_fd_tripulante);
 
-	log_info(logger,"T%d: Prox. tarea: %s", tripulante->TID, tarea->string);
+	log_info(logger,"T%2d: Prox. tarea: %s", tripulante->TID, tarea->string);
 
 	// Si la tarea leida es la tarea "FIN"
 	if(strcmp(tarea->string, "FIN") == 0){
@@ -746,7 +751,7 @@ void leer_estado_tripulante_mi_ram_hq(int mi_ram_hq_fd_tripulante, t_tripulante*
 
 	char char_estado = leer_estado_mi_ram_hq(mi_ram_hq_fd_tripulante);
 
-	log_info(logger,"T%d: Estado actual: %c", tripulante->TID, char_estado);*/
+	log_info(logger,"T%2d: Estado actual: %c", tripulante->TID, char_estado);*/
 	// Espero a que mi ram hq me envie el estado del tripulante
 }
 
@@ -938,7 +943,7 @@ bool tripulante_esta_en_posicion(t_tripulante* tripulante, t_tarea* tarea, int m
 	free(mensaje_i_mongo);
 	free(mensaje_i_mongo_2);
 
-	log_info(logger,"T%d: Mov: (%d,%d) => (%d,%d)", tripulante->TID, pos_X_vieja, pos_Y_vieja,
+	log_info(logger,"T%2d: Mov: (%d,%d) => (%d,%d)", tripulante->TID, pos_X_vieja, pos_Y_vieja,
 													tripulante->posicion_X, tripulante->posicion_Y);	
 
 	// Como al principio no estaba en la posicion, retorna false

@@ -113,5 +113,8 @@ int desplazar_tripulante_mapa(int TID, int desplazamiento_X, int desplazamiento_
 }
 
 char caracter_tripulante(int TID){
-    return (TID % 50) + '0';
+    char caracter = TID % 16;
+    if(caracter >= 10)
+        return caracter - 10 + 'A';
+    return caracter + '0';
 }

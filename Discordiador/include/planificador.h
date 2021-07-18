@@ -74,6 +74,7 @@ int cantidad_tripulantes_en_cola(int tipo_cola);
 sem_t sem_mutex_ingreso_tripulantes_new;
 sem_t sem_mutex_ejecutar_dispatcher;
 sem_t sem_sabotaje_activado;
+sem_t sem_hay_evento_planificable;
 
 // en ESTADO NEW: genera las estructuras administrativas , una vez generado todo --> pasa a READY.
 t_queue **cola;
