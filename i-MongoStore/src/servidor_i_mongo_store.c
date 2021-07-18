@@ -625,7 +625,6 @@ void generar_recurso(char* path, char caracter_llenado,char* parametro){
         char * caracter = calloc(sizeof(char),1);
         *caracter = caracter_llenado;
         config_set_value(tarea_config_file,"CARACTER_LLENADO",caracter);
-        free(caracter);
         char * cantidadbloquesstr = string_itoa(cantidad_de_bloques);
         set_tarea_config(
             tarea_config_file,
@@ -634,6 +633,11 @@ void generar_recurso(char* path, char caracter_llenado,char* parametro){
             bloques_config,
             "QWERTY"
         );
+        char * datos = datos_create(parametro,cantidadbloquesstr,bloques_config,caracter);
+        char * md5 = md5_create(datos);
+        printf("el md5 es: %s \n",md5);
+        free(md5);
+        free(caracter);
         free(cantidadbloquesstr);
         config_save(tarea_config_file);
         config_destroy(tarea_config_file);
@@ -869,4 +873,33 @@ void liberar_char_array (char** array){
         free(array[i]);
     }
     free(array);
+}
+
+char * datos_create(char * size,char * cantidadbloquesstr, char * bloques_config,char * caracter){
+    char * datos = string_from_format("SIZE=%s\nBLOCK_COUNT=%s\nBLOCKS=%s\nCARACTER_LLENADO",size,cantidadbloquesstr,bloques_config,caracter);
+    return datos;
+}
+
+char * md5_create (char * datos){
+    FILE *ls_cmd = popen("ls -l", "r");
+    if (ls_cmd == NULL) {
+        fprintf(stderr, "popen(3) error");
+        exit(EXIT_FAILURE);
+    }
+
+    static char buff[1024];
+    char * md5 = string_new();
+    size_t n;
+
+    while ((n = fread(buff, 1, sizeof(buff)-1, ls_cmd)) > 0) {
+        buff[n] = '\0';
+        string_append(&md5,buff);
+        printf("%s", buff);
+    }
+    printf("\n%s\n", md5);
+    if (pclose(ls_cmd) < 0)
+        perror("pclose(3) error");
+
+    return md5;
+
 }

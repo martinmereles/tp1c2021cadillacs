@@ -80,7 +80,7 @@ void mapear_blocks(){
 void crear_filesystem(){
 	char * puntomontaje = crear_path_absoluto("/SuperBloque.ims");
 	super_bloque.blocksize = config_get_int_value(config_superbloque, "BLOCKSIZE");
-	super_bloque.blocks = config_get_int_value(config_superbloque, "BLOCKSIZE");
+	super_bloque.blocks = config_get_int_value(config_superbloque, "BLOCKS");
 	super_bloque.bitarray = calloc(super_bloque.blocks/8, sizeof(char));
 	int sizeStruct = sizeof(super_bloque.blocksize)+sizeof(super_bloque.blocks)+super_bloque.blocks/8+1;
 	sbfile = open(puntomontaje, O_RDWR | O_CREAT , S_IRUSR | S_IWUSR);
