@@ -225,6 +225,7 @@ int existe_filesystem(){
 		//compruebo la existencia de Blocks.ims
 		if(existe_archivo(block_path)){
 			log_info(logger, "Se encontro un archivo Blocks.ims existente");
+			free(block_path);
 			return 1;
 		}else{
 			blocks_create = fopen (block_path, "w");
@@ -232,10 +233,13 @@ int existe_filesystem(){
 			ftruncate(fileno(blocks_create), size);
 			fclose(blocks_create);
 			log_info(logger, "No se encontro un archivo Blocks.ims existente y se creo uno en base a SuperBloque.ims");
+			free(block_path);
 			return 1;
 		}
 	}else{
 		log_info(logger, "No se encontro un archivo SuperBloque.ims existente");
 	}
+	free(block_path);
+	free(sb_path);
 	return 0;
 }

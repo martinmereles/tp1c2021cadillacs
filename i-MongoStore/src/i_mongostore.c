@@ -184,6 +184,10 @@ void leer_consola_y_procesar() {
 		status_servidor = END;
 		log_info(logger, "Finalizando i-Mongo-Store");
 	}
+	if(strcmp(linea_consola,"test") == 0){
+		testear_md5();
+		log_info(logger, "Finalizando test");
+	}
 }
 
 int comunicacion_cliente(int cliente_fd) {
