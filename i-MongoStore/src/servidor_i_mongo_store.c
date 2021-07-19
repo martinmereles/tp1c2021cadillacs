@@ -68,6 +68,7 @@ void escribir_bitacora(char* mensaje){
     int offset_bitacora=0;
     if(!existe_archivo(path_bitacora)){
         //creando archivo Tripulanten.ims de 0
+        printf("NO existe bitacora\n");
         int size_a_modificar = string_length(mensaje);
         int resto =size_a_modificar%super_bloque.blocksize;
         cantidad_de_bloques=size_a_modificar/super_bloque.blocksize;
@@ -120,6 +121,7 @@ void escribir_bitacora(char* mensaje){
         free(bloques_config);
         free(bloques_usables);
     }else{
+        printf("existe bitacora\n");
         //Ya existiendo Bitacoran.ims
         bitacora_config_file = config_create(path_bitacora);
         leer_bitacora_config(bitacora_config_file);
