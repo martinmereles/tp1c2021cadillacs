@@ -12,29 +12,9 @@ int main(void) {
 	generadorPID = 0;
 	generadorTID = 0;
 
-<<<<<<< HEAD
 	sem_init(&sem_generador_PID, 0, 1);
 	sem_init(&sem_generador_TID, 0, 1);
 	sem_init(&sem_struct_iniciar_tripulante, 0, 0);
-=======
-	// Creo las colas
-	crear_colas();
-
-	sem_init(&sem_generador_PID,0,1);
-	sem_init(&sem_generador_TID,0,1);
-	sem_init(&sem_struct_iniciar_tripulante,0,0);
-
-	// Inicializo semaforo de Planificacion
-	// sem_init(&sem_planificacion_fue_iniciada,0,0);
-
-    // Inicializo semaforos del dispatcher
-    sem_init(&sem_mutex_ingreso_tripulantes_new,0,1);
-    sem_init(&sem_mutex_ejecutar_dispatcher,0,1);
-	sem_init(&sem_sabotaje_mutex,0,1);
-	sem_init(&sem_sabotaje_finalizado,0,0);
-	sem_init(&sem_sabotaje_tripulante,0,0);
-	
->>>>>>> origin/testsabotaje
 
 	// Creo estructuras del planificador
 	crear_estructuras_planificador();
@@ -599,7 +579,6 @@ int submodulo_tripulante(void* args) {
 		// Si la planificacion no esta pausada
 		
 		switch(tripulante->estado){
-<<<<<<< HEAD
 
 			case NEW:	// El tripulante espera hasta que el planificador lo saque de la cola de new
 				enviar_op_recibir_estado_tripulante(mi_ram_hq_fd_tripulante, 'N');
@@ -612,18 +591,9 @@ int submodulo_tripulante(void* args) {
 				enviar_op_recibir_estado_tripulante(mi_ram_hq_fd_tripulante, 'R');	
 				leer_estado_tripulante_mi_ram_hq(mi_ram_hq_fd_tripulante, tripulante);
 				sem_post(&sem_hay_evento_planificable);
-=======
-			case NEW:	// El tripulante espera hasta que el planificacor lo saque de la cola de new
-				sem_wait(tripulante->sem_tripulante_dejo[NEW]);
-				break;
-
-			case READY:	// El tripulante espera hasta que el planificacor lo saque de la cola de ready	
-				printf("entre en ready trip: %d\n",tripulante->TID);
->>>>>>> origin/testsabotaje
 				sem_wait(tripulante->sem_tripulante_dejo[READY]);
 				break;
 			case BLOCKED_IO:	// Solo hay que esperar los ciclos hasta que se libere
-<<<<<<< HEAD
 				
 				// Si recien llega a BLOCKED_IO
 				if(ciclos_en_estado_actual == 0){
@@ -635,7 +605,6 @@ int submodulo_tripulante(void* args) {
 					log_info(logger,"T%2d: Ocupando disp. E/S", tripulante->TID);
 				}
 
-=======
 				if(sabotaje_activo){
 					//pongo en pausa los blocked io para poder testear
 					//TO DO: si terminan los ciclos IO y hay sabotaje activo, pasan a cola Blocked Emergency
@@ -643,7 +612,7 @@ int submodulo_tripulante(void* args) {
 					printf("blocked io pausa del trip: %d", tripulante->TID);
 					sem_wait(tripulante->sem_planificacion_fue_reanudada);
 				}
->>>>>>> origin/testsabotaje
+
 				// Me fijo si cumplio los ciclos de la tarea
 				if(ciclos_en_estado_actual == tarea->duracion){
 					// TODO: Le pide al planificador que lo agregue a la cola de ready
@@ -1016,15 +985,9 @@ int generarNuevoTID() {
 	return nuevo_valor;
 }
 
-<<<<<<< HEAD
 // Si el tripulante no esta en posicion, retorna false y lo mueve
 // Si el tripulante esta en posicion, retorna true
 bool tripulante_esta_en_posicion(t_tripulante* tripulante, t_tarea* tarea, int mi_ram_hq_fd_tripulante, int i_mongo_store_fd_tripulante){
-=======
-//mueve al tripulante y retorna true cuando esta en posicion
-bool tripulante_esta_en_posicion(t_tripulante* tripulante, t_tarea * tarea, int mi_ram_hq_fd_tripulante, int i_mongo_store_fd_tripulante){
-
->>>>>>> origin/testsabotaje
 	// PIDO LA POSICION A MI RAM HQ
 	int estado_envio_mensaje = enviar_op_enviar_ubicacion_tripulante(mi_ram_hq_fd_tripulante);
 	if(estado_envio_mensaje != EXIT_SUCCESS)

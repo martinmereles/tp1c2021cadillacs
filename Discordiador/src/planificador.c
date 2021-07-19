@@ -122,6 +122,9 @@ void crear_estructuras_planificador(){
     sem_init(&sem_mutex_ingreso_tripulantes_new,0,1);
     sem_init(&sem_mutex_ejecutar_dispatcher,0,0);
 	sem_init(&sem_sabotaje_activado,0,0);
+	sem_init(&sem_sabotaje_mutex,0,1);
+	sem_init(&sem_sabotaje_finalizado,0,0);
+	sem_init(&sem_sabotaje_tripulante,0,0);
 
 	crear_colas();
 
