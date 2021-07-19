@@ -25,6 +25,8 @@ int dispatcher(void *algor_planif){
     t_tripulante* primer_tripulante;
     t_tripulante* tripulante;
 
+    sabotaje_activo=0;
+
     log_info(logger,"DISPATCHER CREADO");
 	
     while(status_discordiador != END || !list_is_empty(lista_tripulantes)){
@@ -159,6 +161,7 @@ void finalizar_discordiador(){
 }
 
 
+
 void gestionar_tripulantes_en_exit(){
 
     log_error(logger, "Iniciando gestion de cola EXIT");
@@ -279,9 +282,14 @@ int rutina_expulsar_tripulante(void* args){
 }
 
  int hay_sabotaje(void){
+     if(sabotaje_activo){
+         return 1;
+     }
     // TODO: verificar cuando reciba el MODULO DISCORDIADOR el aviso de parte de iMongo-Store.
     return 0;
 }
+
+
 
 int listar_tripulantes(void){
     char *fecha = temporal_get_string_time("%d/%m/%y %H:%M:%S");
@@ -346,32 +354,27 @@ char *code_dispatcher_to_string(enum estado_tripulante code){
 int bloquear_tripulantes_por_sabotaje(void){
 
     //Pasar todos los tripulantes a blocked_emerg SEGUN ORDEN (1-EXEC -> 2-READY ->3- BLOCKED_IO)
-
-    // Ordeno la cola de EXEC por TID
-    list_sort(cola[EXEC]->elements, tripulante_tid_es_menor_que);
-    // Muevo uno por uno los tripulantes a la cola BLOCKED_EMERGENCY
-    while(existen_tripulantes_en_cola(EXEC))
-        encolar(BLOCKED_EMERGENCY, desencolar(EXEC));
-
-    // Ordeno la cola de READY por TID
-    list_sort(cola[READY]->elements, tripulante_tid_es_menor_que);
-    // Muevo uno por uno los tripulantes a la cola BLOCKED_EMERGENCY
-    while(existen_tripulantes_en_cola(READY))
-        encolar(BLOCKED_EMERGENCY, desencolar(READY));
-
-    // Ordeno la cola de BLOCKED_IO por TID
-    list_sort(cola[BLOCKED_IO]->elements, tripulante_tid_es_menor_que);
-    // Muevo uno por uno los tripulantes a la cola BLOCKED_EMERGENCY
-    while(existen_tripulantes_en_cola(BLOCKED_IO))
-        encolar(BLOCKED_EMERGENCY, desencolar(BLOCKED_IO));
-
+    
+    // Copio el estado actual de las colas para recuperarlo tras el sabotaje
+    // Paso los tripulantes de ready y exec a blocked emergency
+    while(existen_tripulantes_en_cola(EXEC)){
+        t_tripulante * temporal = desencolar(EXEC);
+        encolar(EXEC_TEMPORAL, temporal);
+        transicion(temporal,EXEC,BLOCKED_EMERGENCY);
+    }
+        
+    while(existen_tripulantes_en_cola(READY)){
+        t_tripulante * temporal = desencolar(READY);
+        encolar(READY_TEMPORAL, temporal);
+        transicion(temporal,READY,BLOCKED_EMERGENCY);
+    }
+        
+    // Si no hay nadie para atender el sabotaje, falla, y no continua el sabotaje
     if (!existen_tripulantes_en_cola(BLOCKED_EMERGENCY))
         return EXIT_FAILURE;
 
-    // Si hay algun tripulante en la cola de BLOCKED_EMERGENCY:
-    //TODO
-    //OBS: se debe mover un UNICO tripulante a EXEC que es quien TRABAJA/ATIENDE el SABOTAJE.
-
+    // activo el sabotaje, para que los tripulantes cambien su comportamiento en exec y bloqued io
+    sabotaje_activo=1;
     return EXIT_SUCCESS;
 }
 
@@ -386,15 +389,40 @@ int bloquear_tripulantes_por_sabotaje(void){
     return (temp1->TID <= temp2->TID)? true: false;
 }
 
-// Revisar (no van todos a ready)
- void desbloquear_tripulantes_tras_sabotaje(void){
 
-    // Deberia guardarse el estado anterior antes del bloqueo
-    // Asi al desbloquearse vuelven a donde estaban
-
-    while(existen_tripulantes_en_cola(BLOCKED_EMERGENCY)){
-        encolar(READY, desencolar(BLOCKED_EMERGENCY));
+void desbloquear_tripulantes_tras_sabotaje(void){
+    printf("desbloqueando tripulantes\n");
+    // Paso los tripulantes de las colas temporales a las comunes. Si estaban pausados, los reanudo
+    queue_clean(cola[EXEC]);
+    queue_clean(cola[READY]);
+    while(existen_tripulantes_en_cola(EXEC_TEMPORAL)){
+        int valor_semaforo;
+        t_tripulante * temporal = desencolar(EXEC_TEMPORAL);
+        transicion(temporal,BLOCKED_EMERGENCY,EXEC);
+        sem_getvalue(temporal->sem_planificacion_fue_reanudada, &valor_semaforo);
+	    if(valor_semaforo == 0)
+			sem_post(temporal->sem_planificacion_fue_reanudada);
     }
+    while(existen_tripulantes_en_cola(READY_TEMPORAL)){
+        int valor_semaforo;
+        t_tripulante * temporal = desencolar(READY_TEMPORAL);
+        transicion(temporal,BLOCKED_EMERGENCY,READY);
+        sem_getvalue(temporal->sem_planificacion_fue_reanudada, &valor_semaforo);
+	    if(valor_semaforo == 0)
+			sem_post(temporal->sem_planificacion_fue_reanudada);
+    }
+    //Esto no tiene que funcionar asi, pero sirve para el test, siempre y cuando haya tripulantes
+    //para atender el sabotaje, a parte de los bloqued io
+    for(int i =0;i<queue_size(cola[BLOCKED_IO]);i++){
+        int valor_semaforo;
+        t_tripulante * temporal = desencolar(BLOCKED_IO);
+        sem_getvalue(temporal->sem_planificacion_fue_reanudada, &valor_semaforo);
+	    if(valor_semaforo == 0)
+			sem_post(temporal->sem_planificacion_fue_reanudada);
+        encolar(BLOCKED_IO, temporal);
+    }
+    //Limpio la queue de blocked emergency para reutilizarla
+    queue_clean(cola[BLOCKED_EMERGENCY]);
 }
 
 int inicializar_algoritmo_planificacion(t_config* config){
@@ -471,11 +499,13 @@ t_tripulante *desencolar_tripulante_por_tid(t_queue *cola_src, int tid_buscado){
     return list_remove_by_condition(cola_src->elements, tiene_TID_a_desencolar);
 }
 
-t_tripulante* iniciador_tripulante(int tid, int pid){
+t_tripulante* iniciador_tripulante(int tid, int pid, int pos_x, int pos_y){
     t_tripulante *nuevo;
     nuevo = malloc(sizeof(t_tripulante));
     nuevo -> PID = pid;
     nuevo -> TID = tid;
+    nuevo -> posicion_X = pos_x;
+    nuevo -> posicion_Y = pos_y;
     nuevo -> estado = NEW;
     
 	// Inicializamos los semaforos (inicializan todos en 0)

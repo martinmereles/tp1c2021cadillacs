@@ -14,6 +14,7 @@
 #include <semaphore.h>
 #include "servidor_i_mongo_store.h"
 #include "i_filesystem.h"
+#include <sys/signalfd.h>
 
 //estructura archivo config
 typedef struct {
@@ -23,7 +24,10 @@ typedef struct {
     char* posiciones_sabotaje;
 }filesystem_config;
 
-
+typedef struct {
+	uint32_t blocks;
+	uint32_t blocksize;
+}superbloque_config;
 
 enum server_status{
     RUNNING,
@@ -31,20 +35,23 @@ enum server_status{
 };
 
 void leer_consola_y_procesar();
-void i_mongo_store(int);
+int i_mongo_store(int);
 int comunicacion_cliente(int cliente_fd);
 void atender_cliente(void *args);
 bool leer_mensaje_cliente_y_procesar(int);
 void leer_config();
 void iniciar_semaforos_fs();
 void handler(int num);
+void liberar_recursos();
 
 int primer_conexion_discordiador;
 int discordiador_fd;
 int status_servidor;
 sem_t semaforo_aceptar_conexiones;
 t_config *config;
+t_config *config_superbloque;
 filesystem_config fs_config;
+superbloque_config sb_config;
 t_bitarray bitmap;
 void* superbloquemap;
 char * blocksmap;
