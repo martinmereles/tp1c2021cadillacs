@@ -24,14 +24,15 @@ enum tarea_cod{
 };
 
 typedef struct {
-    char* caracter_llenado;
-    char* blocks;
+    char * caracter_llenado;
+    char * blocks;
     int block_count;
     int size;
+    char * md5;
 }t_config_tarea;
 
 typedef struct {
-    char* blocks;
+    char * blocks;
     int block_count;
     int size;
 }t_config_bitacora;
@@ -45,7 +46,7 @@ void ocupar_bit(t_bitarray *bitarray, int offset);
 void liberar_bit(t_bitarray *bitarray, int offset);
 void leer_tarea_config(t_config * tarea_config_file);
 void eliminar_keys_tarea(t_config * tarea_config_file);
-void set_tarea_config(t_config * tarea_config_file,char * size, char * cantidad_bloques, char* bloques, char * md5);
+void set_tarea_config(t_config * tarea_config_file,char * size, char * cantidad_bloques, char* bloques);
 char * array_two_block_to_string(char ** bloq_antiguo, char** bloq_nuevo, int config_block_count);
 char * array_block_to_string(char ** bloq_array,int indice);
 void generar_recurso(char* path, char caracter_llenado,char* parametro);
@@ -60,6 +61,8 @@ int movimiento_tripulante(char * payload);
 void liberar_char_array (char** array);
 char * datos_create(char * size,char * cantidadbloquesstr, char * bloques_config,char * caracter);
 char * md5_create (char * datos);
+void liberar_recursos_thread();
+void testear_md5();
 
 
 

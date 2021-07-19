@@ -7,13 +7,19 @@ typedef struct {
     uint32_t pos_y;
 }t_trip;
 
-
+t_config_tarea tarea_test;
 __thread t_config * tarea_config_file;
 __thread t_config_tarea tarea_config;
 __thread t_config * bitacora_config_file;
 __thread t_config_bitacora bitacora_config;
 __thread t_trip tripulante;
 __thread char* path_bitacora;
+
+void liberar_recursos_thread(){
+    config_destroy(bitacora_config_file);
+    config_destroy(tarea_config_file);
+    free(path_bitacora);
+}
 
 int loguear_mensaje(char* payload){
     log_info(logger, "Recibi el mensaje: %s", payload);
@@ -52,9 +58,9 @@ void iniciar_tripulante(char* payload){
     string_append(&path_relativo, "/Files/Bitacoras/Tripulante");
     char * tidstr = string_itoa(TID);
     string_append(&path_relativo, tidstr);
-    free(tidstr);
     string_append(&path_relativo, ".ims");
     path_bitacora= crear_path_absoluto(path_relativo);
+    free(tidstr);
     free(path_relativo);
     //escribir_bitacora(mensaje);
 }
@@ -62,7 +68,7 @@ void iniciar_tripulante(char* payload){
 
 
 void escribir_bitacora(char* mensaje){
-    printf("\nlargo de mensaje: %d\n",strlen(mensaje));
+    printf("\nBIT: largo de mensaje: %d\n",strlen(mensaje));
     char ** bloques_usables;
     int cantidad_de_bloques;
     int offset_bitacora=0;
@@ -74,7 +80,7 @@ void escribir_bitacora(char* mensaje){
         if(resto!=0){
             cantidad_de_bloques++;
         }
-        printf("cantidad bloques %d\n",cantidad_de_bloques);
+        printf("BIT: cantidad bloques %d\n",cantidad_de_bloques);
         char * bloques_config;
         crear_archivo(path_bitacora);
         bitacora_config_file = config_create(path_bitacora);
@@ -85,7 +91,7 @@ void escribir_bitacora(char* mensaje){
         //printf("hice post\n");
         //modifica el array para guardarlo como char * en el config
         bloques_config = array_block_to_string(bloques_usables,cantidad_de_bloques);
-        printf("bloques a config: %s\n", bloques_config);
+        printf("BIT: bloques a config: %s\n", bloques_config);
         
         for(int i = 0; bloques_usables[i]!=NULL;i++){
             sem_wait(&sem_mutex_bitmap);
@@ -118,7 +124,7 @@ void escribir_bitacora(char* mensaje){
         config_save(bitacora_config_file);
         config_destroy(bitacora_config_file);
         free(bloques_config);
-        free(bloques_usables);
+        liberar_char_array(bloques_usables);
     }else{
         //Ya existiendo Bitacoran.ims
         bitacora_config_file = config_create(path_bitacora);
@@ -126,9 +132,8 @@ void escribir_bitacora(char* mensaje){
         char ** lista_bloques = string_get_string_as_array(bitacora_config.blocks);
         char * bloques_config;
         int size_a_modificar = string_length(mensaje);
-
         int resto_anterior = bitacora_config.size%super_bloque.blocksize;
-        printf("resto anterior%d\n",resto_anterior);
+        printf("BIT: resto anterior%d\n",resto_anterior);
         int cantidad_repetir;
 
         //En caso de que el ultimo bloque no este lleno, decide si 
@@ -141,24 +146,23 @@ void escribir_bitacora(char* mensaje){
         }
         if(resto_anterior!=0){
             char * ultimo_bloque_anterior = lista_bloques[bitacora_config.block_count-1];
-            printf("bloque numero:%s\n",ultimo_bloque_anterior);
+            printf("BIT: bloque numero:%s\n",ultimo_bloque_anterior);
             int ultimo_bloque_offset = atoi(ultimo_bloque_anterior)*super_bloque.blocksize;
             sem_wait(&sem_mutex_blocks);
-            printf("si quedo resto, empiezo en :%d\n",ultimo_bloque_offset+ resto_anterior);
+            printf("BIT: si quedo resto, empiezo en :%d\n",ultimo_bloque_offset+ resto_anterior);
             memcpy(blocksmap+ultimo_bloque_offset+ resto_anterior,mensaje+offset_bitacora,cantidad_repetir);
             sem_post(&sem_mutex_blocks);
             size_a_modificar-=(cantidad_repetir);
             offset_bitacora+=cantidad_repetir;
-            free(ultimo_bloque_anterior);
         }
 
         int resto = size_a_modificar%super_bloque.blocksize;
-        printf("resto actual:%d\n",resto);
+        printf("BIT: resto actual:%d\n",resto);
         cantidad_de_bloques=size_a_modificar/super_bloque.blocksize;
         if(resto!=0){
             cantidad_de_bloques++;
         }
-        printf("cantidad bloques %d\n",cantidad_de_bloques);
+        printf("BIT: cantidad bloques %d\n",cantidad_de_bloques);
         
         //solicita una lista de bloques disponibles y los setea en memoria
         if(cantidad_de_bloques>0){
@@ -166,7 +170,7 @@ void escribir_bitacora(char* mensaje){
             bloques_usables = bits_libres(&bitmap,cantidad_de_bloques);
             sem_post(&sem_mutex_bitmap);
             bloques_config=array_two_block_to_string(lista_bloques,bloques_usables,bitacora_config.block_count);
-            printf("bloques a config: %s\n", bloques_config);
+            printf("BIT: bloques a config: %s\n", bloques_config);
             for(int i = 0; bloques_usables[i]!=NULL;i++){
                 int offset = atoi(bloques_usables[i])*super_bloque.blocksize;
                 if(i==cantidad_de_bloques-1){
@@ -174,7 +178,7 @@ void escribir_bitacora(char* mensaje){
                     memcpy(blocksmap+offset,mensaje+offset_bitacora,resto);
                     sem_post(&sem_mutex_blocks);
                     offset_bitacora+=resto;
-                    printf("termino de escribir bitacora post init en %d\n",offset+resto);
+                    printf("BIT: termino de escribir bitacora post init en %d\n",offset+resto);
                 }else{
                     sem_wait(&sem_mutex_blocks);
                     memcpy(blocksmap+offset,mensaje+offset_bitacora,(int)super_bloque.blocksize);
@@ -182,9 +186,11 @@ void escribir_bitacora(char* mensaje){
                     offset_bitacora+=(int)super_bloque.blocksize;
                 }
             }
+            liberar_char_array(bloques_usables);
         }else{
-            bloques_config = bitacora_config.blocks;
-            printf("bloques a config: %s\n", bloques_config);
+            bloques_config = string_new();
+            string_append(&bloques_config, bitacora_config.blocks);
+            printf("BIT: bloques a config: %s\n", bloques_config);
         }
         
         sem_wait(&sem_mutex_blocks);
@@ -197,14 +203,13 @@ void escribir_bitacora(char* mensaje){
         char * blockcountstr = string_itoa(bitacora_config.block_count+cantidad_de_bloques);
         config_set_value(bitacora_config_file,"SIZE",sizestr);
         config_set_value(bitacora_config_file,"BLOCK_COUNT",blockcountstr);
-        free(sizestr);
-        free(blockcountstr);
-        printf("bloques a config antes de finalizar: %s\n", bloques_config_final);
+        printf("BIT: bloques a config antes de finalizar: %s\n\n", bloques_config_final);
         config_set_value(bitacora_config_file,"BLOCKS",bloques_config_final);
         config_save(bitacora_config_file);
         config_destroy(bitacora_config_file);
+        free(sizestr);
+        free(blockcountstr);
         liberar_char_array(lista_bloques);
-        free(bloques_usables);
         free(bloques_config_final);
         free(bloques_config);
     }
@@ -248,7 +253,6 @@ char * leer_bitacora(char* payload){
             }
             
         }
-        config_destroy(bitacora_config_file);
         free(path_relativo);
         liberar_char_array(lista_bloques);
     }
@@ -257,7 +261,6 @@ char * leer_bitacora(char* payload){
 
 int movimiento_tripulante(char * payload){
     escribir_bitacora(payload);
-    free(payload);
     return EXIT_SUCCESS;
 }
 
@@ -285,13 +288,12 @@ int recibir_tarea(char* payload){
     string_append(&mensaje,"Se comenzo la tarea :");
     string_append(&mensaje,payload);
     escribir_bitacora(mensaje);
-    free(payload);
     liberar_char_array(parametros);
     free(mensaje);
     if(nombre_parametros[1]==NULL){
         //tarea comun sin parametros
         log_info(logger, "se realizo %s con exito", nombre_parametros[0]);
-        liberar_char_array(nombre_parametros);
+
     }else{
         //se procesa tarea con parametros
        
@@ -311,7 +313,7 @@ int recibir_tarea(char* payload){
                 //printf("hice post soy trip%d\n",tripulante.TID);
                 sem_post(&sem_mutex_oxigeno);
                 log_info(logger, "se genero %s unidades de oxigeno",nombre_parametros[1]);
-                liberar_char_array(nombre_parametros);
+                free(path);
                 break;
             }
             case CONSUMIR_OXIGENO:{
@@ -319,7 +321,7 @@ int recibir_tarea(char* payload){
                 sem_wait(&sem_mutex_oxigeno);
                 consumir_recurso(path,"Oxigeno",nombre_parametros[1]);
                 sem_post(&sem_mutex_oxigeno);
-                liberar_char_array(nombre_parametros);
+                free(path);
                 break;
             }
             case GENERAR_COMIDA:{
@@ -329,7 +331,7 @@ int recibir_tarea(char* payload){
                 generar_recurso(path, caracter_llenado, nombre_parametros[1]);
                 sem_post(&sem_mutex_comida);
                 log_info(logger, "se genero %s unidades de comida",nombre_parametros[1]);
-                liberar_char_array(nombre_parametros);
+                free(path);
                 break;
             }
             case CONSUMIR_COMIDA:{
@@ -337,7 +339,7 @@ int recibir_tarea(char* payload){
                 sem_wait(&sem_mutex_comida);
                 consumir_recurso(path,"Comida",nombre_parametros[1]);
                 sem_post(&sem_mutex_comida);
-                liberar_char_array(nombre_parametros);
+                free(path);
                 break;
             }
             case GENERAR_BASURA:{
@@ -347,7 +349,7 @@ int recibir_tarea(char* payload){
                 generar_recurso(path, caracter_llenado, nombre_parametros[1]);
                 sem_post(&sem_mutex_basura);
                 log_info(logger, "se genero %s unidades de basura",nombre_parametros[1]);
-                liberar_char_array(nombre_parametros);
+                free(path);
                 break;
             }
             case DESCARTAR_BASURA:{
@@ -366,19 +368,17 @@ int recibir_tarea(char* payload){
                         sem_post(&sem_mutex_bitmap);
                     }
                     remove(path);
-                    config_destroy(tarea_config_file);
                     liberar_char_array(lista_bloques);
                     log_info(logger, "Se descarto la basura");
                 }else{
                     log_info(logger, "Se intento descartar basura pero no existe el archivo Basura.ims");
                 }
                 sem_post(&sem_mutex_basura);
+                free(path);
                 break;
-                liberar_char_array(nombre_parametros);
             }
             default:{
                 log_info(logger,"operacion desconocida");
-                liberar_char_array(nombre_parametros);
                 return EXIT_FAILURE;
                 break;
             }
@@ -394,6 +394,15 @@ void leer_tarea_config(t_config * tarea_config_file){
 	tarea_config.block_count = config_get_int_value(tarea_config_file,"BLOCK_COUNT");
 	tarea_config.blocks = config_get_string_value(tarea_config_file, "BLOCKS");
 	tarea_config.caracter_llenado = config_get_string_value(tarea_config_file, "CARACTER_LLENADO");
+    tarea_config.md5 = config_get_string_value(tarea_config_file, "MD5_ARCHIVO");
+}
+
+void leer_tarea_config_test(t_config * test){
+	tarea_test.size = config_get_int_value(test,"SIZE");
+	tarea_test.block_count = config_get_int_value(test,"BLOCK_COUNT");
+	tarea_test.blocks = config_get_string_value(test, "BLOCKS");
+	tarea_test.caracter_llenado = config_get_string_value(test, "CARACTER_LLENADO");
+    tarea_test.md5 = config_get_string_value(test, "MD5_ARCHIVO");
 }
 
 void leer_bitacora_config(t_config * bitacora_config_file){
@@ -453,8 +462,6 @@ char ** bits_libres (t_bitarray * bitarray, int cantidad_bits) {
     
     lista_bloques_libres = string_split(bloques_libres,",");
     free(bloques_libres);
-    liberar_char_array(lista_bloques_libres);
-
     return lista_bloques_libres;
     
 }
@@ -509,11 +516,10 @@ void eliminar_keys_bitacora(t_config * bitacora_config_file){
     config_remove_key(bitacora_config_file,"BLOCKS");
 }
 
-void set_tarea_config(t_config * tarea_config_file,char* size, char* cantidad_bloques, char* bloques, char * md5){
+void set_tarea_config(t_config * tarea_config_file,char* size, char* cantidad_bloques, char* bloques){
     config_set_value(tarea_config_file,"SIZE",size);
     config_set_value(tarea_config_file,"BLOCK_COUNT",cantidad_bloques);
     config_set_value(tarea_config_file,"BLOCKS",bloques);
-    config_set_value(tarea_config_file, "MD5_ARCHIVO", md5);
 }
 
 //une dos char ** y los deja como char * [x,x,x]
@@ -630,11 +636,12 @@ void generar_recurso(char* path, char caracter_llenado,char* parametro){
             tarea_config_file,
             parametro,
             cantidadbloquesstr,
-            bloques_config,
-            "QWERTY"
+            bloques_config
         );
-        char * datos = datos_create(parametro,cantidadbloquesstr,bloques_config,caracter);
-        char * md5 = md5_create(datos);
+        config_save(tarea_config_file);
+        printf("hola\n");
+        char * md5 = md5_create(path);
+        config_set_value(tarea_config_file,"MD5_ARCHIVO",md5);
         printf("el md5 es: %s \n",md5);
         free(md5);
         free(caracter);
@@ -716,6 +723,7 @@ void generar_recurso(char* path, char caracter_llenado,char* parametro){
                     free(fill);
                 }
             }    
+            free(bloques_usables);
         }else{
             bloques_config = string_new();
             string_append(&bloques_config, tarea_config.blocks);
@@ -732,15 +740,18 @@ void generar_recurso(char* path, char caracter_llenado,char* parametro){
             tarea_config_file,
             sizestr,
             blockcountstr,
-            bloques_config,
-            "QWERTY"
+            bloques_config
         );
+        config_save(tarea_config_file);
+        char * md5 = md5_create(path);
+        config_set_value(tarea_config_file,"MD5_ARCHIVO",md5);
+        printf("el md5 es: %s \n",md5);
+        config_save(tarea_config_file);
+        //config_destroy(tarea_config_file);
+        free(md5);
         free(sizestr);
         free(blockcountstr);
-        config_save(tarea_config_file);
-        config_destroy(tarea_config_file);
         liberar_char_array(lista_bloques);
-        free(bloques_usables);
         free(bloques_config);
     }
 }
@@ -814,9 +825,13 @@ void consumir_recurso(char* path, char* nombre_recurso ,char* parametro){
                 tarea_config_file,
                 sizestr,
                 blockcountstr,
-                bloques_config,
-                "QWERTY"
+                bloques_config
             );
+            config_save(tarea_config_file);
+            char * md5 = md5_create(path);
+            config_set_value(tarea_config_file,"MD5_ARCHIVO",md5);
+            printf("el md5 es: %s \n",md5);
+            config_save(tarea_config_file);
             free(sizestr);
             free(blockcountstr);
             config_save(tarea_config_file);
@@ -851,9 +866,13 @@ void consumir_recurso(char* path, char* nombre_recurso ,char* parametro){
                 tarea_config_file,
                 cerostr,
                 cerostr,
-                bloques_config,
-                "QWERTY"
+                bloques_config
             );
+            config_save(tarea_config_file);
+            char * md5 = md5_create(path);
+            config_set_value(tarea_config_file,"MD5_ARCHIVO",md5);
+            printf("el md5 es: %s \n",md5);
+            config_save(tarea_config_file);
             free(cerostr);
             config_save(tarea_config_file);
             config_destroy(tarea_config_file);
@@ -875,31 +894,56 @@ void liberar_char_array (char** array){
     free(array);
 }
 
-char * datos_create(char * size,char * cantidadbloquesstr, char * bloques_config,char * caracter){
-    char * datos = string_from_format("SIZE=%s\nBLOCK_COUNT=%s\nBLOCKS=%s\nCARACTER_LLENADO",size,cantidadbloquesstr,bloques_config,caracter);
-    return datos;
-}
 
 char * md5_create (char * datos){
-    FILE *ls_cmd = popen("ls -l", "r");
+    char * command = string_from_format("md5sum %s",datos);
+    FILE *ls_cmd = popen(command, "r");
     if (ls_cmd == NULL) {
         fprintf(stderr, "popen(3) error");
         exit(EXIT_FAILURE);
     }
 
+    free(command);
+
     static char buff[1024];
-    char * md5 = string_new();
+    char * md5temp = string_new();
     size_t n;
 
     while ((n = fread(buff, 1, sizeof(buff)-1, ls_cmd)) > 0) {
         buff[n] = '\0';
-        string_append(&md5,buff);
-        printf("%s", buff);
+        string_append(&md5temp,buff);
     }
-    printf("\n%s\n", md5);
+    char ** md5arr = string_split(md5temp," ");
+    char * md5 = string_from_format("%s",md5arr[0]);
+    liberar_char_array(md5arr);
+    free(md5temp);
     if (pclose(ls_cmd) < 0)
         perror("pclose(3) error");
 
     return md5;
 
+}
+
+void testear_md5(){
+    t_config * test;
+    test = config_create("/home/utnso/polus/Files/Oxigeno.ims");
+    /*t_config * test2;
+    test2 = config_create("/home/utnso/polus/Files/Oxigeno2.ims");
+    eliminar_keys_tarea(test2);*/
+    leer_tarea_config_test(test);
+    printf("md5 viejo = %s\n",tarea_test.md5);
+    config_remove_key(test,"MD5_ARCHIVO");
+    config_save(test);
+    /*config_set_value(test2,"CARACTER_LLENADO",tarea_test.caracter_llenado);
+    set_tarea_config(
+                test2,
+                string_itoa(tarea_test.size),
+                string_itoa(tarea_test.block_count),
+                tarea_test.blocks
+            );
+    config_save(test2);*/
+    char * md5nuevo = md5_create("/home/utnso/polus/Files/Oxigeno.ims");
+    config_set_value(test,"MD5_ARCHIVO",md5nuevo);
+    config_save(test);
+    printf("md5 nuevo = %s\n", md5nuevo);
 }
