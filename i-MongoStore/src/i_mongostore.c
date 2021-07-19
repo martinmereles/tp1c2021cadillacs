@@ -69,7 +69,7 @@ void leer_config(){
 	fs_config.posiciones_sabotaje = config_get_string_value(config, "TIEMPO_SINCRONIZACION");
 	config_superbloque = config_create("./cfg/superbloque.config");
 	sb_config.blocks = config_get_int_value(config_superbloque,"BLOCKS");
-	sb_config.blocksize = config_get_int_value(config_superbloque,"BLOCKSIZE");
+	sb_config.blocksize = config_get_int_value(config_superbloque,"BLOCK_SIZE");
 }
 
 void sighandler(int signum) {
