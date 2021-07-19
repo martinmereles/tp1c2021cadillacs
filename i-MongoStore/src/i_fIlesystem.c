@@ -79,8 +79,11 @@ void mapear_blocks(){
 
 void crear_filesystem(){
 	char * puntomontaje = crear_path_absoluto("/SuperBloque.ims");
-	super_bloque.blocksize = config_get_int_value(config_superbloque, "BLOCKSIZE");
-	super_bloque.blocks = config_get_int_value(config_superbloque, "BLOCKS");
+	super_bloque.blocksize = sb_config.blocksize;
+	super_bloque.blocks = sb_config.blocks;
+	printf("blocks :%d, blocksize:%d\n", super_bloque.blocks, super_bloque.blocksize);
+	/*super_bloque.blocksize = 50;
+	super_bloque.blocks = 500;*/
 	super_bloque.bitarray = calloc(super_bloque.blocks/8, sizeof(char));
 	int sizeStruct = sizeof(super_bloque.blocksize)+sizeof(super_bloque.blocks)+super_bloque.blocks/8+1;
 	sbfile = open(puntomontaje, O_RDWR | O_CREAT , S_IRUSR | S_IWUSR);
@@ -129,7 +132,7 @@ void crear_filesystem(){
 	ftruncate(fileno(blocks_create), size);
 	fclose(blocks_create);
 	log_info(logger, "No se encontro un archivo Blocks.ims existente y se creo uno en base a SuperBloque.ims");
-			
+	free(puntomontaje);
 }
 
 void crear_directorios(){
@@ -146,7 +149,6 @@ char* crear_path_absoluto(char * pathRelativo){
 	char * pathAbsoluto = string_new();
 	string_append(&pathAbsoluto, fs_config.punto_montaje);
 	string_append(&pathAbsoluto, pathRelativo);
-	free(pathAbsoluto);
 	return pathAbsoluto;
 }
 
