@@ -24,9 +24,10 @@ int dispatcher(void *algor_planif){
 
     t_tripulante* primer_tripulante;
     t_tripulante* tripulante;
-    //int code_algor = string_to_code_algor(algor_planif);
+
+    log_info(logger,"DISPATCHER CREADO");
 	
-    while(true){
+    while(status_discordiador != END || !list_is_empty(lista_tripulantes)){
 
         sem_wait(&sem_hay_evento_planificable);
         sem_wait(&sem_mutex_ejecutar_dispatcher);
@@ -105,99 +106,56 @@ int dispatcher(void *algor_planif){
             }
 
         }while(false);
-
         sem_post(&sem_mutex_ejecutar_dispatcher);
+    } // FIN WHILE
+	liberar_estructuras_planificador();
+    return 0;
+}
 
-/*
-        // Se admiten en el sistema cada uno de los tripulantes creados
-        sem_wait(&sem_mutex_ejecutar_dispatcher);
-        sem_wait(&sem_mutex_ingreso_tripulantes_new);
-		if( existen_tripulantes_en_cola(NEW) ){
-            //log_debug(logger, "Atendiendo COLA NEW");
-            //pasar_todos_new_to_ready(code_algor);
-            tripulante = desencolar(NEW); 
-            transicion(tripulante, NEW, READY);
-        }
-        sem_post(&sem_mutex_ingreso_tripulantes_new);
-        sem_post(&sem_mutex_ejecutar_dispatcher);
-        
-        sem_wait(&sem_mutex_ejecutar_dispatcher);
-		if( hay_espacio_disponible(grado_multiproc) && existen_tripulantes_en_cola(READY) ){
-            //log_debug(logger, "Atendiendo COLA READY");
-            //gestionar_exec(grado_multiproc);
-            tripulante = desencolar(READY);
-            transicion(tripulante, READY, EXEC);
-        }
-        sem_post(&sem_mutex_ejecutar_dispatcher);
+void crear_estructuras_planificador(){
+    estado_planificador = PLANIFICADOR_OFF;
 
-        // Consulto si hay que atender Bloqueos IO
-        sem_wait(&sem_mutex_ejecutar_dispatcher);
-        if(existen_tripulantes_en_cola(BLOCKED_IO_TO_READY)){
-            //log_debug(logger, "Atendiendo COLA BLOCKED IO TO READY");
-            get_buffer_peticiones_and_swap(BLOCKED_IO_TO_READY);
+    // Inicializo semaforos del dispatcher
+	sem_init(&sem_hay_evento_planificable, 0, 0);
+    sem_init(&sem_mutex_ingreso_tripulantes_new,0,1);
+    sem_init(&sem_mutex_ejecutar_dispatcher,0,0);
+	sem_init(&sem_sabotaje_activado,0,0);
 
-            // Si quedo algun tripulante en la cola, al primero le dejo usar el dispositivo de E/S
-            primer_tripulante = ojear_cola(BLOCKED_IO);
-            if(primer_tripulante != NULL)
-                sem_post(primer_tripulante->sem_puede_usar_dispositivo_io);
-        }
-        sem_post(&sem_mutex_ejecutar_dispatcher);
+	crear_colas();
 
-        sem_wait(&sem_mutex_ejecutar_dispatcher);
-        if(existen_tripulantes_en_cola(EXEC_TO_BLOCKED_IO)){
-            //log_debug(logger, "Atendiendo COLA EXEC TO BLOCKED IO");
+	// Lista de tripulantes (sirve para poder pausar/reanudar la planificacion)
+	lista_tripulantes = list_create();
 
-            int cant_tripulantes = cantidad_tripulantes_en_cola(BLOCKED_IO);
+    // Creando hilo del dispatcher
+    pthread_create(&hilo_dispatcher, NULL, (void*) dispatcher, NULL);
+}
 
-            get_buffer_peticiones_and_swap(EXEC_TO_BLOCKED_IO);
 
-            // Si la cola estaba vacia, al tripulante agregado (si hay) le dejo usar el dispositivo de E/S
-            if(cant_tripulantes == 0){
-                primer_tripulante = ojear_cola(BLOCKED_IO);
-                if(primer_tripulante != NULL)
-                    sem_post(primer_tripulante->sem_puede_usar_dispositivo_io);  
-            }
-        }
-        sem_post(&sem_mutex_ejecutar_dispatcher);
-
-        // Consulto si hay sabotaje
-        sem_wait(&sem_mutex_ejecutar_dispatcher);
-		if( hay_sabotaje() ){
-            //Atendiendo sabotaje
-            log_debug(logger, "Atendiendo COLA BLOCKED_EMERGENCY");
-            if (bloquear_tripulantes_por_sabotaje() != EXIT_SUCCESS)
-                log_error(logger, "No se pudo ejecutar la funcion de bloqueo ante sabotajes");
-            //while ( !termino_sabotaje() ); //ESPERA ACTIVA o implementar SEMÁFORO.
-            //TODO: pasar TRIPULANTE que atendio SABOTAJE de EXEC a BLOCKED_IO
-            log_debug(logger, "Termino sabotaje"); 
-            desbloquear_tripulantes_tras_sabotaje();
-		}
-        sem_post(&sem_mutex_ejecutar_dispatcher);
-
-        // Si hay tripulantes que se quedaron sin quantum (transicion EXEC_TO_READY)
-        sem_wait(&sem_mutex_ejecutar_dispatcher);
-		if( existen_tripulantes_en_cola(EXEC_TO_READY) )
-            get_buffer_peticiones_and_swap(EXEC_TO_READY);
-        sem_post(&sem_mutex_ejecutar_dispatcher);
-
-        // Si hay tripulantes en EXIT
-        sem_wait(&sem_mutex_ejecutar_dispatcher);
-		if( existen_tripulantes_en_cola(EXIT) )
-            gestionar_tripulantes_en_exit();
-        sem_post(&sem_mutex_ejecutar_dispatcher);*/
-    }
-
+void liberar_estructuras_planificador(){
 	//libero recursos:
     log_error(logger, "Desarmando todos los tripulantes de las colas por finalizacion");
+    list_destroy_and_destroy_elements(lista_tripulantes, destructor_elementos_tripulante);
     for(int tipo_cola = 0;tipo_cola < CANT_COLAS; tipo_cola++){
-        list_destroy_and_destroy_elements(cola[tipo_cola]->elements, destructor_elementos_tripulante);
+        queue_destroy_and_destroy_elements(cola[tipo_cola], destructor_elementos_tripulante);
         sem_destroy(mutex_cola[tipo_cola]);
         free(mutex_cola[tipo_cola]);
     }
-    list_destroy_and_destroy_elements(lista_tripulantes, destructor_elementos_tripulante);
     free(cola);
-    free(mutex_cola); 
-    return 0;
+    free(mutex_cola);
+}
+
+void finalizar_discordiador(){
+    void ejecutar_expulsar_tripulante(void* args){
+        t_tripulante* tripulante = (t_tripulante*) args;
+        int* TID = malloc(sizeof(int));
+	    *TID = tripulante->TID;
+        rutina_expulsar_tripulante(TID);
+    }
+
+    // Enviamos a EXIT a todos los tripulantes
+    list_iterate(lista_tripulantes, ejecutar_expulsar_tripulante);
+    status_discordiador = END;  // Cambiamos el estado del discordiador a END
+    sem_post(&sem_hay_evento_planificable);
 }
 
 
@@ -227,22 +185,12 @@ void gestionar_tripulantes_en_exit(){
     log_debug(logger, "Se elimino al tripulante %d exitosamente", tid);
 }
 
-int iniciar_dispatcher(char *algoritmo_planificador){
+int iniciar_dispatcher(){
 
-    if(estado_planificador == PLANIFICADOR_OFF){
-        pthread_t *hilo_dispatcher;
-        hilo_dispatcher = malloc(sizeof(pthread_t));
-
-        // Creando hilo del dispatcher
-        pthread_create(hilo_dispatcher, NULL, (void*) dispatcher,&algoritmo_planificador);
-        pthread_detach(*hilo_dispatcher);
-        free(hilo_dispatcher);
-
+    if(estado_planificador != PLANIFICADOR_RUNNING){
+        log_info(logger, "Iniciando dispatcher");
         estado_planificador = PLANIFICADOR_RUNNING;
-    }
-    else if(estado_planificador == PLANIFICADOR_BLOCKED){
         sem_post(&sem_mutex_ejecutar_dispatcher);
-        estado_planificador = PLANIFICADOR_RUNNING;
     }
     
     return EXIT_SUCCESS;
@@ -281,17 +229,21 @@ int transicion(t_tripulante *tripulante, enum estado_tripulante estado_inicial, 
 }
 
 bool existen_tripulantes_en_cola(int tipo_cola){
-    return (cantidad_tripulantes_en_cola(tipo_cola) > 0)? true: false;
+    return cantidad_tripulantes_en_cola(tipo_cola) > 0;
 }
 
  int hay_espacio_disponible(int grado_multiprocesamiento){
-    return (cantidad_tripulantes_en_cola(EXEC) < grado_multiprocesamiento)? 1: 0;
+    return cantidad_tripulantes_en_cola(EXEC) < grado_multiprocesamiento;
 }
 
-int hay_tarea_a_realizar(void){
-    // TODO: fijarse si hay siguiente tarea a leer AUN. ¿POSIBLE sincronizacion?
-    // USAR funciones de commons txt / o medir si no alcanzó a EOF de lista_tareas.txt
-    return 1;
+t_tripulante *buscar_tripulante_por_tid(int tid_buscado){
+
+    bool tiene_TID(void* args){
+        t_tripulante* tripulante_encontrado = (t_tripulante*) args;
+        return tripulante_encontrado->TID == tid_buscado;
+    }
+
+    return list_find(lista_tripulantes, tiene_TID);
 }
 
 int rutina_expulsar_tripulante(void* args){
@@ -300,11 +252,6 @@ int rutina_expulsar_tripulante(void* args){
     t_tripulante *trip_expulsado;
     int resultado_exit = EXIT_FAILURE;
     int estado_cola;
-
-    if ( estado_planificador == PLANIFICADOR_OFF ){
-        log_error(logger,"ERROR. rutina_expulsar_tripulante: El planificador esta apagado");
-        return -1;
-    }
 
     sem_wait(&sem_mutex_ejecutar_dispatcher);
 
@@ -326,6 +273,7 @@ int rutina_expulsar_tripulante(void* args){
         log_error(logger,"El tripulante %d no existe", tid_buscado);
 
     sem_post(&sem_mutex_ejecutar_dispatcher);
+    sem_post(&sem_hay_evento_planificable);
     
     return resultado_exit;
 }
@@ -358,21 +306,22 @@ void destructor_elementos_tripulante(void *data){
         return tripulante_encontrado->TID == tripulante->TID;
     }
 
-    // Lo quito de la lista global de tripulantes
-    list_remove_by_condition(lista_tripulantes, tiene_TID_a_eliminar);
-
     // Destruyo todos sus semaforos
     sem_destroy(tripulante->sem_planificacion_fue_reanudada); 
     free(tripulante->sem_planificacion_fue_reanudada);   
     sem_destroy(tripulante->sem_finalizo); 
-    free(tripulante->sem_finalizo);        
+    free(tripulante->sem_finalizo);      
+    sem_destroy(tripulante->sem_puede_usar_dispositivo_io); 
+    free(tripulante->sem_puede_usar_dispositivo_io);    
 
     for(int i = 0;i < CANT_ESTADOS;i++){
         sem_destroy(tripulante->sem_tripulante_dejo[i]); 
         free(tripulante->sem_tripulante_dejo[i]);
     }
+    free(tripulante->sem_tripulante_dejo);
 
-    free(tripulante);   // Libero el struct
+    // Lo quito de la lista global de tripulantes y libero el struct
+    list_remove_and_destroy_by_condition(lista_tripulantes, tiene_TID_a_eliminar, free);
 }
 
 char *code_dispatcher_to_string(enum estado_tripulante code){
@@ -448,12 +397,23 @@ int bloquear_tripulantes_por_sabotaje(void){
     }
 }
 
-enum algoritmo string_to_code_algor(char *string_code){
-    if (strcmp("RR",string_code) == 0)
-        return RR;
-    else
-        return FIFO;
-}// TODO: evaluar su aplicacion
+int inicializar_algoritmo_planificacion(t_config* config){
+    if(strcmp("RR", config_get_string_value(config, "ALGORITMO")) == 0){
+        algoritmo_planificacion = RR;
+        log_info(logger, "El algoritmo de planificacion es: RR");
+        quantum = atoi(config_get_string_value(config, "QUANTUM"));	// Variable global
+        log_info(logger, "El quantum es: %d", quantum);
+        return EXIT_SUCCESS;
+    }
+    if(strcmp("FIFO", config_get_string_value(config, "ALGORITMO")) == 0){
+        algoritmo_planificacion = FIFO;
+        log_info(logger, "El algoritmo de planificacion es: FIFO");
+        quantum = 0; // Variable global
+        return EXIT_SUCCESS;
+    }
+    log_error(logger, "ERROR. Algoritmo de planificacion: %s. No es valido", config_get_string_value(config, "ALGORITMO"));
+    return EXIT_FAILURE;
+}
 
 int get_buffer_peticiones_and_swap(enum peticion_transicion tipo_peticion){
     t_tripulante *tripulante;
@@ -526,7 +486,7 @@ t_tripulante* iniciador_tripulante(int tid, int pid){
     nuevo -> sem_puede_usar_dispositivo_io = malloc(sizeof(sem_t));
     sem_init(nuevo -> sem_puede_usar_dispositivo_io, 0, 0);
 
-    nuevo -> sem_tripulante_dejo = malloc(sizeof(sem_t*) * 6);
+    nuevo -> sem_tripulante_dejo = malloc(sizeof(sem_t*) * CANT_ESTADOS);
     for(int i = 0;i < CANT_ESTADOS;i++){
         nuevo->sem_tripulante_dejo[i] = malloc(sizeof(sem_t));
         sem_init(nuevo->sem_tripulante_dejo[i], 0, 0);

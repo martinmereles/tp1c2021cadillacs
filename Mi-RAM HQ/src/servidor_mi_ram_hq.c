@@ -77,7 +77,8 @@ int iniciar_tripulante(char* payload, void** tabla, uint32_t* dir_log_tcb){
 
     dibujar_tripulante_mapa(TID, posicion_X, posicion_Y);
 
-    if(crear_tripulante(tabla, dir_log_tcb, PID, TID, posicion_X, posicion_Y) == EXIT_FAILURE){
+    if(crear_tripulante(tab
+la, dir_log_tcb, PID, TID, posicion_X, posicion_Y) == EXIT_FAILURE){
         log_error(logger, "NO SE PUDO CREAR AL TRIPULANTE.");
         borrar_tripulante_mapa(TID);
         return COD_INICIAR_TRIPULANTE_ERROR;

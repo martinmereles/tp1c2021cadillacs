@@ -11,6 +11,7 @@
 #include <pthread.h>
 #include <semaphore.h>
 #include <commons/temporal.h>
+#include <commons/config.h>
 
 #define CANT_ESTADOS 6
 #define CANT_COLAS 9
@@ -30,6 +31,9 @@ enum peticion_transicion{
     BLOCKED_IO_TO_READY = 7,
     EXEC_TO_READY = 8
 };
+
+enum status_discordiador{   RUNNING,
+                            END };
 
 // Estructura de dato para colas del planificador / dispatcher
 typedef struct dato_tripulante{
@@ -56,12 +60,11 @@ enum algoritmo {
 };
 
 // PROTOTIPOS DE FUNCIONES
-int iniciar_dispatcher(char *algoritmo_planificador);
+int iniciar_dispatcher();
 int listar_tripulantes(void);
 char *code_dispatcher_to_string(enum estado_tripulante code);
 int rutina_expulsar_tripulante(void* args);
 void dispatcher_pausar(void);
-enum algoritmo string_to_code_algor(char *string_algor);
 int dispatcher_eliminar_tripulante(int tid_eliminar);
 t_tripulante* iniciador_tripulante(int tid, int pid);
 void crear_colas();
@@ -69,6 +72,10 @@ void encolar(int tipo_cola, t_tripulante* tripulante);
 t_tripulante* desencolar(int tipo_cola);
 t_tripulante* ojear_cola(int tipo_cola);
 int cantidad_tripulantes_en_cola(int tipo_cola);
+void crear_estructuras_planificador();
+void liberar_estructuras_planificador();
+void finalizar_discordiador();
+int inicializar_algoritmo_planificacion(t_config* config);
 
 // VARIABLES GLOBALES
 sem_t sem_mutex_ingreso_tripulantes_new;
@@ -80,14 +87,13 @@ sem_t sem_hay_evento_planificable;
 t_queue **cola;
 sem_t ** mutex_cola;
 
-// agrego cola buffer que interactua con cada tripulante - estos contienen el TID respectivo
-t_queue *buffer_peticiones_exec_to_blocked_io;
-t_queue *buffer_peticiones_blocked_io_to_ready;
-t_queue *buffer_peticiones_exec_to_ready; // RR
-
 enum status_planificador estado_planificador;
+enum status_discordiador status_discordiador;
+enum algoritmo algoritmo_planificacion;
 
 // Lista global de tripulantes (sirve para pausar/reanudar la planificacion)
 t_list* lista_tripulantes;
+
+pthread_t hilo_dispatcher;
 
 #endif

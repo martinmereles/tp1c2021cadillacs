@@ -8,24 +8,16 @@ int main(void) {
 
 	// Inicializo variables globales
 	status_discordiador = RUNNING;
-    estado_planificador = PLANIFICADOR_OFF;
 
 	generadorPID = 0;
 	generadorTID = 0;
 
-	// Creo las colas
-	crear_colas();
-
 	sem_init(&sem_generador_PID, 0, 1);
 	sem_init(&sem_generador_TID, 0, 1);
 	sem_init(&sem_struct_iniciar_tripulante, 0, 0);
-	sem_init(&sem_hay_evento_planificable, 0, 0);
 
-    // Inicializo semaforos del dispatcher
-    sem_init(&sem_mutex_ingreso_tripulantes_new,0,1);
-    sem_init(&sem_mutex_ejecutar_dispatcher,0,1);
-	sem_init(&sem_sabotaje_activado,0,0);
-
+	// Creo estructuras del planificador
+	crear_estructuras_planificador();
 
 	int i_mongo_store_fd;
 	int mi_ram_hq_fd;
@@ -38,33 +30,13 @@ int main(void) {
 	puerto_i_Mongo_Store = config_get_string_value(config, "PUERTO_I_MONGO_STORE");
 	direccion_IP_Mi_RAM_HQ = config_get_string_value(config, "IP_MI_RAM_HQ");
 	puerto_Mi_RAM_HQ = config_get_string_value(config, "PUERTO_MI_RAM_HQ");
-	algoritmo_planificador = config_get_string_value(config, "ALGORITMO");
 	grado_multiproc = atoi(config_get_string_value(config, "GRADO_MULTITAREA"));
 	duracion_sabotaje = atoi(config_get_string_value(config, "DURACION_SABOTAJE"));
 	retardo_ciclo_cpu = atoi(config_get_string_value(config, "RETARDO_CICLO_CPU"));
 	path_tareas = config_get_string_value(config, "PATH_TAREAS");
 
-    if(strcmp(algoritmo_planificador,"RR")==0){
-		log_info(logger, "El algoritmo de planificacion es: RR");
-		quantum = atoi(config_get_string_value(config, "QUANTUM"));	// Variable global
-		log_info(logger, "El quantum es: %d", quantum);
-    }
-    else{
-		if(strcmp(algoritmo_planificador,"FIFO")==0){
-			log_info(logger, "El algoritmo de planificacion es: FIFO");
-			quantum = 0; // Variable global
-		}
-		else{
-			log_error(logger, "ERROR. Algoritmo de planificacion: %s. No es valido", algoritmo_planificador);
-			return EXIT_FAILURE;
-		}
-    }
-
-	// Inicializo semaforo grado multitarea
-	sem_init(&sem_recurso_multitarea_disponible, 0, grado_multiproc);
-
-	// Lista de tripulantes (sirve para poder pausar/reanudar la planificacion)
-	lista_tripulantes = list_create();	// La inicializo
+	if(inicializar_algoritmo_planificacion(config) == EXIT_FAILURE)
+		return EXIT_FAILURE;
 
 	log_info(logger, "Configuracion terminada");
 
@@ -95,9 +67,10 @@ int main(void) {
 
 	leer_fds(i_mongo_store_fd, mi_ram_hq_fd);
 
+	// Espero a que finalice el planificador
+	pthread_join(hilo_dispatcher, NULL);
+
 	// Libero recursos
-	log_info(logger,"Finalizando Discordiador");
-	list_destroy(lista_tripulantes);	// Lista global para pausar/reanudar planif.
 	log_destroy(logger);
 	config_destroy(config);
 	liberar_conexion(i_mongo_store_fd);
@@ -144,6 +117,7 @@ void leer_fds(int i_mongo_store_fd, int mi_ram_hq_fd){
 
 void recibir_y_procesar_mensaje_i_mongo_store(int i_mongo_store_fd){
 	char* mensaje;
+	char * bitacora;
 	int cod_op = recibir_operacion(i_mongo_store_fd);
 	switch(cod_op)
 	{
@@ -154,12 +128,13 @@ void recibir_y_procesar_mensaje_i_mongo_store(int i_mongo_store_fd){
 			break;
 		case COD_OBTENER_BITACORA:;
 			log_info(logger, "obteniendo bitacora desde el i-mongo...");
-			char * bitacora = recibir_payload(i_mongo_store_fd);
+			bitacora = recibir_payload(i_mongo_store_fd);
 			log_info(logger, bitacora);
 			/*char ** lista_bitacora = string_split(bitacora,";");
 			for(int i =0 ;lista_bitacora[i]!=NULL ;i++){
 				log_info(logger, lista_bitacora[i]);
 			}*/
+			free(bitacora);
 			break;
 		case COD_MANEJAR_SABOTAJE:
 			printf("manejar sabotaje");
@@ -250,9 +225,9 @@ void leer_consola_y_procesar(int i_mongo_store_fd, int mi_ram_hq_fd) {
             log_info(logger, "Iniciando planificacion");
 
 			// Habilito la planificacion para cada tripulante cuando se ejecuta por 1ra vez o si fue pausado:
-			if (estado_planificador == PLANIFICADOR_OFF || estado_planificador == PLANIFICADOR_BLOCKED){		
+			if (estado_planificador != PLANIFICADOR_RUNNING){		
 				// Inicia la ejecucion del HILO Dispatcher: gestor de QUEUEs del Sistema
-				iniciar_dispatcher(algoritmo_planificador);
+				iniciar_dispatcher();
         		reanudar_planificacion();
 			}
 			else 
@@ -272,6 +247,16 @@ void leer_consola_y_procesar(int i_mongo_store_fd, int mi_ram_hq_fd) {
 		case OBTENER_BITACORA:
 			log_info(logger, "Obteniendo bitacora");
 			obtener_bitacora(argumentos,i_mongo_store_fd);
+			break;
+		case FINALIZAR:
+			log_info(logger, "Finalizando Discordiador");	
+			if(estado_planificador != PLANIFICADOR_RUNNING){
+				iniciar_dispatcher();
+				finalizar_discordiador();
+				reanudar_planificacion();
+			}
+			else
+				finalizar_discordiador();
 			break;
 		default:
 			log_error(logger, "%s: comando no encontrado", argumentos[0]);
@@ -336,6 +321,8 @@ int iniciar_patota(char** argumentos, int mi_ram_hq_fd){
 	archivo_de_tareas = fopen(path_archivo, "r");
 	if(archivo_de_tareas == NULL){
 		log_error(logger, "INICIAR_PATOTA: %s: No existe el archivo",argumentos[2]);
+		free(path_archivo);
+		free(lista_de_tareas);
 		return EXIT_FAILURE;
 	}
 
@@ -395,8 +382,9 @@ int iniciar_patota(char** argumentos, int mi_ram_hq_fd){
 	}
 
 	log_info(logger, "La patota fue inicializada");
-
 	fclose(archivo_de_tareas);
+	free(path_archivo);
+	free(lista_de_tareas);
 	return EXIT_SUCCESS;
 }
 
@@ -429,7 +417,7 @@ int submodulo_tripulante(void* args) {
 	int i_mongo_store_fd_tripulante;
 	int estado_envio_mensaje;
 
-	int ciclos_en_estado_actual;
+	int ciclos_en_estado_actual = 0;
 
 	int	ciclos_ejecutando_tarea = 0;
 
@@ -493,7 +481,7 @@ int submodulo_tripulante(void* args) {
 
 	log_info(logger, "Tripulante inicializado");
 		
-	while(status_discordiador != END && !tripulante_finalizado){
+	while(!tripulante_finalizado){
 			
 		// Si la planificacion fue pausada, se bloquea el tripulante
 		if(estado_planificador != PLANIFICADOR_RUNNING){
@@ -543,7 +531,7 @@ int submodulo_tripulante(void* args) {
 
 					// TODO: Avisa que finalizo la tarea
 					
-					log_error(logger, "T%2d: Tarea completada: Total %d ciclos", tripulante->TID, tarea->duracion);	
+					log_error(logger,"T%2d: Ciclo Tarea I/O: Tarea completada", tripulante->TID);
 					enviar_operacion(i_mongo_store_fd_tripulante, COD_TERMINAR_TAREA, tarea->string, strlen(tarea->string)+1);
 					destruir_tarea(tarea);
 					tarea = NULL;
@@ -564,7 +552,7 @@ int submodulo_tripulante(void* args) {
 
 				// PARA ROUND ROBIN
 				// Si al tripulante se le acabo el quantum => pasa a READY
-				if(!strcmp(algoritmo_planificador, "RR") && ciclos_en_estado_actual >= quantum){
+				if(algoritmo_planificacion == RR && ciclos_en_estado_actual >= quantum){
 					// log_debug(logger, "T%2d: Expul. CPU: Fin de quantum", tripulante->TID);
 					// TODO: Le pide al planificador que lo agregue a la cola de ready
 					encolar(EXEC_TO_READY, tripulante);
@@ -829,15 +817,12 @@ void leer_ubicacion_tripulante_mi_ram_hq(int mi_ram_hq_fd_tripulante, int* posic
 	{
 		case COD_UBICACION_TRIPULANTE:
 			payload = recibir_payload(mi_ram_hq_fd_tripulante);
-
 			int offset = 0;
-		
 			memcpy(posicion_X, payload + offset, sizeof(uint32_t));
 			offset += sizeof(uint32_t);
-
 			memcpy(posicion_Y, payload + offset, sizeof(uint32_t));
 			offset += sizeof(uint32_t);
-
+			free(payload);
 			break;
 		case -1:
 			log_error(logger, "Mi-RAM HQ se desconecto. Terminando discordiador");
@@ -864,6 +849,8 @@ enum comando_discordiador string_to_comando_discordiador(char* string){
 		return PAUSAR_PLANIFICACION;
 	if(strcmp(string,"OBTENER_BITACORA")==0)
 		return OBTENER_BITACORA;
+	if(strcmp(string,"FINALIZAR")==0)
+		return FINALIZAR;
 	return ERROR;
 }
 

@@ -24,15 +24,13 @@ typedef struct {
 	pthread_t hilo;
 } ciclo_t;
 
-enum status_discordiador{   RUNNING,
-                            END };
-
 enum comando_discordiador{  INICIAR_PATOTA, 
                             LISTAR_TRIPULANTES,
                             EXPULSAR_TRIPULANTE, 
                             INICIAR_PLANIFICACION,
                             PAUSAR_PLANIFICACION,
                             OBTENER_BITACORA,
+                            FINALIZAR,
                             ERROR };
 
 
@@ -70,14 +68,11 @@ char* direccion_IP_i_Mongo_Store;
 char* puerto_i_Mongo_Store;
 char* direccion_IP_Mi_RAM_HQ;
 char* puerto_Mi_RAM_HQ;
-char* algoritmo_planificador;
 char* path_tareas;
 
 //grado_multitarea = grado multiprocesamiento
 int duracion_sabotaje; // expresado como cantidad en ciclos CPU
 int retardo_ciclo_cpu; // tiempo de espera por c/ciclo CPU
-
-enum status_discordiador status_discordiador;
 
 int generadorPID;
 int generadorTID;
@@ -85,8 +80,5 @@ int generadorTID;
 sem_t sem_generador_TID;
 sem_t sem_generador_PID;
 sem_t sem_struct_iniciar_tripulante;
-
-//sem_t sem_planificacion_fue_iniciada;
-sem_t sem_recurso_multitarea_disponible;
 
 #endif
