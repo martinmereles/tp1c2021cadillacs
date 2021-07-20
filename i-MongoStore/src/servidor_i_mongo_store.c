@@ -397,14 +397,6 @@ void leer_tarea_config(t_config * tarea_config_file){
     tarea_config.md5 = config_get_string_value(tarea_config_file, "MD5_ARCHIVO");
 }
 
-void leer_tarea_config_test(t_config * test){
-	tarea_test.size = config_get_int_value(test,"SIZE");
-	tarea_test.block_count = config_get_int_value(test,"BLOCK_COUNT");
-	tarea_test.blocks = config_get_string_value(test, "BLOCKS");
-	tarea_test.caracter_llenado = config_get_string_value(test, "CARACTER_LLENADO");
-    tarea_test.md5 = config_get_string_value(test, "MD5_ARCHIVO");
-}
-
 void leer_bitacora_config(t_config * bitacora_config_file){
     bitacora_config.size = config_get_int_value(bitacora_config_file,"SIZE");
 	bitacora_config.block_count = config_get_int_value(bitacora_config_file,"BLOCK_COUNT");
@@ -528,27 +520,34 @@ char * array_two_block_to_string(char ** bloq_antiguo, char** bloq_nuevo, int co
     string_append(&bloques, "[");
     if (bloq_antiguo[0]!=NULL){
         for(int i = 0; bloq_antiguo[i]!=NULL;i++){
-            if(i==config_block_count-1){
-                string_append(&bloques,bloq_antiguo[i]);
+            string_append(&bloques,bloq_antiguo[i]);
+            string_append(&bloques,",");
+        }
+        for(int i = 0; bloq_nuevo[i]!=NULL;i++){
+            if(bloq_nuevo[i+1]==NULL){
+                string_append(&bloques,bloq_nuevo[i]);
             }else{
-                string_append(&bloques,bloq_antiguo[i]);
+                string_append(&bloques,bloq_nuevo[i]);
                 string_append(&bloques,",");
             }
         }
+        /*
         //if(bloq_nuevo[0]!="0"&&atoi(bloq_nuevo[0])!=0){
         if(!strcmp(bloq_nuevo[0],"0")&&atoi(bloq_nuevo[0])!=0){
+            printf("CHAU\n");
             for(int i = 0; bloq_nuevo[i]!=NULL;i++){
             string_append(&bloques,",");
             string_append(&bloques,bloq_nuevo[i]);
             }
         //}else if (bloq_nuevo[0]=="0"){
         }else if (strcmp(bloq_nuevo[0],"0")){
+            printf("HOLA\n");
             for(int i = 0; bloq_nuevo[i]!=NULL;i++){
             //printf("entre bloqnuevo\n");
             string_append(&bloques,",");
             string_append(&bloques,bloq_nuevo[i]);
             }
-        }
+        }*/
     }else{
         for(int i = 0; bloq_nuevo[i]!=NULL;i++){
             if(i==0){
@@ -603,6 +602,9 @@ void generar_recurso(char* path, char caracter_llenado,char* parametro){
         //modifica el array para guardarlo como char * en el config
         bloques_config = array_block_to_string(bloques_usables,cantidad_de_bloques);
         printf("bloques recurso %c a config: %s\n", caracter_llenado, bloques_config);
+
+        //char para md5 del ultimo bloque modificado
+        char * md5_str = calloc(1,super_bloque.blocksize+1);
         for(int i = 0; bloques_usables[i]!=NULL;i++){
             int offset = atoi(bloques_usables[i])*super_bloque.blocksize;
             //char *test = bloques_usables[i];
@@ -611,6 +613,7 @@ void generar_recurso(char* path, char caracter_llenado,char* parametro){
                 char * fill = string_repeat(caracter_llenado,resto);
                 sem_wait(&sem_mutex_blocks);
                 printf(" no existe y termina offset:%d\n",offset);
+                memcpy(md5_str,fill,resto);
                 memcpy(blocksmap+offset,fill,resto);
                 sem_post(&sem_mutex_blocks);
                 free(fill);
@@ -640,7 +643,7 @@ void generar_recurso(char* path, char caracter_llenado,char* parametro){
         );
         config_save(tarea_config_file);
         printf("hola\n");
-        char * md5 = md5_create(path);
+        char * md5 = md5_create(md5_str);
         config_set_value(tarea_config_file,"MD5_ARCHIVO",md5);
         printf("el md5 es: %s \n",md5);
         free(md5);
@@ -896,7 +899,7 @@ void liberar_char_array (char** array){
 
 
 char * md5_create (char * datos){
-    char * command = string_from_format("md5sum %s",datos);
+    char * command = string_from_format("echo -n %s | md5sum",datos);
     FILE *ls_cmd = popen(command, "r");
     if (ls_cmd == NULL) {
         fprintf(stderr, "popen(3) error");
@@ -925,25 +928,266 @@ char * md5_create (char * datos){
 }
 
 void testear_md5(){
+    fsck();
+}
+
+
+
+void fsck(){
+    t_superbloque st_sb_fsck;
+    char * puntomontaje = crear_path_absoluto("/SuperBloque.ims");
+    int offset = 0;
+    int sbfile_fsck;
+
+    //abro el superbloque.ims
+    sbfile_fsck = open(puntomontaje, O_RDWR, S_IRUSR | S_IWUSR);
+    //void * map_sb_fsck = mmap (NULL, superbloque_stat.st_size, PROT_READ | PROT_WRITE ,MAP_SHARED, sbfile_fsck, 0 );
+    superbloquemap = mmap (NULL, superbloque_stat.st_size, PROT_READ | PROT_WRITE ,MAP_SHARED, sbfile_fsck, 0 );
+    //tamaño de bloques
+    memcpy(&st_sb_fsck.blocksize,superbloquemap,sizeof(st_sb_fsck.blocksize));
+    offset = offset + sizeof(st_sb_fsck.blocksize);
+    //cantidad de bloques(posiblemente modificado)
+    memcpy(&st_sb_fsck.blocks,superbloquemap+offset,sizeof(st_sb_fsck.blocks));
+    offset = offset + sizeof(st_sb_fsck.blocks);
+    st_sb_fsck.bitarray = calloc(st_sb_fsck.blocks/8+1, sizeof(char*));
+	memcpy(st_sb_fsck.bitarray,superbloquemap+offset,st_sb_fsck.blocks/8+1);
+    t_bitarray bitmap_fsck = *bitarray_create_with_mode(st_sb_fsck.bitarray,st_sb_fsck.blocks/8,LSB_FIRST);
+
+    printf("cantidad de bloques:%d\n", st_sb_fsck.blocks);
+    int cantidad_bloques = blocks_stat.st_size/st_sb_fsck.blocksize;
+    printf("cantidad de bloques:%d\n", cantidad_bloques);
+
+    //detecto sabotaje a cantidad de blocks de Superbloque.ims
+    if(cantidad_bloques!=st_sb_fsck.blocks){
+        log_error(logger, "Cantidad de bloques inconsistente en Superbloque.ims");
+        memcpy(superbloquemap+sizeof(super_bloque.blocksize),&cantidad_bloques,sizeof(super_bloque.blocks));
+        msync(superbloquemap, superbloque_stat.st_size, MS_SYNC);
+        log_info(logger,"Sabotaje corregido con exito");
+    }
+
+    char * path_oxigeno = crear_path_absoluto("/Files/Oxigeno.ims");
+    char * path_comida = crear_path_absoluto("/Files/Comida.ims");
+    char * path_basura = crear_path_absoluto("/Files/Basura.ims");
+    printf("test de bitarray:\n");
+    //detecto sabotaje al bitmap
+    if(strcmp(bitmap.bitarray,bitmap_fsck.bitarray)){
+        log_error(logger, "Bitarray inconsistente en Superbloque.ims");
+        /*printf("test de bitarray viejo:");
+		for(int i = 0; i<super_bloque.blocks; i++){
+			int test = bitarray_test_bit(&bitmap, i);
+			printf("%d",test);
+		}
+		printf("\n");
+        printf("test de bitarray nuevo:");
+		for(int i = 0; i<super_bloque.blocks; i++){
+			int test = bitarray_test_bit(&bitmap_fsck, i);
+			printf("%d",test);
+		}
+		printf("\n");
+        printf("bitarrays distintos detectados\n");*/
+        int cantidad_de_bloques = 0;
+        int primer_modificacion = 0;
+        
+        char * path_bitacora = crear_path_absoluto("/Files/Bitacoras");
+        char * bloques_ocupados = string_new();
+        //consultar archivo oxigeno.ims
+        if(existe_archivo(path_oxigeno)){
+            t_config * config_oxigeno;
+            config_oxigeno = config_create(path_oxigeno);
+            char * bloques = config_get_string_value(config_oxigeno, "BLOCKS");
+            int cantidad = config_get_int_value(config_oxigeno, "BLOCK_COUNT");
+            cantidad_de_bloques+=cantidad;
+            if(primer_modificacion == 0){
+                string_append(&bloques_ocupados,bloques);
+                primer_modificacion = 1;
+            }
+            printf("bloques detectados en oxigeno: %s\n",bloques_ocupados);
+            char * log = string_from_format("Bloques en uso: %s, despues de revisar Oxigeno.ims",bloques_ocupados);
+            log_info(logger,log);
+        }
+        //consultar archivo comida.ims
+        if(existe_archivo(path_comida)){
+            t_config * config_comida;
+            config_comida = config_create(path_comida);
+            char * bloques = config_get_string_value(config_comida, "BLOCKS");
+            int cantidad = config_get_int_value(config_comida, "BLOCK_COUNT");
+            if(primer_modificacion == 0){
+                string_append(&bloques_ocupados,bloques);
+                primer_modificacion = 1;
+            }else{
+                char ** bloques_viejos = string_get_string_as_array(bloques_ocupados);
+                char ** bloques_nuevos = string_get_string_as_array(bloques);
+                free(bloques_ocupados);
+                bloques_ocupados = array_two_block_to_string(bloques_viejos,bloques_nuevos,cantidad_de_bloques);                
+            }
+            cantidad_de_bloques+=cantidad;
+            printf("bloques detectados en comida: %s\n",bloques_ocupados);
+            char * log = string_from_format("Bloques en uso: %s, despues de revisar Comida.ims",bloques_ocupados);
+            log_info(logger,log);
+        }
+        //consultar archivo basura.ims
+        if(existe_archivo(path_basura)){
+            t_config * config_basura;
+            config_basura = config_create(path_basura);
+            char * bloques = config_get_string_value(config_basura, "BLOCKS");
+            int cantidad = config_get_int_value(config_basura, "BLOCK_COUNT");
+            if(primer_modificacion == 0){
+                string_append(&bloques_ocupados,bloques);
+                primer_modificacion = 1;
+            }else{
+                char ** bloques_viejos = string_get_string_as_array(bloques_ocupados);
+                char ** bloques_nuevos = string_get_string_as_array(bloques);
+                free(bloques_ocupados);
+                bloques_ocupados = array_two_block_to_string(bloques_viejos,bloques_nuevos,cantidad_de_bloques);                
+            }
+            cantidad_de_bloques+=cantidad;
+            printf("bloques detectados en basura: %s\n",bloques_ocupados);
+            char * log = string_from_format("Bloques en uso: %s, despues de revisar Basura.ims",bloques_ocupados);
+            log_info(logger,log);
+        }
+        int indice_tripulante = 1;
+        char * path_tripulante = string_from_format("%s/Tripulante%d.ims",path_bitacora,indice_tripulante);
+        //consultar archivo tripulante.ims
+        while(existe_archivo(path_tripulante)){
+            t_config * config_tripulante;
+            config_tripulante = config_create(path_tripulante);
+            char * bloques = config_get_string_value(config_tripulante, "BLOCKS");
+            int cantidad = config_get_int_value(config_tripulante, "BLOCK_COUNT");
+            if(primer_modificacion == 0){
+                string_append(&bloques_ocupados,bloques);
+                primer_modificacion = 1;
+            }else{
+                char ** bloques_viejos = string_get_string_as_array(bloques_ocupados);
+                char ** bloques_nuevos = string_get_string_as_array(bloques);
+                free(bloques_ocupados);
+                bloques_ocupados = array_two_block_to_string(bloques_viejos,bloques_nuevos,cantidad_de_bloques);                
+            }
+            printf("bloques detectados en tripulante%d: %s\n",indice_tripulante,bloques_ocupados);
+            char * log = string_from_format("Bloques en uso: %s, despues de revisar Tripulante%d.ims",bloques_ocupados,indice_tripulante);
+            log_info(logger,log);
+            cantidad_de_bloques+=cantidad;
+            free(path_tripulante);
+            indice_tripulante++;
+            path_tripulante = string_from_format("%s/Tripulante%d.ims",path_bitacora,indice_tripulante);
+            printf("siguiente trip es:%s\n",path_tripulante);
+        }
+        
+
+        if(cantidad_de_bloques>0){
+            char ** array_bloques_ocupados = string_get_string_as_array(bloques_ocupados);
+            //limpio el bitmap
+            for(int i = 0; i<super_bloque.blocks; i++){
+                bitarray_clean_bit(&bitmap, i);
+            }
+            //ocupo bitmap segun los blocks recolectados
+            for(int i = 0;array_bloques_ocupados[i]!=NULL;i++){
+                int indice = atoi(array_bloques_ocupados[i]);
+                bitarray_set_bit(&bitmap,indice);
+            }
+            /*printf("test de bitarray viejo:");
+            for(int i = 0; i<super_bloque.blocks; i++){
+                int test = bitarray_test_bit(&bitmap, i);
+                printf("%d",test);
+            }
+            printf("\n");*/
+
+            //mapeo a memoria y bajo al archivo
+            memcpy(superbloquemap+sizeof(super_bloque.blocksize)+sizeof(super_bloque.blocks),
+                super_bloque.bitarray,
+                strlen(super_bloque.bitarray)+1);
+            int sync = msync(superbloquemap, superbloque_stat.st_size, MS_SYNC);
+        }
+        
+        log_info(logger,"Sabotaje corregido con exito");
+    }
+
+    if(existe_archivo(path_oxigeno)){
+        testear_files(path_oxigeno);
+    }
+    if(existe_archivo(path_comida)){
+        testear_files(path_comida);
+    }
+    if(existe_archivo(path_basura)){
+        testear_files(path_basura);
+    }
+
+}
+
+void testear_files(char * path){
+    //variables para testear los Files
     t_config * test;
-    test = config_create("/home/utnso/polus/Files/Oxigeno.ims");
-    /*t_config * test2;
-    test2 = config_create("/home/utnso/polus/Files/Oxigeno2.ims");
-    eliminar_keys_tarea(test2);*/
-    leer_tarea_config_test(test);
-    printf("md5 viejo = %s\n",tarea_test.md5);
-    config_remove_key(test,"MD5_ARCHIVO");
-    config_save(test);
-    /*config_set_value(test2,"CARACTER_LLENADO",tarea_test.caracter_llenado);
-    set_tarea_config(
-                test2,
-                string_itoa(tarea_test.size),
-                string_itoa(tarea_test.block_count),
-                tarea_test.blocks
-            );
-    config_save(test2);*/
-    char * md5nuevo = md5_create("/home/utnso/polus/Files/Oxigeno.ims");
-    config_set_value(test,"MD5_ARCHIVO",md5nuevo);
-    config_save(test);
+    test = config_create(path);
+    char * bloques_config = config_get_string_value(test,"BLOCKS");
+    int cantidad_bloques_config = config_get_int_value(test,"BLOCK_COUNT"); 
+    int size_config = config_get_int_value(test,"SIZE");
+    char * md5_config = config_get_string_value(test,"MD5_ARCHIVO");
+    char * caracter_config = config_get_string_value(test,"CARACTER_LLENADO");
+
+    printf("md5 viejo = %s\n",md5_config);
+
+    //comparo Block_count y Blocks, para validar Block_count y poder usarlo para verificar el size
+    int cantidad_real_bloques = 0;
+    
+    //para el size del archivo
+    int size_archivo = 0;
+    char * buffer_temporal = calloc(1,super_bloque.blocksize+1);
+
+    char ** lista_bloques = string_get_string_as_array(bloques_config);
+    for(int i =0;lista_bloques[i]!=NULL;i++){
+        cantidad_real_bloques++;
+        int indice = atoi(lista_bloques[i]);
+        memcpy(buffer_temporal,
+            blocksmap+(indice*super_bloque.blocksize),
+            super_bloque.blocksize);
+        //calculo el size recorriendo todos los bloques
+        size_archivo+=strlen(buffer_temporal);
+        printf("size parcial:%d\n",size_archivo);
+    }
+    if(cantidad_real_bloques!=  cantidad_bloques_config){
+        log_error(logger,"Inconsistencia en el valor de BLOCK_COUNT");
+        char * block_count = string_itoa(cantidad_real_bloques);
+        config_remove_key(test,"BLOCK_COUNT");
+        config_set_value(test,"BLOCK_COUNT",block_count);
+        config_save(test);
+        log_info(logger,"Sabotaje reparado con exito");
+    }
+    if(size_config!=size_archivo){
+        log_error(logger,"Inconsistencia en el valor de SIZE");
+        char * size = string_itoa(size_archivo);
+        config_remove_key(test,"SIZE");
+        config_set_value(test,"SIZE",size);
+        config_save(test);
+        log_info(logger,"Sabotaje reparado con exito");
+    }
+    free(buffer_temporal);
+
+    
+    char * md5_fsck = calloc(1,super_bloque.blocksize+1);
+    int indice_ultimo_bloque = atoi(lista_bloques[cantidad_bloques_config-1]);
+    memcpy(md5_fsck,blocksmap+(indice_ultimo_bloque*super_bloque.blocksize),super_bloque.blocksize);
+    char * md5nuevo = md5_create(md5_fsck);
+    for(int i=0;i<strlen(md5_fsck);i++){
+        //printf("char leido %c\n",md5_fsck[i]);
+    }
     printf("md5 nuevo = %s\n", md5nuevo);
+    //detecto problema en ultimo bloque del Blocks del File
+    if(strcmp(md5_config,md5nuevo)){
+        log_error(logger,"Inconsistencia en el orden de blocks");
+        int resto = size_archivo%super_bloque.blocksize;
+        for(int i =0;lista_bloques[i]!=NULL;i++){
+            int offset = atoi(lista_bloques[i])*super_bloque.blocksize;
+            if(lista_bloques[i+1]==NULL){
+                char * fill_space = string_repeat(' ',(int)super_bloque.blocksize);
+                memcpy(blocksmap+offset,fill_space,strlen(fill_space));
+                char * fill = string_repeat(*caracter_config,resto);
+                memcpy(blocksmap+offset,fill,strlen(fill));
+                free(fill);
+            }else{
+                char * fill = string_repeat(*caracter_config,(int)super_bloque.blocksize);
+                memcpy(blocksmap+offset,fill,strlen(fill));
+                free(fill);
+            }
+        }
+        log_info(logger,"Sabotaje reparado con exito");
+    }
 }

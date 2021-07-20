@@ -69,7 +69,7 @@ void mapear_blocks(){
 
 	//test de lectura de un bloque usando indice
 	//(en practica hay que tener en cuenta el tamaño del archivo para el ultimo bloque en vez de blocksize)
-	int indicetest = 2;
+	int indicetest = 3;
 	char * contenidotest = calloc(1,super_bloque.blocksize);
 	memcpy(contenidotest, blocksmap+(super_bloque.blocksize * indicetest), super_bloque.blocksize);
 	printf("se leyo el bloque %d, con el contenido : %s\n",indicetest,contenidotest);
@@ -214,14 +214,14 @@ int existe_filesystem(){
 			printf("%d",test);
 		}
 		printf("\n");
-		*/
+		
 
 		// (para el test)copio al void* mapeado el contenido del bitarray para actualizar el bitmap
-		//memcpy(superbloquemap+offset,super_bloque.bitarray,strlen(super_bloque.bitarray)+1);
+		memcpy(superbloquemap+offset,super_bloque.bitarray,strlen(super_bloque.bitarray)+1);
 		// (para el test)fuerzo un sync para que el mapeo se refleje en SuperBloque.ims
-		//int sync = msync(superbloquemap, superbloque_stat.st_size, MS_SYNC);
-		//printf("se sincronizo:%d\n", sync);
-
+		int sync = msync(superbloquemap, superbloque_stat.st_size, MS_SYNC);
+		printf("se sincronizo:%d\n", sync);
+*/
 		//compruebo la existencia de Blocks.ims
 		if(existe_archivo(block_path)){
 			log_info(logger, "Se encontro un archivo Blocks.ims existente");

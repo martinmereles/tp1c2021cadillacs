@@ -253,6 +253,7 @@ bool leer_mensaje_cliente_y_procesar(int cliente_fd){
 		case COD_MANEJAR_SABOTAJE:;
 			char * payload = recibir_payload(cliente_fd);
 			printf("el trip %s intentara resolver el sabotaje\n",payload);
+			fsck();
 			break;
 		case -1:
 			log_error(logger, "El cliente se desconecto.");

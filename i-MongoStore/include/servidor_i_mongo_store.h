@@ -63,6 +63,8 @@ char * datos_create(char * size,char * cantidadbloquesstr, char * bloques_config
 char * md5_create (char * datos);
 void liberar_recursos_thread();
 void testear_md5();
+void fsck();
+void testear_files(char * path);
 
 
 
