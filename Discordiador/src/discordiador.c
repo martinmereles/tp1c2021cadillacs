@@ -784,6 +784,7 @@ int submodulo_tripulante(void* args) {
 	liberar_conexion(mi_ram_hq_fd_tripulante);
 
 	// Habilita al dispatcher a eliminar sus estructuras del Discordiador
+	sem_post(&sem_hay_evento_planificable);
 	sem_post(tripulante->sem_finalizo);
 
 	return EXIT_SUCCESS;

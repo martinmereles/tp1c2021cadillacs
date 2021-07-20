@@ -239,8 +239,7 @@ int escribir_memoria_principal_paginacion(void* args, uint32_t inicio_logico, ui
     // Si la pagina esta en memoria virtual, debo traerla
     marco_t* pagina = get_pagina(tabla, numero_pagina(direccion_logica)); 
 
-    if(!pagina->bit_presencia)
-        proceso_swap(pagina);
+    proceso_swap(pagina);
    
     sem_wait(pagina->semaforo);
 
@@ -298,9 +297,8 @@ int leer_memoria_principal_paginacion(void* args, uint32_t inicio_logico, uint32
 
     // Si la pagina esta en memoria virtual, debo traerla
     marco_t* pagina = get_pagina(tabla, numero_pagina(direccion_logica)); 
-
-    if(!pagina->bit_presencia)
-        proceso_swap(pagina);
+    
+    proceso_swap(pagina);
 
     sem_wait(pagina->semaforo);
 
@@ -475,11 +473,11 @@ void dump_marco(void* args, FILE* archivo_dump){
     // Marco:0	Estado:Ocupado	Proceso: 1	Pagina: 2
     char* info_marco;                                    
     if(marco->estado == MARCO_OCUPADO)
-        info_marco = string_from_format("\nMarco: %3d Estado: Ocupado Proceso: %3d Pagina: %3d Ultimo uso: %s",
-                                         marco->numero_marco,marco->PID,marco->numero_pagina,marco->timestamp);
+        info_marco = string_from_format("\nMarco: %3d Estado: Ocupado Proceso: %3d Pagina: %3d Ultimo uso: %s Bit Presencia: %d",
+                                         marco->numero_marco,marco->PID,marco->numero_pagina,marco->timestamp,marco->bit_presencia);
     else
-        info_marco = string_from_format("\nMarco: %3d Estado: Libre   Proceso:  -  Pagina:  -  Ultimo uso: - ",
-                                         marco->numero_marco);       
+        info_marco = string_from_format("\nMarco: %3d Estado: Libre   Proceso:  -  Pagina:  -  Ultimo uso: -  Bit Presencia: %d",
+                                         marco->numero_marco, marco->bit_presencia);       
     
     fwrite(info_marco, sizeof(char), strlen(info_marco), archivo_dump);
 
@@ -490,8 +488,8 @@ void dump_marco(void* args, FILE* archivo_dump){
 
 // LRU
 void actualizar_timestamp(marco_t* pagina){
-    free(pagina->timestamp);
     sem_wait(&mutex_temporal);
+    free(pagina->timestamp);
     pagina->timestamp = temporal_get_string_time("%y%m%d%H%M%S");
     sem_post(&mutex_temporal);
 }
@@ -517,6 +515,8 @@ marco_t* algoritmo_lru(){
     marco_t* pagina_victima;
 
     void* pagina_menos_recientemente_usada(void* args_1, void* args_2){
+        sem_wait(&mutex_temporal);
+        void* retorno;
         marco_t* pagina_1 = (marco_t*) args_1;
         marco_t* pagina_2 = (marco_t*) args_2;
         char* timestamp_1 = pagina_1->timestamp;
@@ -525,8 +525,11 @@ marco_t* algoritmo_lru(){
 
         for(;i < 11 && atoi(timestamp_1 + i) == atoi(timestamp_2 + i);i++);
         if(atoi(timestamp_1 + i) < atoi(timestamp_2 + i))
-            return (void*) pagina_1;
-        return (void*) pagina_2;
+            retorno = (void*) pagina_1;
+        else
+            retorno = (void*) pagina_2;
+        sem_post(&mutex_temporal);
+        return retorno;
     }
 
     bool es_pagina_presente(void* args){
@@ -535,11 +538,9 @@ marco_t* algoritmo_lru(){
     }
 
     t_list* paginas_presentes = list_filter(lista_de_marcos, es_pagina_presente);
-
     pagina_victima = (marco_t*) list_get_minimum(paginas_presentes, pagina_menos_recientemente_usada);
     list_destroy(paginas_presentes);
-    log_error(logger,"PAGINA VICTIMA POR LRU ES:");
-    log_error(logger,"%d",pagina_victima->numero_pagina);
+    //log_debug(logger,"MARCO VICTIMA POR LRU ES: %d",pagina_victima->numero_marco);
 
     return pagina_victima;
 }
@@ -587,16 +588,21 @@ void destruir_reloj(){
     // Mientras la aguja del reloj no apunte a la primera hora borrada
 }
 
-void proceso_swap(marco_t* pagina_necesitada){
+int proceso_swap(marco_t* pagina_necesitada){
 
     sem_wait(&mutex_proceso_swap);
 
-    log_info(logger, "INICIANDO PROCESO SWAP");
-    // ejecutar_rutina(dump_memoria);
+    if(pagina_necesitada->bit_presencia){
+        sem_post(&mutex_proceso_swap);
+        return EXIT_SUCCESS;
+    }
+
+    //log_info(logger, "INICIANDO PROCESO SWAP");
 
     // Bloquear con semaforos las paginas
     sem_wait(pagina_necesitada->semaforo);
-    log_info(logger, "BLOQUEO MARCO NUMERO %d", pagina_necesitada->numero_marco);
+    //log_debug(logger, "MARCO NECESITADO: %d", pagina_necesitada->numero_marco);
+    // log_info(logger, "BLOQUEO MARCO NUMERO %d", pagina_necesitada->numero_marco);
 
     // Copiamos en un buffer el contenido de la pagina necesitada
     char* buffer_necesitado = leer_marco(pagina_necesitada);
@@ -615,7 +621,7 @@ void proceso_swap(marco_t* pagina_necesitada){
         // Buscamos una pagina victima con algoritmo de reemplazo
         pagina_victima = algoritmo_de_reemplazo();
         sem_wait(pagina_victima->semaforo);
-        log_info(logger, "BLOQUEO MARCO NUMERO %d", pagina_victima->numero_marco);
+        // log_info(logger, "BLOQUEO MARCO NUMERO %d", pagina_victima->numero_marco);
         // Movemos la informacion de la pagina victima a donde estaba la pagina necesitada en memoria virtual 
         char* buffer_victima = leer_marco(pagina_victima);
         escribir_marco(pagina_necesitada, buffer_victima);
@@ -623,7 +629,7 @@ void proceso_swap(marco_t* pagina_necesitada){
     }
     else{
         sem_wait(pagina_victima->semaforo);
-        log_info(logger, "BLOQUEO MARCO NUMERO %d", pagina_victima->numero_marco);
+        // log_info(logger, "BLOQUEO MARCO NUMERO %d", pagina_victima->numero_marco);
     }
 
     // Movemos el contenido de la pagina necesitada a memoria principal
@@ -649,7 +655,8 @@ void proceso_swap(marco_t* pagina_necesitada){
     pagina_necesitada->numero_marco = n_marco_auxiliar;
 
     pagina_necesitada->bit_presencia = true;    // Se mueve a RAM
-    pagina_victima->bit_presencia = false;       // Se mueve a Memoria Virtual
+    pagina_victima->bit_presencia = false;      // Se mueve a Memoria Virtual
+
 
     // Actualizamos el reloj de clock (la aguja quedo apuntando a la hora de la pagina victima)
     aguja_reloj->marco = pagina_necesitada; // La pagina traida a memoria ocupa el lugar de la pagina victima
@@ -663,16 +670,19 @@ void proceso_swap(marco_t* pagina_necesitada){
     }
 
     list_sort(lista_de_marcos, tiene_menor_numero_marco);    
-
+  
+    //log_info(logger, "FINALIZANDO SWAP");
+    //  log_info(logger, "DESBLOQUEO MARCOs NUMERO %d %d", pagina_necesitada->numero_marco, pagina_victima->numero_marco);
+ 
     // Liberar los semaforos de las paginas
     sem_post(pagina_necesitada->semaforo);
     sem_post(pagina_victima->semaforo);
 
-    log_info(logger, "FINALIZANDO SWAP");
-    log_info(logger, "DESBLOQUEO MARCOs NUMERO %d %d", pagina_necesitada->numero_marco, pagina_victima->numero_marco);
-    // ejecutar_rutina(dump_memoria);
+   // ejecutar_rutina(dump_memoria);
 
     sem_post(&mutex_proceso_swap);
+
+    return EXIT_SUCCESS;
 }
 
 char* leer_marco(marco_t* marco){

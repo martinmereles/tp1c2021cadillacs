@@ -223,7 +223,7 @@ void leer_tarea_memoria_principal(void* tabla, char** tarea, uint32_t id_prox_ta
     uint32_t dir_log_tareas;
     leer_memoria_principal(tabla, DIR_LOG_PCB, DESPL_TAREAS, &dir_log_tareas, sizeof(uint32_t));
     
-    log_info(logger,"La direccion logica de las tareas es: %x",dir_log_tareas);
+    log_info(logger,"La direccion logica de las tareas es: %x", dir_log_tareas);
 
     // Leemos la lista de tareas completa
     char* tareas = malloc(tamanio + 1);

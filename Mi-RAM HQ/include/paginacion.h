@@ -78,7 +78,7 @@ void dump_memoria_paginacion();
 void dump_marco(void* args, FILE* archivo_dump);
 
 // Proceso SWAP
-void proceso_swap(marco_t* pagina_necesitada);
+int proceso_swap(marco_t* pagina_necesitada);
 char* leer_marco(marco_t* marco);
 void escribir_marco(marco_t* marco, char* informacion);
 

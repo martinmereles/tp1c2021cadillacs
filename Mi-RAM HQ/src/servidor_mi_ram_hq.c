@@ -156,7 +156,7 @@ int enviar_ubicacion_tripulante(int tripulante_fd, char* payload, void** tabla, 
 
 
 int recibir_estado_tripulante(char* payload, void** tabla, uint32_t* direccion_logica_TCB){
-    uint32_t estado_tripulante;
+    char estado_tripulante;
     int offset = 0;
     
     log_info(logger, "Recibiendo estado de un tripulante");
