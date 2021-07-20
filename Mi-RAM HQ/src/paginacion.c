@@ -84,8 +84,6 @@ int crear_patota_paginacion(uint32_t PID, uint32_t longitud_tareas, char* tareas
  
     log_info(logger, "Estructuras de la patota inicializadas exitosamente");
 
-    //ejecutar_rutina(dump_memoria);
-
     return EXIT_SUCCESS;
 }
 
@@ -122,8 +120,6 @@ int crear_tripulante_paginacion(void** args, uint32_t* direccion_logica_TCB,
     escribir_memoria_principal(*tabla_patota, *direccion_logica_TCB, DESPL_POS_Y, &posicion_Y, sizeof(uint32_t));
     escribir_memoria_principal(*tabla_patota, *direccion_logica_TCB, DESPL_PROX_INSTR, &id_proxima_instruccion, sizeof(uint32_t));
     escribir_memoria_principal(*tabla_patota, *direccion_logica_TCB, DESPL_DIR_PCB, &dir_log_pcb, sizeof(uint32_t));
-
-    //ejecutar_rutina(dump_memoria);
 
     return EXIT_SUCCESS;
 }
@@ -187,8 +183,6 @@ int liberar_memoria(tabla_paginas_t* tabla_patota, int tamanio_total, uint32_t d
         liberar_memoria(tabla_patota, tamanio_total, direccion_logica_proxima_pagina);
     }
 
-    //ejecutar_rutina(dump_memoria);
-
     return EXIT_SUCCESS;
 }
 
@@ -225,9 +219,6 @@ int reservar_memoria(tabla_paginas_t* tabla_patota, int tamanio, uint32_t* direc
     tabla_patota->fragmentacion_interna = -tamanio;         
     ultima_pagina(tabla_patota)->fragmentacion_interna = -tamanio;
 
-    // PARA TESTEAR
-    //ejecutar_rutina(dump_memoria);
-
     return EXIT_SUCCESS;
 }
 
@@ -248,10 +239,11 @@ int escribir_memoria_principal_paginacion(void* args, uint32_t inicio_logico, ui
     if(direccion_fisica_paginacion(tabla, direccion_logica, &direccion_fisica_dato) == EXIT_FAILURE){
         log_error(logger,"ERROR: escribir_memoria_principal. Direccionamiento invalido.");
         sem_post(pagina->semaforo);
+        sem_post(&mutex_proceso_swap);
         return EXIT_FAILURE;
     }   
     
-    // log_info(logger,"DIRECCION FISICA A ESCRIBIR: %x",direccion_fisica_dato);
+    //log_info(logger,"DIRECCION FISICA A ESCRIBIR: %d (DL: %x)", direccion_fisica_dato, direccion_logica);
 
     int desplazamiento = get_desplazamiento(direccion_logica);
 
@@ -269,6 +261,7 @@ int escribir_memoria_principal_paginacion(void* args, uint32_t inicio_logico, ui
     // Escribo el dato en memoria principal
     memcpy(memoria_principal + direccion_fisica_dato, dato, tamanio_escritura_pagina_actual);
    
+    sem_post(&mutex_proceso_swap);
     // Actualizo informacion de la pagina
     actualizar_timestamp(pagina);   // LRU
     pagina->bit_uso = true;         // Clock
@@ -307,10 +300,11 @@ int leer_memoria_principal_paginacion(void* args, uint32_t inicio_logico, uint32
     if(direccion_fisica_paginacion(tabla, direccion_logica, &direccion_fisica_dato) == EXIT_FAILURE){
         log_error(logger,"ERROR: leer_memoria_principal. Direccionamiento invalido.");
         sem_post(pagina->semaforo);
+        sem_post(&mutex_proceso_swap);
         return EXIT_FAILURE;
     }
 
-    //log_info(logger,"DIRECCION FISICA A LEER: %x",direccion_fisica_dato);
+    //log_info(logger,"DIRECCION FISICA A LEER: %d (DL: %x)", direccion_fisica_dato, direccion_logica);
 
     int desplazamiento = get_desplazamiento(direccion_logica);
     
@@ -327,6 +321,8 @@ int leer_memoria_principal_paginacion(void* args, uint32_t inicio_logico, uint32
 
     // Leo el dato de memoria principal
     memcpy(dato, memoria_principal + direccion_fisica_dato, tamanio_lectura_pagina_actual);
+
+    sem_post(&mutex_proceso_swap);
 
     // Actualizo informacion de la pagina
     actualizar_timestamp(pagina);   // LRU
@@ -363,7 +359,7 @@ tabla_paginas_t* obtener_tabla_patota_paginacion(int PID_buscado){
 
     bool tiene_PID(void* args){
         tabla_paginas_t* tabla = (tabla_paginas_t*) args;        
-        log_info(logger,"EL PID ENCONTRADO ES: %d",tabla->PID);
+        //log_info(logger,"EL PID ENCONTRADO ES: %d",tabla->PID);
         return tabla->PID == PID_buscado;
     }
 
@@ -463,8 +459,16 @@ int direccion_fisica_paginacion(tabla_paginas_t* tabla_patota, uint32_t direccio
 
 // DUMP MEMORIA
 void dump_memoria_paginacion(){
-    // Bloquear todas las paginas con semaforos??
-    crear_archivo_dump(lista_de_marcos, dump_marco);
+    
+    bool es_pagina_presente(void* args){
+        marco_t* pagina = (marco_t*) args;
+        return pagina->bit_presencia;
+    }
+
+    sem_wait(&mutex_proceso_swap);
+    t_list* paginas_presentes = list_filter(lista_de_marcos, es_pagina_presente);
+    crear_archivo_dump(paginas_presentes, dump_marco);
+    sem_post(&mutex_proceso_swap);
 }
 
 void dump_marco(void* args, FILE* archivo_dump){
@@ -473,10 +477,10 @@ void dump_marco(void* args, FILE* archivo_dump){
     // Marco:0	Estado:Ocupado	Proceso: 1	Pagina: 2
     char* info_marco;                                    
     if(marco->estado == MARCO_OCUPADO)
-        info_marco = string_from_format("\nMarco: %3d Estado: Ocupado Proceso: %3d Pagina: %3d Ultimo uso: %s Bit Presencia: %d",
+        info_marco = string_from_format("\nMarco: %3d Estado: Ocupado Proceso: %3d Pagina: %3d",
                                          marco->numero_marco,marco->PID,marco->numero_pagina,marco->timestamp,marco->bit_presencia);
     else
-        info_marco = string_from_format("\nMarco: %3d Estado: Libre   Proceso:  -  Pagina:  -  Ultimo uso: -  Bit Presencia: %d",
+        info_marco = string_from_format("\nMarco: %3d Estado: Libre   Proceso:  -  Pagina:  - ",
                                          marco->numero_marco, marco->bit_presencia);       
     
     fwrite(info_marco, sizeof(char), strlen(info_marco), archivo_dump);
@@ -540,7 +544,6 @@ marco_t* algoritmo_lru(){
     t_list* paginas_presentes = list_filter(lista_de_marcos, es_pagina_presente);
     pagina_victima = (marco_t*) list_get_minimum(paginas_presentes, pagina_menos_recientemente_usada);
     list_destroy(paginas_presentes);
-    //log_debug(logger,"MARCO VICTIMA POR LRU ES: %d",pagina_victima->numero_marco);
 
     return pagina_victima;
 }
@@ -593,7 +596,7 @@ int proceso_swap(marco_t* pagina_necesitada){
     sem_wait(&mutex_proceso_swap);
 
     if(pagina_necesitada->bit_presencia){
-        sem_post(&mutex_proceso_swap);
+       // sem_post(&mutex_proceso_swap);
         return EXIT_SUCCESS;
     }
 
@@ -601,7 +604,7 @@ int proceso_swap(marco_t* pagina_necesitada){
 
     // Bloquear con semaforos las paginas
     sem_wait(pagina_necesitada->semaforo);
-    //log_debug(logger, "MARCO NECESITADO: %d", pagina_necesitada->numero_marco);
+    log_debug(logger, "MARCO NECESITADO: %d", pagina_necesitada->numero_marco);
     // log_info(logger, "BLOQUEO MARCO NUMERO %d", pagina_necesitada->numero_marco);
 
     // Copiamos en un buffer el contenido de la pagina necesitada
@@ -620,7 +623,10 @@ int proceso_swap(marco_t* pagina_necesitada){
 
         // Buscamos una pagina victima con algoritmo de reemplazo
         pagina_victima = algoritmo_de_reemplazo();
+
+    
         sem_wait(pagina_victima->semaforo);
+        log_debug(logger,"MARCO VICTIMA POR ALGORITMO ES: %d",pagina_victima->numero_marco);
         // log_info(logger, "BLOQUEO MARCO NUMERO %d", pagina_victima->numero_marco);
         // Movemos la informacion de la pagina victima a donde estaba la pagina necesitada en memoria virtual 
         char* buffer_victima = leer_marco(pagina_victima);
@@ -678,9 +684,7 @@ int proceso_swap(marco_t* pagina_necesitada){
     sem_post(pagina_necesitada->semaforo);
     sem_post(pagina_victima->semaforo);
 
-   // ejecutar_rutina(dump_memoria);
-
-    sem_post(&mutex_proceso_swap);
+    // sem_post(&mutex_proceso_swap);
 
     return EXIT_SUCCESS;
 }
