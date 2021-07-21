@@ -57,6 +57,8 @@ void* superbloquemap;
 char * blocksmap;
 int sbfile;
 int bfile;
+char ** posiciones_sabotaje;
+int num_sabotaje;
 sem_t sem_mutex_superbloque;
 sem_t sem_mutex_blocks;
 sem_t sem_mutex_oxigeno;

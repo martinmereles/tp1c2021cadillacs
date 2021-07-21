@@ -89,6 +89,7 @@ sem_t sem_mutex_ejecutar_dispatcher;
 sem_t sem_sabotaje_mutex;
 sem_t sem_sabotaje_finalizado;
 sem_t sem_sabotaje_tripulante;
+sem_t sem_tripulante_disponible;
 
 
 int grado_multiproc;

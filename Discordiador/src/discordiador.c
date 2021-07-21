@@ -29,6 +29,8 @@ int main(void) {
 	sem_init(&sem_sabotaje_mutex,0,1);
 	sem_init(&sem_sabotaje_finalizado,0,0);
 	sem_init(&sem_sabotaje_tripulante,0,0);
+	sem_init(&sem_tripulante_disponible,0,0);
+	
 	
 
 
@@ -185,6 +187,7 @@ void recibir_y_procesar_mensaje_i_mongo_store(int i_mongo_store_fd){
                 log_error(logger, "No se pudo ejecutar la funcion de bloqueo ante sabotajes");
 				break;
 			}
+			
             tripulante_sabotaje= malloc(sizeof(t_tripulante));
 			tripulante_sabotaje->posicion_X=1000;
 			tripulante_sabotaje->posicion_Y=1000;
@@ -215,6 +218,9 @@ void recibir_y_procesar_mensaje_i_mongo_store(int i_mongo_store_fd){
 			sem_post(&sem_sabotaje_finalizado);
 
             log_debug(logger, "Termino sabotaje"); 
+			break;
+		case COD_MANEJAR_SABOTAJE_INEXISTENTE:
+			log_error(logger,"No existen posiciones de sabotaje");
 			break;
 		case -1:
 			log_error(logger, "El i-Mongo-Store se desconecto. Terminando Discordiador");
@@ -598,6 +604,12 @@ int submodulo_tripulante(void* args) {
 				break;
 
 			case READY:	// El tripulante espera hasta que el planificacor lo saque de la cola de ready	
+				if(sabotaje_activo){
+					desencolar_tripulante_por_tid(cola[READY],tripulante->TID);
+					transicion(tripulante,READY,BLOCKED_EMERGENCY);
+					printf("entre en ready sabotaje trip: %d\n",tripulante->TID);
+					break;
+				}
 				printf("entre en ready trip: %d\n",tripulante->TID);
 				sem_wait(tripulante->sem_tripulante_dejo[READY]);
 				break;
@@ -606,8 +618,32 @@ int submodulo_tripulante(void* args) {
 					//pongo en pausa los blocked io para poder testear
 					//TO DO: si terminan los ciclos IO y hay sabotaje activo, pasan a cola Blocked Emergency
 					// y no a ready
-					printf("blocked io pausa del trip: %d", tripulante->TID);
-					sem_wait(tripulante->sem_planificacion_fue_reanudada);
+					if(ciclos_en_estado_actual == tarea->duracion){
+						// TODO: Le pide al planificador que lo agregue a la cola de ready
+						encolar(BLOCKED_IO_TO_READY, tripulante);
+
+						// El tripulante espera hasta que el planificacor lo saque de la cola de ready
+						sem_wait(tripulante->sem_tripulante_dejo[BLOCKED_IO]);
+						ciclos_en_estado_actual = 0;
+
+						// TODO: Avisa que finalizo la tarea
+						
+						log_debug(logger, "El tripulante %d completo tarea de %d ciclos exitosamente, pasando a estado READY", tripulante->TID, tarea->duracion);	
+						enviar_operacion(i_mongo_store_fd_tripulante, COD_TERMINAR_TAREA, tarea->string, strlen(tarea->string)+1);
+						destruir_tarea(tarea);
+						tarea = NULL;
+						break;	// Salgo del switch
+					}
+
+					// Se crea un hilo aparte que termina despues de un ciclo
+					ciclo = crear_ciclo_cpu();	
+
+					ciclos_en_estado_actual++;
+					log_error(logger,"EJECUTO UN CICLO DE LA TAREA EN BLOCKED IO");
+
+					// Se espera que termine el ciclo
+					esperar_fin_ciclo_de_cpu(ciclo);					
+					break;
 				}
 				// Me fijo si cumplio los ciclos de la tarea
 				if(ciclos_en_estado_actual == tarea->duracion){
@@ -743,7 +779,15 @@ int submodulo_tripulante(void* args) {
 
 			case BLOCKED_EMERGENCY:
 				printf("blocked emergency pausa del trip %d\n",tripulante->TID);
+				int valor_semaforo;
+				sem_getvalue(&sem_tripulante_disponible, &valor_semaforo);
+				printf("valor semaforo:%d \n",valor_semaforo);
+				if(valor_semaforo == 0){
+					sem_post(&sem_tripulante_disponible);
+				}
+				
 				sem_wait(tripulante->sem_planificacion_fue_reanudada);
+				
 				// Creo que con pausarlos basta
 				break;
 

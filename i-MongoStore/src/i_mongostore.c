@@ -1,24 +1,29 @@
 #include "i_mongostore.h"
-#define handle_error(msg) \
-		do { perror(msg); exit(EXIT_FAILURE); } while (0)
 
 int server_fd;
+numero_sabotaje = 0;
 
 void handler(int num){
 	printf("le envio la señal al discord\n");
-	char * payload = "4|5";
-	enviar_operacion(discordiador_fd,COD_MANEJAR_SABOTAJE,payload,strlen(payload)+1);
+	if(posiciones_sabotaje[num_sabotaje]!=NULL){
+		char * payload = posiciones_sabotaje[num_sabotaje];
+		num_sabotaje++;
+		enviar_operacion(discordiador_fd,COD_MANEJAR_SABOTAJE,payload,strlen(payload)+1);
+	}else{
+		char * payload = "";
+		enviar_operacion(discordiador_fd,COD_MANEJAR_SABOTAJE_INEXISTENTE,payload,strlen(payload)+1);
+	}
+	
 }
 
 int main(void)
 {
 	primer_conexion_discordiador=1;
-	//signal para sabotaje
-	signal(SIGUSR1, handler);
+	
 
 	// inicializo semaforos
 	iniciar_semaforos_fs();
-
+	signal(SIGUSR1, handler);
 	logger = log_create("./cfg/i-mongostore.log", "I-MongoStore", 1, LOG_LEVEL_DEBUG);
 	
 	// Leo IP y PUERTO del config y datos base de SUPERBLOQUE
@@ -66,34 +71,19 @@ void leer_config(){
 	fs_config.puerto = config_get_string_value(config,"PUERTO");
 	fs_config.punto_montaje = config_get_string_value(config,"PUNTO_MONTAJE");
 	fs_config.tiempo_sincro = config_get_int_value(config, "TIEMPO_SINCRONIZACION");
-	fs_config.posiciones_sabotaje = config_get_string_value(config, "TIEMPO_SINCRONIZACION");
+	fs_config.posiciones_sabotaje = config_get_string_value(config, "POSICIONES_SABOTAJE");
+	posiciones_sabotaje = string_get_string_as_array(fs_config.posiciones_sabotaje);
 	config_superbloque = config_create("./cfg/superbloque.config");
 	sb_config.blocks = config_get_int_value(config_superbloque,"BLOCKS");
 	sb_config.blocksize = config_get_int_value(config_superbloque,"BLOCKSIZE");
 }
 
-void sighandler(int signum) {
-    (void)signum;
-}
 
 int i_mongo_store(int servidor_fd) {
 	// Declaramos variables
 	status_servidor = RUNNING;
 	pthread_t *hilo_atender_cliente;
-	//
-	sigset_t mask;
 	int sfd;
-	struct signalfd_siginfo fdsi;
-	ssize_t s;
-
-	sigemptyset(&mask);
-	sigaddset(&mask, SIGUSR1);
-	sigaddset(&mask, SIGQUIT);
-
-	/* Block signals so that they aren't handled
-		according to their default dispositions. */
-
-	sfd = signalfd(-1, &mask, 0);
 
 	// Inicializamos pollfd
 	struct pollfd pfds[3];
@@ -101,18 +91,17 @@ int i_mongo_store(int servidor_fd) {
 	pfds[0].events = POLLIN;	// Avisa cuando llega un mensaje en el socket de escucha
 	pfds[1].fd = 0;
 	pfds[1].events = POLLIN;	// Avisa cuando llega un mensaje por consola
-	pfds[2].fd = sfd;
-    pfds[2].events = POLLIN;
 
 	int num_events;
 
 	while(status_servidor != END){
 		// Revisamos si hay algun evento
-		num_events = poll(pfds, 3, 2500);
+		num_events = poll(pfds, 2, 2500);
 		// Si ocurrio un evento
 		if(num_events != 0){
 			// Si llego un mensaje en el socket de escucha
 			if((pfds[0].revents & POLLIN)){
+				printf("entre en 0\n");
 				// Creamos el hilo que se encarga de atender el cliente
 				// NOTA: el struct pthread_t de cada hilo se pierde
 				hilo_atender_cliente = malloc(sizeof(pthread_t));
@@ -127,21 +116,16 @@ int i_mongo_store(int servidor_fd) {
 			else{			
 				// Si llego un mensaje por consola
 				if((pfds[1].revents & POLLIN)){
+					printf("entre en 1\n");
 					// Leemos la consola y procesamos el mensaje
 					leer_consola_y_procesar();
 				}
 				// Si ocurrio un evento inesperado
 				else{
-					if((pfds[2].revents & POLLIN)){
-						if (read(sfd, &fdsi, sizeof(fdsi)) != sizeof(fdsi)) {
-							handle_error("read siginfo");
-						}
-						break;
-					}else{
+					if(strcmp(strerror(pfds[0].revents),"Success")!=0)
 						log_error(logger, "Evento inesperado en los file descriptor: %s", strerror(pfds[0].revents));
+					if(strcmp(strerror(pfds[1].revents),"Success")!=0)
 						log_error(logger, "Evento inesperado en los file descriptor: %s", strerror(pfds[1].revents));
-						status_servidor = END;	
-					}
 				}
 			}
 		}
