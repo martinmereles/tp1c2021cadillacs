@@ -9,8 +9,17 @@ void iniciar_filesystem() {
 		
 	}
 	mapear_blocks();
-	
+	printf("creando hilo\n");
 
+}
+
+void * bajada_a_disco(void * arg){
+	while(1){
+		sleep(fs_config.tiempo_sincro);
+		log_debug(logger,"Bajando datos a disco...");
+		msync(blocksmap, blocks_stat.st_size, MS_SYNC);
+	}
+	return NULL;
 }
 
 void existe_directorio(char * path){

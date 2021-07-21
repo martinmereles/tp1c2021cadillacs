@@ -687,17 +687,15 @@ int submodulo_tripulante(void* args) {
 				break;
 
 			case EXEC:
+				printf("imprimo tid\n");
 				printf("soy trip %d y entre en exec\n",tripulante->TID);
 				if(sabotaje_activo){
-					
+					ciclo = crear_ciclo_cpu();
 					if(primer_ciclo){
 						printf("soy trip %d y entre a resolver el sabotaje\n",tripulante->TID);
 						llego_a_el_sabotaje=false;
-						printf("HOLA\n");
 						ciclos_ejecutando_sabotaje=0;
-						printf("HOLA\n");
 						primer_ciclo = false;
-						printf("HOLA\n");
 						
 						
 					}
@@ -720,6 +718,7 @@ int submodulo_tripulante(void* args) {
 
 					// Si el tripulante llego la tarea 
 					if(llego_a_el_sabotaje){
+						printf("aumento ciclo\n");
 						ciclos_ejecutando_sabotaje++;
 						log_error(logger,"EJECUTO UN CICLO DE RESOLVER SABOTAJE");
 					
@@ -731,6 +730,7 @@ int submodulo_tripulante(void* args) {
 						}	
 					}
 					// Espero que termine el ciclo de cpu
+					printf("esperarciclo\n");
 					esperar_fin_ciclo_de_cpu(ciclo);
 					//revisar semaforos, talvez son innecesarios, no los uso en otros lados y no rompe.
 					

@@ -31,6 +31,10 @@ int main(void)
 	leer_config();
 	//Levanto/Creo el Filesystem
 	iniciar_filesystem();
+	pthread_t hilo_bajada_a_disco;
+	pthread_create(&hilo_bajada_a_disco, NULL, bajada_a_disco, NULL);
+	pthread_detach(hilo_bajada_a_disco);
+
 
 	server_fd = iniciar_servidor(ip, fs_config.puerto);
 	log_info(logger, "I-MongoStore listo para recibir al Discordiador");

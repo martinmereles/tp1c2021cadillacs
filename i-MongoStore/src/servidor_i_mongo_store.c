@@ -111,9 +111,9 @@ void escribir_bitacora(char* mensaje){
                 offset_bitacora+=super_bloque.blocksize;
             }
         }
-        sem_wait(&sem_mutex_blocks);
+        /*sem_wait(&sem_mutex_blocks);
         msync(blocksmap, blocks_stat.st_size, MS_SYNC);
-        sem_post(&sem_mutex_blocks);
+        sem_post(&sem_mutex_blocks);*/
         char * mensajelenstr = string_itoa(strlen(mensaje));
         char * blockcountstr = string_itoa(cantidad_de_bloques);
         config_set_value(bitacora_config_file,"SIZE",mensajelenstr);
@@ -193,9 +193,9 @@ void escribir_bitacora(char* mensaje){
             printf("BIT: bloques a config: %s\n", bloques_config);
         }
         
-        sem_wait(&sem_mutex_blocks);
+        /*sem_wait(&sem_mutex_blocks);
         msync(blocksmap, blocks_stat.st_size, MS_SYNC);
-        sem_post(&sem_mutex_blocks);
+        sem_post(&sem_mutex_blocks);*/
         char * bloques_config_final = string_new();
         string_append(&bloques_config_final,bloques_config);
         eliminar_keys_bitacora(bitacora_config_file);
@@ -629,9 +629,9 @@ void generar_recurso(char* path, char caracter_llenado,char* parametro){
             }
         }
         
-        sem_wait(&sem_mutex_blocks);
+        /*sem_wait(&sem_mutex_blocks);
         msync(blocksmap, blocks_stat.st_size, MS_SYNC);
-        sem_post(&sem_mutex_blocks);
+        sem_post(&sem_mutex_blocks);*/
         char * caracter = calloc(sizeof(char),1);
         *caracter = caracter_llenado;
         config_set_value(tarea_config_file,"CARACTER_LLENADO",caracter);
@@ -734,9 +734,9 @@ void generar_recurso(char* path, char caracter_llenado,char* parametro){
             string_append(&bloques_config, tarea_config.blocks);
             printf("bloques recurso %s a config: %s\n", caracter_llenado, bloques_config);
         }
-        sem_wait(&sem_mutex_blocks);
+        /*sem_wait(&sem_mutex_blocks);
         msync(blocksmap, blocks_stat.st_size, MS_SYNC);
-        sem_post(&sem_mutex_blocks);
+        sem_post(&sem_mutex_blocks);*/
         eliminar_keys_tarea(tarea_config_file);
         printf("bloques recurso %s a config: %s\n", caracter_llenado, bloques_config);
         char * sizestr = string_itoa(tarea_config.size + atoi(parametro));
@@ -819,9 +819,9 @@ void consumir_recurso(char* path, char* nombre_recurso ,char* parametro){
             }
             printf("sali del for \n");
             char * bloques_config = array_block_to_string(lista_bloques,block_config);
-            sem_wait(&sem_mutex_blocks);
+            /*sem_wait(&sem_mutex_blocks);
             msync(blocksmap, blocks_stat.st_size, MS_SYNC);
-            sem_post(&sem_mutex_blocks);
+            sem_post(&sem_mutex_blocks);*/
             printf("config\n");
             eliminar_keys_tarea(tarea_config_file);
             char * sizestr = string_itoa(tarea_config.size - atoi(parametro));
@@ -862,9 +862,9 @@ void consumir_recurso(char* path, char* nombre_recurso ,char* parametro){
             }
             //printf("sali del for \n");
             char * bloques_config = array_block_to_string(lista_bloques,0);
-            sem_wait(&sem_mutex_blocks);
+            /*sem_wait(&sem_mutex_blocks);
             msync(blocksmap, blocks_stat.st_size, MS_SYNC);
-            sem_post(&sem_mutex_blocks);
+            sem_post(&sem_mutex_blocks);*/
             //printf("config\n");
             eliminar_keys_tarea(tarea_config_file);
             char * cerostr = string_itoa(0);
@@ -1098,7 +1098,7 @@ void fsck(){
             memcpy(superbloquemap+sizeof(super_bloque.blocksize)+sizeof(super_bloque.blocks),
                 super_bloque.bitarray,
                 strlen(super_bloque.bitarray)+1);
-            int sync = msync(superbloquemap, superbloque_stat.st_size, MS_SYNC);
+            msync(superbloquemap, superbloque_stat.st_size, MS_SYNC);
         }
         
         log_info(logger,"Sabotaje corregido con exito");
