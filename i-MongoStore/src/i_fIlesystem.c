@@ -74,6 +74,7 @@ void mapear_blocks(){
 	memcpy(contenidotest, blocksmap+(super_bloque.blocksize * indicetest), super_bloque.blocksize);
 	printf("se leyo el bloque %d, con el contenido : %s\n",indicetest,contenidotest);
 	free(contenidotest);
+	free(pathBlocks);
 	
 }
 
@@ -133,6 +134,7 @@ void crear_filesystem(){
 	fclose(blocks_create);
 	log_info(logger, "No se encontro un archivo Blocks.ims existente y se creo uno en base a SuperBloque.ims");
 	free(puntomontaje);
+	free(block_path);
 }
 
 void crear_directorios(){

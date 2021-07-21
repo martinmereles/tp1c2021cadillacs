@@ -369,6 +369,7 @@ int recibir_tarea(char* payload){
                     }
                     remove(path);
                     liberar_char_array(lista_bloques);
+                    config_destroy(tarea_config_file);
                     log_info(logger, "Se descarto la basura");
                 }else{
                     log_info(logger, "Se intento descartar basura pero no existe el archivo Basura.ims");
@@ -646,6 +647,7 @@ void generar_recurso(char* path, char caracter_llenado,char* parametro){
         char * md5 = md5_create(md5_str);
         config_set_value(tarea_config_file,"MD5_ARCHIVO",md5);
         printf("el md5 es: %s \n",md5);
+        free(md5_str);
         free(md5);
         free(caracter);
         free(cantidadbloquesstr);
@@ -835,6 +837,7 @@ void consumir_recurso(char* path, char* nombre_recurso ,char* parametro){
             config_set_value(tarea_config_file,"MD5_ARCHIVO",md5);
             printf("el md5 es: %s \n",md5);
             config_save(tarea_config_file);
+            free(md5);
             free(sizestr);
             free(blockcountstr);
             config_save(tarea_config_file);
