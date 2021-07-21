@@ -15,6 +15,7 @@ typedef struct{
     uint32_t numero_segmento;
     uint32_t inicio;
     uint32_t tamanio;
+    uint32_t PID;
     sem_t semaforo;
 } segmento_t;
 
@@ -22,6 +23,7 @@ typedef struct{
     t_list *filas;
     uint32_t proximo_numero_segmento;
     uint32_t tamanio_tareas;
+    uint32_t PID;
     sem_t *semaforo;
 } tabla_segmentos_t;
 
@@ -69,7 +71,7 @@ void quitar_y_destruir_tabla(tabla_segmentos_t* tabla_a_destruir);
 // Dump
 void dump_memoria_segmentacion();
 void dump_patota_segmentacion(void* args, FILE* archivo_dump);
-void dump_segmento(segmento_t* segmento, int PID, FILE* archivo_dump);
+void dump_segmento(void* args, FILE* archivo_dump);
 void dump_patota_segmentacion_pruebas(void* args);
 void dump_tripulante_segmentacion_pruebas(tabla_segmentos_t* tabla, int nro_fila);
 

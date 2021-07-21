@@ -200,6 +200,7 @@ int crear_patota_segmentacion(uint32_t PID, uint32_t longitud_tareas, char* tare
     tabla_patota->filas = list_create();
     tabla_patota->proximo_numero_segmento = 0;
     tabla_patota->semaforo = malloc(sizeof(sem_t));
+    tabla_patota->PID = PID;
     sem_init(tabla_patota->semaforo, 0, 1);
 
     // Buscamos un espacio en memoria para el PCB y creamos su fila en la tabla de segmentos
@@ -323,6 +324,7 @@ segmento_t* crear_fila(tabla_segmentos_t* tabla, int tamanio){
     segmento_t* segmento = malloc(sizeof(segmento_t));
     segmento->inicio = inicio;
     segmento->tamanio = tamanio;
+    segmento->PID = tabla->PID;
     sem_init(&(segmento->semaforo), 0, 1);
 
     // Agregamos el segmento a la tabla
@@ -382,7 +384,8 @@ void eliminar_tripulante_segmentacion(void* tabla, uint32_t direccion_logica_TCB
 // DUMP MEMORIA
 
 void dump_memoria_segmentacion(){
-    crear_archivo_dump(tablas_de_patotas, dump_patota_segmentacion);
+    // crear_archivo_dump(tablas_de_patotas, dump_patota_segmentacion);
+    crear_archivo_dump(lista_segmentos_en_memoria(), dump_segmento);
     // Para pruebas
     /*
     log_info(logger,"Dump: %s",temporal_get_string_time("%d/%m/%y %H:%M:%S"));
@@ -390,6 +393,7 @@ void dump_memoria_segmentacion(){
     */
 }
 
+/*
 void dump_patota_segmentacion(void* args, FILE* archivo_dump){
     tabla_segmentos_t* tabla_patota = (tabla_segmentos_t*) args;
 
@@ -407,12 +411,14 @@ void dump_patota_segmentacion(void* args, FILE* archivo_dump){
     }
 
     list_iterator_destroy(iterador);    // Liberamos el iterador
-}
+}*/
 
-void dump_segmento(segmento_t* segmento, int PID, FILE* archivo_dump){
+void dump_segmento(void* args, FILE* archivo_dump){
+    segmento_t* segmento = (segmento_t*) args;
+
     // Proceso: 1	Segmento: 1	Inicio: 0x0000	Tam: 20b
     char* info_segmento = string_from_format("\nProceso: %3d Segmento: %3d Inicio: %8d Tam: %db", 
-                                                PID, segmento->numero_segmento, segmento->inicio, segmento->tamanio);
+                        segmento->PID, segmento->numero_segmento, segmento->inicio, segmento->tamanio);
     
     // Escribimos la info en el archivo
     fwrite(info_segmento, sizeof(char), strlen(info_segmento), archivo_dump);   
