@@ -1,5 +1,7 @@
 #include "discordiador.h"
 
+t_tarea tarea_sabotaje;
+
 int main(int argc, char *argv[])
 {
 	if(argc!=2) {
@@ -32,6 +34,10 @@ int main(int argc, char *argv[])
 	sem_init(&sem_generador_PID, 0, 1);
 	sem_init(&sem_generador_TID, 0, 1);
 	sem_init(&sem_struct_iniciar_tripulante, 0, 0);
+	//semaforos sabotaje
+	sem_init(&sem_sabotaje_finalizado,0,0);
+	sem_init(&sem_sabotaje_tripulante,0,0);
+	sem_init(&sem_tripulante_disponible,0,0);
 
 	// Creo estructuras del planificador
 	crear_estructuras_planificador();
@@ -162,7 +168,10 @@ void recibir_y_procesar_mensaje_i_mongo_store(int i_mongo_store_fd){
 			posicion_sabotaje.pos_x=atoi(posiciones[0]);
 			posicion_sabotaje.pos_y=atoi(posiciones[1]);
 			printf("empiezo a planificar el sabotaje\n");
-
+			tarea_sabotaje.pos_x=posicion_sabotaje.pos_x;
+			tarea_sabotaje.pos_y=posicion_sabotaje.pos_y;
+			printf("HOLA\n");
+			tarea_sabotaje.duracion=duracion_sabotaje;
 			/*log_info(logger, "Pausando planificacion");
 			if (estado_planificador == PLANIFICADOR_RUNNING){
 				dispatcher_pausar();
@@ -175,6 +184,7 @@ void recibir_y_procesar_mensaje_i_mongo_store(int i_mongo_store_fd){
                 log_error(logger, "No se pudo ejecutar la funcion de bloqueo ante sabotajes");
 				break;
 			}
+			
             tripulante_sabotaje= malloc(sizeof(t_tripulante));
 			tripulante_sabotaje->posicion_X=1000;
 			tripulante_sabotaje->posicion_Y=1000;
@@ -205,6 +215,9 @@ void recibir_y_procesar_mensaje_i_mongo_store(int i_mongo_store_fd){
 			sem_post(&sem_sabotaje_finalizado);
 
             log_debug(logger, "Termino sabotaje"); 
+			break;
+		case COD_MANEJAR_SABOTAJE_INEXISTENTE:
+			log_error(logger,"No existen posiciones de sabotaje");
 			break;
 		case -1:
 			log_error(logger, "El i-Mongo-Store se desconecto. Terminando Discordiador");
@@ -515,6 +528,7 @@ int submodulo_tripulante(void* args) {
 	iniciar_tripulante_t struct_iniciar_tripulante = *((iniciar_tripulante_t*) args);
 	t_tripulante* tripulante;
 	t_tarea* tarea = NULL;
+	
 	ciclo_t* ciclo;
 
 	int mi_ram_hq_fd_tripulante;
@@ -526,6 +540,8 @@ int submodulo_tripulante(void* args) {
 	int	ciclos_ejecutando_tarea = 0;
 
 	bool tripulante_finalizado = false;
+
+	
 
 	log_info(logger, "Iniciando tripulante");
 
@@ -585,6 +601,11 @@ int submodulo_tripulante(void* args) {
 	sem_post(&sem_struct_iniciar_tripulante);
 
 	log_info(logger, "Tripulante inicializado");
+	bool primer_ciclo = true;
+	bool llego_a_el_sabotaje=false;
+	int ciclos_ejecutando_sabotaje=0;
+	
+	char * indice_tripulante = string_itoa(tripulante->TID);
 		
 	while(!tripulante_finalizado){
 			
@@ -606,7 +627,13 @@ int submodulo_tripulante(void* args) {
 				sem_wait(tripulante->sem_tripulante_dejo[NEW]);
 				break;
 
-			case READY:	// El tripulante espera hasta que el planificacor lo saque de la cola de ready
+			case READY:	// El tripulante espera hasta que el planificacor lo saque de la cola de 
+				if(sabotaje_activo){
+					desencolar_tripulante_por_tid(cola[READY],tripulante->TID);
+					transicion(tripulante,READY,BLOCKED_EMERGENCY);
+					printf("entre en ready sabotaje trip: %d\n",tripulante->TID);
+					break;
+				}
 				enviar_op_recibir_estado_tripulante(mi_ram_hq_fd_tripulante, 'R');	
 				leer_estado_tripulante_mi_ram_hq(mi_ram_hq_fd_tripulante, tripulante);
 				sem_post(&sem_hay_evento_planificable);
@@ -625,11 +652,36 @@ int submodulo_tripulante(void* args) {
 				}
 
 				if(sabotaje_activo){
-					//pongo en pausa los blocked io para poder testear
-					//TO DO: si terminan los ciclos IO y hay sabotaje activo, pasan a cola Blocked Emergency
-					// y no a ready
-					printf("blocked io pausa del trip: %d", tripulante->TID);
+					//solo pausuo su ejecucion
 					sem_wait(tripulante->sem_planificacion_fue_reanudada);
+					//implementacion sin pausar a los bloqueados y moviendolo a emergency cuando terminan
+					//(NO SERIA LA FORMA CORRECTA)
+					/*if(ciclos_en_estado_actual == tarea->duracion){
+						// TODO: Le pide al planificador que lo agregue a la cola de ready
+						encolar(BLOCKED_IO_TO_READY, tripulante);
+
+						// El tripulante espera hasta que el planificacor lo saque de la cola de ready
+						sem_wait(tripulante->sem_tripulante_dejo[BLOCKED_IO]);
+						ciclos_en_estado_actual = 0;
+
+						// TODO: Avisa que finalizo la tarea
+						
+						log_debug(logger, "El tripulante %d completo tarea de %d ciclos exitosamente, pasando a estado READY", tripulante->TID, tarea->duracion);	
+						enviar_operacion(i_mongo_store_fd_tripulante, COD_TERMINAR_TAREA, tarea->string, strlen(tarea->string)+1);
+						destruir_tarea(tarea);
+						tarea = NULL;
+						break;	// Salgo del switch
+					}
+
+					// Se crea un hilo aparte que termina despues de un ciclo
+					ciclo = crear_ciclo_cpu();	
+
+					ciclos_en_estado_actual++;
+					log_error(logger,"EJECUTO UN CICLO DE LA TAREA EN BLOCKED IO");
+
+					// Se espera que termine el ciclo
+					esperar_fin_ciclo_de_cpu(ciclo);*/					
+					break;
 				}
 
 				// Me fijo si cumplio los ciclos de la tarea
@@ -662,21 +714,53 @@ int submodulo_tripulante(void* args) {
 				break;
 
 			case EXEC:
+				printf("imprimo tid\n");
 				printf("soy trip %d y entre en exec\n",tripulante->TID);
 				if(sabotaje_activo){
-					printf("soy trip %d y entre a resolver el sabotaje\n",tripulante->TID);
-					char * indice_tripulante = string_itoa(tripulante->TID);
-					//TO DO: mover tripulante de su posicion a la del sabotaje
-					sleep(1);
-					//envio el id del tripulante a imongo para facilitar su reconocimiento
-					enviar_operacion(i_mongo_store_fd_tripulante,COD_MANEJAR_SABOTAJE, indice_tripulante,strlen(indice_tripulante)+1);
-					//TO DO: consumir ciclos reparando el sabotaje
-					sleep(3);
+					ciclo = crear_ciclo_cpu();
+					if(primer_ciclo){
+						printf("soy trip %d y entre a resolver el sabotaje\n",tripulante->TID);
+						llego_a_el_sabotaje=false;
+						ciclos_ejecutando_sabotaje=0;
+						primer_ciclo = false;
+						
+						
+					}
+					printf("HOLA\n");
+				
+					//TO DO: mover tripulante de su posicion a la del 
+					// muevo al tripulante y luego verifico si llego a la tarea
+					if(!llego_a_el_sabotaje && tripulante_esta_en_posicion(tripulante, &tarea_sabotaje, mi_ram_hq_fd_tripulante, i_mongo_store_fd_tripulante)){
+						
+						llego_a_el_sabotaje = true;
+
+						// Si llego a el sabotaje:
+						//envio el id del tripulante a imongo para facilitar su reconocimiento				
+						enviar_operacion(i_mongo_store_fd_tripulante,COD_MANEJAR_SABOTAJE, indice_tripulante,strlen(indice_tripulante)+1);
+
+						// Espero que termine el ciclo de cpu
+						esperar_fin_ciclo_de_cpu(ciclo);
+						break;
+					}
+
+					// Si el tripulante llego la tarea 
+					if(llego_a_el_sabotaje){
+						printf("aumento ciclo\n");
+						ciclos_ejecutando_sabotaje++;
+						log_error(logger,"EJECUTO UN CICLO DE RESOLVER SABOTAJE");
+					
+						if(ciclos_ejecutando_sabotaje == tarea_sabotaje.duracion){
+							printf("termine la resolver el sabotaje\n");
+							//destruir_tarea(tarea_sabotaje);
+							sabotaje_activo = 0;
+							free(indice_tripulante);
+						}	
+					}
+					// Espero que termine el ciclo de cpu
+					printf("esperarciclo\n");
+					esperar_fin_ciclo_de_cpu(ciclo);
 					//revisar semaforos, talvez son innecesarios, no los uso en otros lados y no rompe.
-					sem_post(&sem_sabotaje_tripulante);
-					sabotaje_activo = 0;
-					sem_wait(&sem_sabotaje_finalizado);
-					free(indice_tripulante);
+					
 					break;
 				}
 				printf("soy trip %d y no entre en sabotaje exec\n",tripulante->TID);
@@ -773,7 +857,15 @@ int submodulo_tripulante(void* args) {
 
 			case BLOCKED_EMERGENCY:
 				printf("blocked emergency pausa del trip %d\n",tripulante->TID);
+				int valor_semaforo;
+				sem_getvalue(&sem_tripulante_disponible, &valor_semaforo);
+				printf("valor semaforo:%d \n",valor_semaforo);
+				if(valor_semaforo == 0){
+					sem_post(&sem_tripulante_disponible);
+				}
+				
 				sem_wait(tripulante->sem_planificacion_fue_reanudada);
+				
 				// Creo que con pausarlos basta
 				break;
 
