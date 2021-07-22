@@ -16,8 +16,8 @@ __thread t_trip tripulante;
 __thread char* path_bitacora;
 
 void liberar_recursos_thread(){
-    //config_destroy(bitacora_config_file);
-    //config_destroy(tarea_config_file);
+    config_destroy(bitacora_config_file);
+    config_destroy(tarea_config_file);
     //free(path_bitacora);
 }
 
@@ -124,11 +124,11 @@ void escribir_bitacora(char* mensaje){
         config_set_value(bitacora_config_file,"BLOCK_COUNT",blockcountstr);
         config_set_value(bitacora_config_file,"BLOCKS",bloques_config);
         config_save(bitacora_config_file);
-        //free(mensajelenstr);
-        //free(blockcountstr);
-        //config_destroy(bitacora_config_file);
-        //free(bloques_config);
-        //liberar_char_array(bloques_usables);
+        free(mensajelenstr);
+        free(blockcountstr);
+        config_destroy(bitacora_config_file);
+        free(bloques_config);
+        liberar_char_array(bloques_usables);
     }else{
         printf("existe bitacora\n");
         //Ya existiendo Bitacoran.ims
@@ -182,8 +182,12 @@ void escribir_bitacora(char* mensaje){
             bloques_config=array_two_block_to_string(lista_bloques,bloques_usables,bitacora_config.block_count);
             printf("BIT: bloques a config: %s\n", bloques_config);
             for(int i = 0; bloques_usables[i]!=NULL;i++){
+                printf("Escribo bloque %d",atoi(bloques_usables[i]));
                 int offset = atoi(bloques_usables[i])*super_bloque.blocksize;
                 if(i==cantidad_de_bloques-1){
+                    if(resto==0){
+                        resto = super_bloque.blocksize; 
+                    }
                     sem_wait(&sem_mutex_blocks);
                     memcpy(blocksmap+offset,mensaje+offset_bitacora,resto);
                     sem_post(&sem_mutex_blocks);
@@ -216,12 +220,12 @@ void escribir_bitacora(char* mensaje){
         printf("BIT: bloques a config antes de finalizar: %s\n\n", bloques_config_final);
         config_set_value(bitacora_config_file,"BLOCKS",bloques_config_final);
         config_save(bitacora_config_file);
-        //config_destroy(bitacora_config_file);
-        //free(sizestr);
-        //free(blockcountstr);
-        //liberar_char_array(lista_bloques);
-        //free(bloques_config_final);
-        //free(bloques_config);
+        config_destroy(bitacora_config_file);
+        free(sizestr);
+        free(blockcountstr);
+        liberar_char_array(lista_bloques);
+        free(bloques_config_final);
+        free(bloques_config);
     }
     
 }
@@ -385,7 +389,7 @@ int recibir_tarea(char* payload){
                     log_info(logger, "Se intento descartar basura pero no existe el archivo Basura.ims");
                 }
                 sem_post(&sem_mutex_basura);
-                //free(path);
+                free(path);
                 break;
             }
             default:{
@@ -396,7 +400,7 @@ int recibir_tarea(char* payload){
         }
         
     }
-    //liberar_char_array(nombre_parametros);
+    liberar_char_array(nombre_parametros);
     return EXIT_SUCCESS;
 }
 
@@ -658,19 +662,20 @@ void generar_recurso(char* path, char caracter_llenado,char* parametro){
         config_set_value(tarea_config_file,"MD5_ARCHIVO",md5);
         printf("el md5 es: %s \n",md5);
         config_save(tarea_config_file);
-        //config_destroy(tarea_config_file);
-        //free(md5_str);
-        //free(md5);
-        //free(caracter);
-        //free(cantidadbloquesstr);
-        //liberar_char_array(bloques_usables);
-        //free(bloques_config);
+        config_destroy(tarea_config_file);
+        free(md5_str);
+        free(md5);
+        free(caracter);
+        free(cantidadbloquesstr);
+        liberar_char_array(bloques_usables);
+        free(bloques_config);
         //printf("caracter llenado: %s\n",config_get_string_value(tarea_config_file,"CARACTER_LLENADO"));
     }else{
         //Ya existiendo Recurso.ims
         tarea_config_file = config_create(path);
         leer_tarea_config(tarea_config_file);
         char * caracter_llenado = tarea_config.caracter_llenado;
+        printf("bloques en config:%s\n",tarea_config.blocks);
         char ** lista_bloques = string_get_string_as_array(tarea_config.blocks);
         char * bloques_config;
         int size_a_modificar = atoi(parametro);
@@ -698,7 +703,6 @@ void generar_recurso(char* path, char caracter_llenado,char* parametro){
             memcpy(blocksmap+ultimo_bloque_offset+ resto_anterior,fill,cantidad_repetir);
             sem_post(&sem_mutex_blocks);
             size_a_modificar-=(cantidad_repetir);
-            free(ultimo_bloque_anterior);
             free(fill);
         }
 
@@ -716,8 +720,9 @@ void generar_recurso(char* path, char caracter_llenado,char* parametro){
             bloques_usables = bits_libres(&bitmap,cantidad_de_bloques);
             sem_post(&sem_mutex_bitmap);
             printf("bloque usable 1: %s  2:%s\n ", bloques_usables[0], bloques_usables[1]);
-            //printf("ultimo bloque anterior: %s\n ", lista_bloques[tarea_config.block_count-1]);
+            printf("bloque anterior: %s\n ", lista_bloques[0]);
             //une la lista de bloques del config con los bloques nuevos a usar
+
             bloques_config=array_two_block_to_string(lista_bloques,bloques_usables,tarea_config.block_count);
             printf("bloques recurso %s a config: %s\n", caracter_llenado, bloques_config);
 
@@ -781,12 +786,12 @@ void generar_recurso(char* path, char caracter_llenado,char* parametro){
         config_set_value(tarea_config_file,"MD5_ARCHIVO",md5);
         printf("el md5 es: %s \n",md5);
         config_save(tarea_config_file);
-        //config_destroy(tarea_config_file);
-        //free(md5);
-        //free(sizestr);
-        //free(blockcountstr);
-        //liberar_char_array(lista_bloques);
-        //free(bloques_config);
+        config_destroy(tarea_config_file);
+        free(md5);
+        free(sizestr);
+        free(blockcountstr);
+        liberar_char_array(lista_bloques);
+        free(bloques_config);
     }
 }
 
@@ -882,12 +887,12 @@ void consumir_recurso(char* path, char* nombre_recurso ,char* parametro){
             config_set_value(tarea_config_file,"MD5_ARCHIVO",md5);
             printf("el md5 es: %s \n",md5);
             config_save(tarea_config_file);
-            //config_destroy(tarea_config_file);
-            //free(md5);
-            //free(sizestr);
-            //free(blockcountstr);
-            //liberar_char_array(lista_bloques);
-            //free(bloques_config);
+            config_destroy(tarea_config_file);
+            free(md5);
+            free(sizestr);
+            free(blockcountstr);
+            liberar_char_array(lista_bloques);
+            free(bloques_config);
             log_info(logger, "se consumio %s unidades de %s\n",parametro, nombre_recurso);
         }else{
             //borrar archivo entero
@@ -935,16 +940,16 @@ void consumir_recurso(char* path, char* nombre_recurso ,char* parametro){
             config_set_value(tarea_config_file,"MD5_ARCHIVO",md5);
             printf("el md5 es: %s \n",md5);
             config_save(tarea_config_file);
-            //config_destroy(tarea_config_file);
-            //free(cerostr);
-            //free(bloques_config);
-            //liberar_char_array(lista_bloques);
+            config_destroy(tarea_config_file);
+            free(cerostr);
+            free(bloques_config);
+            liberar_char_array(lista_bloques);
             log_info(logger, "se intento consumir mas unidades de %s que las disponibles",nombre_recurso);
         }
         
     }else{
         log_info(logger,"No se encontro archivo %s.ims",nombre_recurso);
-        //liberar_char_array(lista_bloques);
+        liberar_char_array(lista_bloques);
     }
 }
 
