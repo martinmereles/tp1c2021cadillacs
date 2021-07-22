@@ -21,11 +21,14 @@ void eliminar_patota(tabla_paginas_t* tabla_a_eliminar){
 
     // QUITAMOS LA PATOTA DE LA LISTA DE PATOTAS Y LA DESTRUIMOS
     list_remove_and_destroy_by_condition(tablas_de_patotas, tiene_PID, destruir_tabla_paginas);
+
+    log_debug(logger, "LA CANTIDAD DE PATOTAS EN EL SISTEMA ES %d",list_size(tablas_de_patotas));
 }
 
 // DESTRUYE LA TABLA DE PAGINAS Y LIBERA LOS MARCOS (Los marcos no se destruyen)
 void destruir_tabla_paginas(void* args){
     tabla_paginas_t* tabla = (tabla_paginas_t*) args;
+    log_debug(logger, "DESTRUIMOS PATOTA CON PID %d",tabla->PID);
     list_destroy_and_destroy_elements(tabla->paginas, liberar_marco);
     sem_destroy(tabla->semaforo);
     free(tabla->semaforo);
