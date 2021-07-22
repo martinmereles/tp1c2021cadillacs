@@ -371,13 +371,18 @@ int bloquear_tripulantes_por_sabotaje(void){
         encolar(READY_TEMPORAL, temporal);
         transicion(temporal,READY,BLOCKED_EMERGENCY);
     }
-        
+    sabotaje_activo=1;
     // Si no hay nadie para atender el sabotaje, falla, y no continua el sabotaje
-    if (!existen_tripulantes_en_cola(BLOCKED_EMERGENCY))
-        return EXIT_FAILURE;
+    if (!existen_tripulantes_en_cola(BLOCKED_EMERGENCY)){
+        printf("no existen tripulantes disponibles\n");
+        int valor_semaforo;
+        sem_getvalue(&sem_tripulante_disponible, &valor_semaforo);
+        printf("valor semaforo:%d \n",valor_semaforo);
+        sem_wait(&sem_tripulante_disponible);
+    }
 
     // activo el sabotaje, para que los tripulantes cambien su comportamiento en exec y bloqued io
-    sabotaje_activo=1;
+    
     return EXIT_SUCCESS;
 }
 
@@ -401,6 +406,7 @@ void desbloquear_tripulantes_tras_sabotaje(void){
     while(existen_tripulantes_en_cola(EXEC_TEMPORAL)){
         int valor_semaforo;
         t_tripulante * temporal = desencolar(EXEC_TEMPORAL);
+        desencolar_tripulante_por_tid(cola[BLOCKED_EMERGENCY], temporal->TID);
         transicion(temporal,BLOCKED_EMERGENCY,EXEC);
         sem_getvalue(temporal->sem_planificacion_fue_reanudada, &valor_semaforo);
 	    if(valor_semaforo == 0)
@@ -409,6 +415,7 @@ void desbloquear_tripulantes_tras_sabotaje(void){
     while(existen_tripulantes_en_cola(READY_TEMPORAL)){
         int valor_semaforo;
         t_tripulante * temporal = desencolar(READY_TEMPORAL);
+        desencolar_tripulante_por_tid(cola[BLOCKED_EMERGENCY], temporal->TID);
         transicion(temporal,BLOCKED_EMERGENCY,READY);
         sem_getvalue(temporal->sem_planificacion_fue_reanudada, &valor_semaforo);
 	    if(valor_semaforo == 0)
@@ -416,13 +423,13 @@ void desbloquear_tripulantes_tras_sabotaje(void){
     }
     //Esto no tiene que funcionar asi, pero sirve para el test, siempre y cuando haya tripulantes
     //para atender el sabotaje, a parte de los bloqued io
-    for(int i =0;i<queue_size(cola[BLOCKED_IO]);i++){
+    while(existen_tripulantes_en_cola(BLOCKED_EMERGENCY)){
         int valor_semaforo;
-        t_tripulante * temporal = desencolar(BLOCKED_IO);
+        t_tripulante * temporal = desencolar(BLOCKED_EMERGENCY);
+        transicion(temporal,BLOCKED_EMERGENCY,READY);
         sem_getvalue(temporal->sem_planificacion_fue_reanudada, &valor_semaforo);
 	    if(valor_semaforo == 0)
 			sem_post(temporal->sem_planificacion_fue_reanudada);
-        encolar(BLOCKED_IO, temporal);
     }
     //Limpio la queue de blocked emergency para reutilizarla
     queue_clean(cola[BLOCKED_EMERGENCY]);

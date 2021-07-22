@@ -9,8 +9,17 @@ void iniciar_filesystem() {
 		
 	}
 	mapear_blocks();
-	
+	printf("creando hilo\n");
 
+}
+
+void * bajada_a_disco(void * arg){
+	while(1){
+		sleep(fs_config.tiempo_sincro);
+		log_debug(logger,"Bajando datos a disco...");
+		msync(blocksmap, blocks_stat.st_size, MS_SYNC);
+	}
+	return NULL;
 }
 
 void existe_directorio(char * path){
@@ -61,19 +70,20 @@ void mapear_blocks(){
 	*/
 
 	//test de lectura (lee hasta un espacio vacio)
-	for (int i = 0; i<blocks_stat.st_size ; i++){
+	/*for (int i = 0; i<blocks_stat.st_size ; i++){
 		printf("%c", blocksmap[i]);
 	}
-	printf("\n");
+	printf("\n");*/
 	
 
 	//test de lectura de un bloque usando indice
 	//(en practica hay que tener en cuenta el tamaño del archivo para el ultimo bloque en vez de blocksize)
-	int indicetest = 2;
+	int indicetest = 3;
 	char * contenidotest = calloc(1,super_bloque.blocksize);
 	memcpy(contenidotest, blocksmap+(super_bloque.blocksize * indicetest), super_bloque.blocksize);
 	printf("se leyo el bloque %d, con el contenido : %s\n",indicetest,contenidotest);
 	free(contenidotest);
+	free(pathBlocks);
 	
 }
 
@@ -133,6 +143,7 @@ void crear_filesystem(){
 	fclose(blocks_create);
 	log_info(logger, "No se encontro un archivo Blocks.ims existente y se creo uno en base a SuperBloque.ims");
 	free(puntomontaje);
+	free(block_path);
 }
 
 void crear_directorios(){
@@ -214,14 +225,14 @@ int existe_filesystem(){
 			printf("%d",test);
 		}
 		printf("\n");
-		*/
+		
 
 		// (para el test)copio al void* mapeado el contenido del bitarray para actualizar el bitmap
-		//memcpy(superbloquemap+offset,super_bloque.bitarray,strlen(super_bloque.bitarray)+1);
+		memcpy(superbloquemap+offset,super_bloque.bitarray,strlen(super_bloque.bitarray)+1);
 		// (para el test)fuerzo un sync para que el mapeo se refleje en SuperBloque.ims
-		//int sync = msync(superbloquemap, superbloque_stat.st_size, MS_SYNC);
-		//printf("se sincronizo:%d\n", sync);
-
+		int sync = msync(superbloquemap, superbloque_stat.st_size, MS_SYNC);
+		printf("se sincronizo:%d\n", sync);
+*/
 		//compruebo la existencia de Blocks.ims
 		if(existe_archivo(block_path)){
 			log_info(logger, "Se encontro un archivo Blocks.ims existente");

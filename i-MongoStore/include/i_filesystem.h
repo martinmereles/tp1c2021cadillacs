@@ -82,7 +82,7 @@ int existe_filesystem();
 void mapear_blocks();
 void crear_directorios();
 void crear_filesystem();
-
+void * bajada_a_disco();
 
 t_superbloque super_bloque;
 struct stat superbloque_stat;
