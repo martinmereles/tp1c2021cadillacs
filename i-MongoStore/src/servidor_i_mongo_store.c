@@ -1183,7 +1183,8 @@ void testear_files(char * path){
     t_config * test;
     test = config_create(path);
     char * bloques_config = config_get_string_value(test,"BLOCKS");
-    int cantidad_bloques_config = config_get_int_value(test,"BLOCK_COUNT"); 
+    int cantidad_bloques_config = config_get_int_value(test,"BLOCK_COUNT");
+    printf("block count: %d\n",cantidad_bloques_config);
     int size_config = config_get_int_value(test,"SIZE");
     char * md5_config = config_get_string_value(test,"MD5_ARCHIVO");
     char * caracter_config = config_get_string_value(test,"CARACTER_LLENADO");
@@ -1213,6 +1214,8 @@ void testear_files(char * path){
         }
         printf("size parcial:%d\n",size_archivo);
     }
+    printf("empiezo comprobaciones\n");
+    printf("cantidad real block count:%d\n",cantidad_real_bloques);
     if(cantidad_real_bloques!=  cantidad_bloques_config){
         log_error(logger,"Inconsistencia en el valor de BLOCK_COUNT");
         char * block_count = string_itoa(cantidad_real_bloques);
@@ -1229,12 +1232,13 @@ void testear_files(char * path){
         config_save(test);
         log_info(logger,"Sabotaje reparado con exito");
     }
-    free(buffer_temporal);
+    printf("termine comprobaciones\n");
+    //free(buffer_temporal);
 
     
     char * md5_fsck = calloc(1,super_bloque.blocksize+1);
     int indice_md5=0;
-    int indice_ultimo_bloque = atoi(lista_bloques[cantidad_bloques_config-1]);
+    int indice_ultimo_bloque = atoi(lista_bloques[cantidad_real_bloques-1]);
     memcpy(buffer_temporal,blocksmap+(indice_ultimo_bloque*super_bloque.blocksize),super_bloque.blocksize);
 
     for(int j= 0;j<super_bloque.blocksize;j++){
@@ -1270,4 +1274,5 @@ void testear_files(char * path){
         }
         log_info(logger,"Sabotaje reparado con exito");
     }
+    config_destroy(test);
 }
