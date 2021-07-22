@@ -2,5 +2,5 @@
 FILE=i-MongoStore
 make
 if test -f "./$FILE.out"; then
-    valgrind --tool=helgrind ./$FILE.out
+    valgrind --tool=helgrind ./$FILE.out $1
 fi

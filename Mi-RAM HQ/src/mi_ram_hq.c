@@ -1,11 +1,25 @@
 #include "mi_ram_hq.h"
 
-int main(void)
+int main(int argc, char *argv[])
 {
-	// Inicializo config
-	t_config *config = config_create("./cfg/mi-ram-hq.config");
-	
-	dibujar_mapa = strcmp(config_get_string_value(config, "DIBUJAR_MAPA"),"ON") == 0;
+	if(argc!=2) {
+		printf("FALTA NOMBRE DEL CONFIG.\n");
+		return EXIT_FAILURE;
+	}
+
+	char* path_config = string_new();
+	string_append(&path_config, "./cfg/tests/");
+	string_append(&path_config, argv[1]);
+	string_append(&path_config, ".config");
+
+	printf("EL PATH DEL CONFIG DEL TEST ES: %s\n", path_config);
+
+	// Inicializo configs
+	t_config *config_general = config_create("./cfg/config_general.config");	
+	t_config *config_test = config_create(path_config);
+	free(path_config);
+
+	dibujar_mapa = strcmp(config_get_string_value(config_general, "DIBUJAR_MAPA"),"ON") == 0;
 
 	// inicializo semaforos
 	sem_init(&semaforo_aceptar_conexiones, 0, 0);
@@ -18,11 +32,11 @@ int main(void)
 
 
 	// Leo IP y PUERTO del config
-	char* puerto_escucha = config_get_string_value(config, "PUERTO");
+	char* puerto_escucha = config_get_string_value(config_general, "PUERTO");
 	char* ip = "127.0.0.1";
 
 	// Inicializar las estructuras para administrar la memoria
-	if(inicializar_estructuras_memoria(config)==EXIT_FAILURE)
+	if(inicializar_estructuras_memoria(config_general, config_test)==EXIT_FAILURE)
 		return EXIT_FAILURE;
 
 	int server_fd = iniciar_servidor(ip, puerto_escucha);
@@ -34,9 +48,10 @@ int main(void)
 
 	log_info(logger, "Cerrando socket servidor");
 	close(server_fd);
-	liberar_estructuras_memoria(config);
+	liberar_estructuras_memoria(config_test);
 	log_destroy(logger);
-	config_destroy(config);
+	config_destroy(config_general);
+	config_destroy(config_test);
 	return EXIT_SUCCESS;
 }
 

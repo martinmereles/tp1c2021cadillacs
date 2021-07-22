@@ -2,5 +2,5 @@
 FILE=i-MongoStore
 make
 if test -f "./$FILE.out"; then
-    valgrind --tool=memcheck --leak-check=yes --show-possibly-lost=no --show-reachable=no --num-callers=20 ./$FILE.out
+    valgrind --tool=memcheck --leak-check=yes --show-possibly-lost=no --show-reachable=no --num-callers=20 ./$FILE.out $1
 fi

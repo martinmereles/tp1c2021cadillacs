@@ -2,5 +2,5 @@
 FILE=Mi-RAM-HQ
 make
 if test -f "./$FILE.out"; then
-    ./$FILE.out
+    ./$FILE.out $1
 fi

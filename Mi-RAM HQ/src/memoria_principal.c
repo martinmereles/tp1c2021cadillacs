@@ -1,14 +1,14 @@
 #include "memoria_principal.h"
 
-int inicializar_estructuras_memoria(t_config* config){
+int inicializar_estructuras_memoria(t_config* config_general, t_config* config_test){
 	// Inicializo las estructuras para administrar la RAM
-	tamanio_memoria = atoi(config_get_string_value(config, "TAMANIO_MEMORIA"));
+	tamanio_memoria = atoi(config_get_string_value(config_test, "TAMANIO_MEMORIA"));
 	memoria_principal = malloc(tamanio_memoria);
 
     log_info(logger, "El tamanio de la RAM es: %d",tamanio_memoria);
 
     // Inicializar esquema de memoria
-    if(inicializar_esquema_memoria(config) == EXIT_FAILURE)
+    if(inicializar_esquema_memoria(config_general, config_test) == EXIT_FAILURE)
         return EXIT_FAILURE;
     
     // Inicializo la lista de tablas de patotas
@@ -28,8 +28,8 @@ int inicializar_estructuras_memoria(t_config* config){
     return EXIT_SUCCESS;
 }
 
-int inicializar_esquema_memoria(t_config* config){
-    char* string_algoritmo_ubicacion = config_get_string_value(config, "ESQUEMA_MEMORIA");
+int inicializar_esquema_memoria(t_config* config_general, t_config* config_test){
+    char* string_algoritmo_ubicacion = config_get_string_value(config_test, "ESQUEMA_MEMORIA");
 
     if(strcmp(string_algoritmo_ubicacion,"SEGMENTACION")==0){
         log_info(logger,"El esquema de memoria es: SEGMENTACION");
@@ -50,7 +50,7 @@ int inicializar_esquema_memoria(t_config* config){
         }
 
         // Inicializo ALGORITMO UBICACION
-        if(inicializar_algoritmo_de_ubicacion(config) == EXIT_FAILURE)
+        if(inicializar_algoritmo_de_ubicacion(config_test) == EXIT_FAILURE)
             return EXIT_FAILURE;
 
         // Inicializo vectores a funciones
@@ -68,7 +68,7 @@ int inicializar_esquema_memoria(t_config* config){
         memoria_virtual = NULL;
 
         // Configuramos signal de compactacion
-	    signal(SIGINT, signal_handler);
+	    signal(SIGUSR2, signal_handler);
 
         log_info(logger, "El tamanio del mapa de memoria disponible es: %d",bitarray_get_max_bit(mapa_memoria_disponible));
 
@@ -79,7 +79,7 @@ int inicializar_esquema_memoria(t_config* config){
         log_info(logger,"El esquema de memoria es: PAGINACION");
 
         // Inicializo TAMANIO PAGINA
-	    tamanio_pagina = atoi(config_get_string_value(config, "TAMANIO_PAGINA"));
+	    tamanio_pagina = atoi(config_get_string_value(config_test, "TAMANIO_PAGINA"));
 
         log_info(logger,"El tamanio de pagina es: %d", tamanio_pagina);
 
@@ -89,7 +89,7 @@ int inicializar_esquema_memoria(t_config* config){
         }
 
         // Inicializo TAMANIO SWAP
-        tamanio_swap = atoi(config_get_string_value(config, "TAMANIO_SWAP"));
+        tamanio_swap = atoi(config_get_string_value(config_test, "TAMANIO_SWAP"));
         log_info(logger,"El tamanio de swap es: %d", tamanio_swap);
 
         if(tamanio_swap % tamanio_pagina != 0){
@@ -98,7 +98,7 @@ int inicializar_esquema_memoria(t_config* config){
         }
 
         // Inicializo PATH SWAP
-        path_swap = config_get_string_value(config, "PATH_SWAP");
+        path_swap = config_get_string_value(config_general, "PATH_SWAP");
         log_info(logger,"El path de swap es: %s", path_swap);
 
     
@@ -116,7 +116,7 @@ int inicializar_esquema_memoria(t_config* config){
         }
 
         // Inicializo ALGORITMO
-        if(inicializar_algoritmo_de_reemplazo(config) == EXIT_FAILURE)
+        if(inicializar_algoritmo_de_reemplazo(config_test) == EXIT_FAILURE)
             return EXIT_FAILURE;
 
 
@@ -263,7 +263,7 @@ void signal_handler(int senial){
 		case SIGUSR1:
             ejecutar_rutina(dump_memoria);
 			break;
-		case SIGINT:
+		case SIGUSR2:
             ejecutar_rutina(compactacion);
 			break;
 	}

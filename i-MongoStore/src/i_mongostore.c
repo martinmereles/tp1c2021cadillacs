@@ -10,8 +10,25 @@ void handler(int num){
 	enviar_operacion(discordiador_fd,COD_MANEJAR_SABOTAJE,payload,strlen(payload)+1);
 }
 
-int main(void)
+int main(int argc, char *argv[])
 {
+	if(argc!=2) {
+		printf("FALTA NOMBRE DEL CONFIG.\n");
+		return EXIT_FAILURE;
+	}
+
+	char* path_config = string_new();
+	string_append(&path_config, "./cfg/tests/");
+	string_append(&path_config, argv[1]);
+	string_append(&path_config, ".config");
+
+	printf("EL PATH DEL CONFIG DEL TEST ES: %s\n", path_config);
+
+	// Inicializo config	
+	config_general = config_create("./cfg/config_general.config");
+	config_test = config_create(path_config);
+	free(path_config);
+
 	primer_conexion_discordiador=1;
 	//signal para sabotaje
 	signal(SIGUSR1, handler);
@@ -43,8 +60,10 @@ void liberar_recursos(){
 	munmap(blocksmap, blocks_stat.st_size);
 	bitarray_destroy(&bitmap);
 	free(super_bloque.bitarray);
-	config_destroy(config);
-	config_destroy(config_superbloque);
+	//config_destroy(config);
+	//config_destroy(config_superbloque);
+	config_destroy(config_test);
+	config_destroy(config_general);
 	log_destroy(logger);
 	close(server_fd);
 	close(sbfile);
@@ -62,14 +81,13 @@ void iniciar_semaforos_fs(){
 }
 
 void leer_config(){
-	config = config_create("./cfg/i-mongo-store.config");
-	fs_config.puerto = config_get_string_value(config,"PUERTO");
-	fs_config.punto_montaje = config_get_string_value(config,"PUNTO_MONTAJE");
-	fs_config.tiempo_sincro = config_get_int_value(config, "TIEMPO_SINCRONIZACION");
-	fs_config.posiciones_sabotaje = config_get_string_value(config, "TIEMPO_SINCRONIZACION");
-	config_superbloque = config_create("./cfg/superbloque.config");
-	sb_config.blocks = config_get_int_value(config_superbloque,"BLOCKS");
-	sb_config.blocksize = config_get_int_value(config_superbloque,"BLOCKSIZE");
+	fs_config.puerto = config_get_string_value(config_general,"PUERTO");
+	fs_config.punto_montaje = config_get_string_value(config_general,"PUNTO_MONTAJE");
+	fs_config.tiempo_sincro = config_get_int_value(config_test, "TIEMPO_SINCRONIZACION");
+	fs_config.posiciones_sabotaje = config_get_string_value(config_test, "POSICIONES_SABOTAJE");
+	// config_superbloque = config_create("./cfg/superbloque.config");
+	sb_config.blocks = config_get_int_value(config_test,"BLOCKS");
+	sb_config.blocksize = config_get_int_value(config_test,"BLOCK_SIZE");
 }
 
 void sighandler(int signum) {

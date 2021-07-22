@@ -1,6 +1,23 @@
 #include "discordiador.h"
 
-int main(void) {
+int main(int argc, char *argv[])
+{
+	if(argc!=2) {
+		printf("FALTA NOMBRE DEL CONFIG.\n");
+		return EXIT_FAILURE;
+	}
+
+	char* path_config = string_new();
+	string_append(&path_config, "./cfg/tests/");
+	string_append(&path_config, argv[1]);
+	string_append(&path_config, ".config");
+
+	printf("EL PATH DEL CONFIG DEL TEST ES: %s\n", path_config);
+
+	// Inicializo config	
+	t_config *config_general = config_create("./cfg/config_general.config");
+	t_config *config_test = config_create(path_config);
+	free(path_config);
 
 	// Creo logger
 	logger = log_create("./cfg/discordiador.log", "Discordiador", 1, LOG_LEVEL_DEBUG);
@@ -23,19 +40,18 @@ int main(void) {
 	int mi_ram_hq_fd;
 
 	// Leo IP y PUERTO del config
-	t_config *config = config_create("./cfg/discordiador.config");
 	log_info(logger, "Iniciando configuracion");
 
-	direccion_IP_i_Mongo_Store = config_get_string_value(config, "IP_I_MONGO_STORE");
-	puerto_i_Mongo_Store = config_get_string_value(config, "PUERTO_I_MONGO_STORE");
-	direccion_IP_Mi_RAM_HQ = config_get_string_value(config, "IP_MI_RAM_HQ");
-	puerto_Mi_RAM_HQ = config_get_string_value(config, "PUERTO_MI_RAM_HQ");
-	grado_multiproc = atoi(config_get_string_value(config, "GRADO_MULTITAREA"));
-	duracion_sabotaje = atoi(config_get_string_value(config, "DURACION_SABOTAJE"));
-	retardo_ciclo_cpu = atoi(config_get_string_value(config, "RETARDO_CICLO_CPU"));
-	path_tareas = config_get_string_value(config, "PATH_TAREAS");
+	direccion_IP_i_Mongo_Store = config_get_string_value(config_general, "IP_I_MONGO_STORE");
+	puerto_i_Mongo_Store = config_get_string_value(config_general, "PUERTO_I_MONGO_STORE");
+	direccion_IP_Mi_RAM_HQ = config_get_string_value(config_general, "IP_MI_RAM_HQ");
+	puerto_Mi_RAM_HQ = config_get_string_value(config_general, "PUERTO_MI_RAM_HQ");
+	grado_multiproc = atoi(config_get_string_value(config_test, "GRADO_MULTITAREA"));
+	duracion_sabotaje = atoi(config_get_string_value(config_test, "DURACION_SABOTAJE"));
+	retardo_ciclo_cpu = atoi(config_get_string_value(config_test, "RETARDO_CICLO_CPU"));
+	path_tareas = config_get_string_value(config_general, "PATH_TAREAS");
 
-	if(inicializar_algoritmo_planificacion(config) == EXIT_FAILURE)
+	if(inicializar_algoritmo_planificacion(config_test) == EXIT_FAILURE)
 		return EXIT_FAILURE;
 
 	log_info(logger, "Configuracion terminada");
@@ -47,7 +63,8 @@ int main(void) {
 		// Libero recursos
 		liberar_conexion(i_mongo_store_fd);
 		log_destroy(logger);
-		config_destroy(config);
+		config_destroy(config_general);
+		config_destroy(config_test);
 		return EXIT_FAILURE;
 	}
 	log_info(logger, "Conexion con el i-Mongo-Store exitosa");
@@ -60,7 +77,8 @@ int main(void) {
 		liberar_conexion(i_mongo_store_fd);
 		liberar_conexion(mi_ram_hq_fd);
 		log_destroy(logger);
-		config_destroy(config);
+		config_destroy(config_general);
+		config_destroy(config_test);
 		return EXIT_FAILURE;
 	}
 	log_info(logger, "Conexion con Mi-RAM HQ exitosa");
@@ -72,7 +90,8 @@ int main(void) {
 
 	// Libero recursos
 	log_destroy(logger);
-	config_destroy(config);
+	config_destroy(config_general);
+	config_destroy(config_test);
 	liberar_conexion(i_mongo_store_fd);
 	liberar_conexion(mi_ram_hq_fd);
 

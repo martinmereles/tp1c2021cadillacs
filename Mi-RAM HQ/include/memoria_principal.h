@@ -9,11 +9,11 @@
 #include <sys/syscall.h>
 
 // NO DEBE DEPENDER DEL ESQUEMA DE MEMORIA (SEGMENTACION O PAGINACION)
-int inicializar_estructuras_memoria(t_config* config);
+int inicializar_estructuras_memoria(t_config* config_general, t_config* config_test);
 void liberar_estructuras_memoria(t_config* config);
 
 // ESQUEMA DE MEMORIA
-int inicializar_esquema_memoria(t_config* config);
+int inicializar_esquema_memoria(t_config* config_general, t_config* config_test);
 
 // FUNCIONES COMUNES PARA SEGMENTACION Y PAGINACION
 void leer_tarea_memoria_principal(void* tabla, char** tarea, uint32_t id_prox_tarea);
