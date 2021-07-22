@@ -245,7 +245,7 @@ char * leer_bitacora(char* payload){
         leer_bitacora_config(bitacora_config_file);
         char ** lista_bloques = string_get_string_as_array(bitacora_config.blocks);
         printf("bloques de bitacora: %s\n",bitacora_config.blocks);
-        bitacora = calloc(bitacora_config.size,1);
+        bitacora = calloc(bitacora_config.size+1,1);
         int offset_bitacora = 0;
         printf("size bitacora:%d\n", bitacora_config.size);
         int resto = bitacora_config.size%super_bloque.blocksize;
@@ -282,6 +282,7 @@ int terminar_tarea(char * payload){
     char * mensaje = string_new();
     string_append(&mensaje,"Se termino la tarea :");
     string_append(&mensaje,payload);
+    string_append(&mensaje,"\n");
     escribir_bitacora(mensaje);
     free(mensaje);
     return EXIT_SUCCESS;
@@ -301,6 +302,7 @@ int recibir_tarea(char* payload){
     char * mensaje = string_new();
     string_append(&mensaje,"Se comenzo la tarea :");
     string_append(&mensaje,payload);
+    string_append(&mensaje,"\n");
     escribir_bitacora(mensaje);
     liberar_char_array(parametros);
     free(mensaje);
