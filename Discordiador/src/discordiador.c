@@ -628,10 +628,11 @@ int submodulo_tripulante(void* args) {
 				break;
 			case BLOCKED_IO:	// Solo hay que esperar los ciclos hasta que se libere
 				if(sabotaje_activo){
-					//pongo en pausa los blocked io para poder testear
-					//TO DO: si terminan los ciclos IO y hay sabotaje activo, pasan a cola Blocked Emergency
-					// y no a ready
-					if(ciclos_en_estado_actual == tarea->duracion){
+					//solo pausuo su ejecucion
+					sem_wait(tripulante->sem_planificacion_fue_reanudada);
+					//implementacion sin pausar a los bloqueados y moviendolo a emergency cuando terminan
+					//(NO SERIA LA FORMA CORRECTA)
+					/*if(ciclos_en_estado_actual == tarea->duracion){
 						// TODO: Le pide al planificador que lo agregue a la cola de ready
 						encolar(BLOCKED_IO_TO_READY, tripulante);
 
@@ -655,7 +656,7 @@ int submodulo_tripulante(void* args) {
 					log_error(logger,"EJECUTO UN CICLO DE LA TAREA EN BLOCKED IO");
 
 					// Se espera que termine el ciclo
-					esperar_fin_ciclo_de_cpu(ciclo);					
+					esperar_fin_ciclo_de_cpu(ciclo);*/					
 					break;
 				}
 				// Me fijo si cumplio los ciclos de la tarea

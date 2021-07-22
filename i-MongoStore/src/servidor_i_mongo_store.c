@@ -677,6 +677,7 @@ void generar_recurso(char* path, char caracter_llenado,char* parametro){
         }else{
             cantidad_repetir = super_bloque.blocksize-resto_anterior;
         }
+        
         if(resto_anterior!=0){
             char * fill = string_repeat(*caracter_llenado,cantidad_repetir);
             char * ultimo_bloque_anterior = lista_bloques[tarea_config.block_count-1];
@@ -709,6 +710,8 @@ void generar_recurso(char* path, char caracter_llenado,char* parametro){
             //une la lista de bloques del config con los bloques nuevos a usar
             bloques_config=array_two_block_to_string(lista_bloques,bloques_usables,tarea_config.block_count);
             printf("bloques recurso %s a config: %s\n", caracter_llenado, bloques_config);
+
+            
             for(int i = 0; bloques_usables[i]!=NULL;i++){
                 printf("bloque usable:%s\n",bloques_usables[i]);
                 int offset = atoi(bloques_usables[i])*super_bloque.blocksize;
@@ -737,6 +740,22 @@ void generar_recurso(char* path, char caracter_llenado,char* parametro){
         /*sem_wait(&sem_mutex_blocks);
         msync(blocksmap, blocks_stat.st_size, MS_SYNC);
         sem_post(&sem_mutex_blocks);*/
+
+        char * buffer_temporal = calloc(1,super_bloque.blocksize+1);
+        char * md5_str = calloc(1,super_bloque.blocksize+1);
+        int indice_md5=0;
+        char ** lista_bloques_temp = string_get_string_as_array(bloques_config);
+        int indice_ultimo_bloque = atoi(lista_bloques_temp[tarea_config.block_count+cantidad_de_bloques-1]);
+        memcpy(buffer_temporal,blocksmap+(indice_ultimo_bloque*super_bloque.blocksize),super_bloque.blocksize);
+
+        for(int j= 0;j<super_bloque.blocksize;j++){
+            if(buffer_temporal[j]==caracter_llenado[0]){
+                //printf("caracter leido:%c y caracter config:%c\n",buffer_temporal[j],caracter_config[0]);
+                md5_str[indice_md5]=buffer_temporal[j];
+                indice_md5++;
+            }
+        }
+
         eliminar_keys_tarea(tarea_config_file);
         printf("bloques recurso %s a config: %s\n", caracter_llenado, bloques_config);
         char * sizestr = string_itoa(tarea_config.size + atoi(parametro));
@@ -748,7 +767,7 @@ void generar_recurso(char* path, char caracter_llenado,char* parametro){
             bloques_config
         );
         config_save(tarea_config_file);
-        char * md5 = md5_create(path);
+        char * md5 = md5_create(md5_str);
         config_set_value(tarea_config_file,"MD5_ARCHIVO",md5);
         printf("el md5 es: %s \n",md5);
         config_save(tarea_config_file);
@@ -822,6 +841,23 @@ void consumir_recurso(char* path, char* nombre_recurso ,char* parametro){
             /*sem_wait(&sem_mutex_blocks);
             msync(blocksmap, blocks_stat.st_size, MS_SYNC);
             sem_post(&sem_mutex_blocks);*/
+
+            char * buffer_temporal = calloc(1,super_bloque.blocksize+1);
+            char * md5_str = calloc(1,super_bloque.blocksize+1);
+            int indice_md5=0;
+            char ** lista_bloques_temp = string_get_string_as_array(bloques_config);
+            int indice_ultimo_bloque = atoi(lista_bloques_temp[block_config-1]);
+            memcpy(buffer_temporal,blocksmap+(indice_ultimo_bloque*super_bloque.blocksize),super_bloque.blocksize);
+
+            for(int j= 0;j<super_bloque.blocksize;j++){
+                if(buffer_temporal[j]==tarea_config.caracter_llenado[0]){
+                    //printf("caracter leido:%c y caracter config:%c\n",buffer_temporal[j],caracter_config[0]);
+                    md5_str[indice_md5]=buffer_temporal[j];
+                    indice_md5++;
+                }
+            }
+
+
             printf("config\n");
             eliminar_keys_tarea(tarea_config_file);
             char * sizestr = string_itoa(tarea_config.size - atoi(parametro));
@@ -833,7 +869,7 @@ void consumir_recurso(char* path, char* nombre_recurso ,char* parametro){
                 bloques_config
             );
             config_save(tarea_config_file);
-            char * md5 = md5_create(path);
+            char * md5 = md5_create(md5_str);
             config_set_value(tarea_config_file,"MD5_ARCHIVO",md5);
             printf("el md5 es: %s \n",md5);
             config_save(tarea_config_file);
@@ -866,6 +902,23 @@ void consumir_recurso(char* path, char* nombre_recurso ,char* parametro){
             msync(blocksmap, blocks_stat.st_size, MS_SYNC);
             sem_post(&sem_mutex_blocks);*/
             //printf("config\n");
+
+            char * buffer_temporal = calloc(1,super_bloque.blocksize+1);
+            char * md5_str = calloc(1,super_bloque.blocksize+1);
+            int indice_md5=0;
+            int indice_ultimo_bloque = atoi(lista_bloques[0]);
+            memcpy(buffer_temporal,blocksmap+(indice_ultimo_bloque*super_bloque.blocksize),super_bloque.blocksize);
+
+            for(int j= 0;j<super_bloque.blocksize;j++){
+                if(buffer_temporal[j]==tarea_config.caracter_llenado[0]){
+                    //printf("caracter leido:%c y caracter config:%c\n",buffer_temporal[j],caracter_config[0]);
+                    md5_str[indice_md5]=buffer_temporal[j];
+                    indice_md5++;
+                }
+            }
+
+
+
             eliminar_keys_tarea(tarea_config_file);
             char * cerostr = string_itoa(0);
             set_tarea_config(
@@ -875,7 +928,7 @@ void consumir_recurso(char* path, char* nombre_recurso ,char* parametro){
                 bloques_config
             );
             config_save(tarea_config_file);
-            char * md5 = md5_create(path);
+            char * md5 = md5_create(md5_str);
             config_set_value(tarea_config_file,"MD5_ARCHIVO",md5);
             printf("el md5 es: %s \n",md5);
             config_save(tarea_config_file);
@@ -973,7 +1026,7 @@ void fsck(){
     char * path_basura = crear_path_absoluto("/Files/Basura.ims");
     printf("test de bitarray:\n");
     //detecto sabotaje al bitmap
-    if(strcmp(bitmap.bitarray,bitmap_fsck.bitarray)){
+    if(strcmp(bitmap.bitarray,bitmap_fsck.bitarray)!=0){
         log_error(logger, "Bitarray inconsistente en Superbloque.ims");
         /*printf("test de bitarray viejo:");
 		for(int i = 0; i<super_bloque.blocks; i++){
@@ -1142,8 +1195,13 @@ void testear_files(char * path){
         memcpy(buffer_temporal,
             blocksmap+(indice*super_bloque.blocksize),
             super_bloque.blocksize);
-        //calculo el size recorriendo todos los bloques
-        size_archivo+=strlen(buffer_temporal);
+        //calculo el size comparando si esta escrito el caracter de llenado
+        for(int j= 0;j<super_bloque.blocksize;j++){
+            if(buffer_temporal[j]==caracter_config[0]){
+                //printf("caracter leido:%c y caracter config:%c\n",buffer_temporal[j],caracter_config[0]);
+                size_archivo++;
+            }
+        }
         printf("size parcial:%d\n",size_archivo);
     }
     if(cantidad_real_bloques!=  cantidad_bloques_config){
@@ -1166,15 +1224,25 @@ void testear_files(char * path){
 
     
     char * md5_fsck = calloc(1,super_bloque.blocksize+1);
+    int indice_md5=0;
     int indice_ultimo_bloque = atoi(lista_bloques[cantidad_bloques_config-1]);
-    memcpy(md5_fsck,blocksmap+(indice_ultimo_bloque*super_bloque.blocksize),super_bloque.blocksize);
+    memcpy(buffer_temporal,blocksmap+(indice_ultimo_bloque*super_bloque.blocksize),super_bloque.blocksize);
+
+    for(int j= 0;j<super_bloque.blocksize;j++){
+        if(buffer_temporal[j]==caracter_config[0]){
+            //printf("caracter leido:%c y caracter config:%c\n",buffer_temporal[j],caracter_config[0]);
+            md5_fsck[indice_md5]=buffer_temporal[j];
+            indice_md5++;
+        }
+    }
+
     char * md5nuevo = md5_create(md5_fsck);
     for(int i=0;i<strlen(md5_fsck);i++){
         //printf("char leido %c\n",md5_fsck[i]);
     }
     printf("md5 nuevo = %s\n", md5nuevo);
     //detecto problema en ultimo bloque del Blocks del File
-    if(strcmp(md5_config,md5nuevo)){
+    if(strcmp(md5_config,md5nuevo)!=0){
         log_error(logger,"Inconsistencia en el orden de blocks");
         int resto = size_archivo%super_bloque.blocksize;
         for(int i =0;lista_bloques[i]!=NULL;i++){

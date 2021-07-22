@@ -105,7 +105,6 @@ int i_mongo_store(int servidor_fd) {
 		if(num_events != 0){
 			// Si llego un mensaje en el socket de escucha
 			if((pfds[0].revents & POLLIN)){
-				printf("entre en 0\n");
 				// Creamos el hilo que se encarga de atender el cliente
 				// NOTA: el struct pthread_t de cada hilo se pierde
 				hilo_atender_cliente = malloc(sizeof(pthread_t));
@@ -120,7 +119,6 @@ int i_mongo_store(int servidor_fd) {
 			else{			
 				// Si llego un mensaje por consola
 				if((pfds[1].revents & POLLIN)){
-					printf("entre en 1\n");
 					// Leemos la consola y procesamos el mensaje
 					leer_consola_y_procesar();
 				}
