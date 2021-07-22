@@ -18,71 +18,48 @@ int inicializar_algoritmo_de_ubicacion(t_config* config){
     return EXIT_FAILURE;
 }
 
-int first_fit(int memoria_pedida) {
-    int memoria_disponible = 0;
-    int posicion_memoria_disponible = 0;
-    // Me fijo byte por byte de la memoria principal cuales estan disponibles
-    for(int nro_byte = 0;nro_byte < tamanio_memoria && memoria_disponible < memoria_pedida;nro_byte++){
-        // Si el byte esta ocupado
-        if(bitarray_test_bit(mapa_memoria_disponible, nro_byte)){
-            memoria_disponible = 0;
-            posicion_memoria_disponible = nro_byte + 1;
+segmento_t* first_fit(int memoria_pedida) {
+    // Me fijo segmento por segmento de la memoria principal cual tiene suficiente espacio disponible
+    t_list_iterator* iterador = list_iterator_create(lista_segmentos);    // Creamos el iterador
+    segmento_t* segmento_first_fit = NULL;
+    segmento_t* segmento;
+
+    while(list_iterator_has_next(iterador)){
+        segmento = list_iterator_next(iterador);
+        if(segmento->estado == SEGMENTO_LIBRE && segmento->tamanio >= memoria_pedida){
+            segmento_first_fit = segmento;
+            break;
         }
-        // Si el byte esta disponible
-        else{
-            memoria_disponible++;
-        }
-	}
-    // Si no se encontro un espacio de memoria del tamanio pedido, retorna -1
-    if(memoria_disponible != memoria_pedida)
-        return -1;
-    return posicion_memoria_disponible;
+    }
+
+    list_iterator_destroy(iterador);    // Liberamos el iterador
+
+    // Si no se encontro un segmento libre mayor o igual al tamanio pedido, retorna NULL
+    return segmento_first_fit;
 }
 
-int best_fit(int memoria_pedida) {
-    int memoria_disponible = 0;
-    int posicion_memoria_disponible = 0;
-    int mejor_memoria_disponible = 0;
-    int mejor_posicion_memoria_disponible = -1;
-    //log_info(logger,"ARRANCA EL BEST FIT");
-    // Me fijo byte por byte de la memoria principal cuales estan disponibles
-    for(int nro_byte = 0;nro_byte < tamanio_memoria;nro_byte++){
-        // Si el byte esta ocupado
-        if(bitarray_test_bit(mapa_memoria_disponible, nro_byte)){
+segmento_t* best_fit(int memoria_pedida) {
+    // Me fijo segmento por segmento de la memoria principal cual tiene el mejor ajuste
+    t_list_iterator* iterador = list_iterator_create(lista_segmentos);    // Creamos el iterador
+    segmento_t* segmento_best_fit = NULL;
+    segmento_t* segmento;
+    log_info(logger,"ARRANCA EL BEST FIT");
 
-            // Me fijo si la memoria pedida entra en la memoria hallada
-            if(memoria_disponible >= memoria_pedida){
-                // Si entra, la comparo con la mejor que habia encontrado
-                if(mejor_memoria_disponible > memoria_disponible || mejor_posicion_memoria_disponible == -1){
-                    // Si es mejor, se convierte en la nueva mejor
-                    mejor_memoria_disponible = memoria_disponible;
-                    mejor_posicion_memoria_disponible = posicion_memoria_disponible;
-                }
-            }
-
-            memoria_disponible = 0;
-            posicion_memoria_disponible = nro_byte + 1;
-        }
-        // Si el byte esta disponible
-        else{
-            memoria_disponible++;
+    while(list_iterator_has_next(iterador)){
+        segmento = list_iterator_next(iterador);
+        // Si el segmento esta libre y tiene espacio suficiente
+        if(segmento->estado == SEGMENTO_LIBRE && segmento->tamanio >= memoria_pedida){
+            
+            // Comparo el segmento hallado con el actual segmento con mejor ajuste encontrado
+            if( segmento_best_fit == NULL || (segmento_best_fit->tamanio > segmento->tamanio ) )
+                segmento_best_fit = segmento;
         }
     }
-    // Verifico si hay memoria disponible al final de la memoria principal
-    // Me fijo si la memoria pedida entra en la memoria hallada
-    if(memoria_disponible >= memoria_pedida){
-        // Si entra, la comparo con la mejor que habia encontrado
-        if(mejor_memoria_disponible > memoria_disponible || mejor_posicion_memoria_disponible == -1){
-            // Si es mejor, se convierte en la nueva mejor
-            mejor_memoria_disponible = memoria_disponible;
-            mejor_posicion_memoria_disponible = posicion_memoria_disponible;
-        }
-    }
-    //log_info(logger,"El mejor ajuste es de tamanio %d", mejor_memoria_disponible);
-    //log_info(logger,"La direccion del mejor ajuste es %d", mejor_posicion_memoria_disponible);
-    // Retorno la mejor posicion de memoria encontrada
-    // Si no se encontro un espacio de memoria del tamanio pedido, retorna -1
-    return mejor_posicion_memoria_disponible;
+
+    list_iterator_destroy(iterador);    // Liberamos el iterador
+
+    // Si no se encontro un segmento libre mayor o igual al tamanio pedido, retorna NULL
+    return segmento_best_fit;
 }
 
 // LECTURA/ESCRITURA EN MEMORIA PRINCIPAL
@@ -155,18 +132,18 @@ void quitar_y_destruir_tabla(tabla_segmentos_t* tabla_a_destruir){
 void destruir_tabla_segmentos(void* args){
     tabla_segmentos_t* tabla = (tabla_segmentos_t*) args;
     // Destruir todas las filas y liberar segmentos;
-    list_destroy_and_destroy_elements(tabla->filas, destruir_fila);
+    list_destroy_and_destroy_elements(tabla->filas, liberar_segmento);
     free(tabla->semaforo);
     free(tabla);
     // ejecutar_rutina(dump_memoria);  // Para test
 }
 
-void quitar_y_destruir_fila(tabla_segmentos_t* tabla, int numero_seg){
+void quitar_y_liberar_segmento(tabla_segmentos_t* tabla, int numero_seg){
     bool tiene_numero_de_segmento(void* args){
         segmento_t* fila = (segmento_t*) args;
         return fila->numero_segmento == numero_seg; 
     }
-    list_remove_and_destroy_by_condition(tabla->filas, tiene_numero_de_segmento, destruir_fila);
+    list_remove_and_destroy_by_condition(tabla->filas, tiene_numero_de_segmento, liberar_segmento);
 }
 
 tabla_segmentos_t* obtener_tabla_patota_segmentacion(int PID_buscado){
@@ -279,13 +256,18 @@ int cantidad_filas(tabla_segmentos_t* tabla){
     return list_size(tabla->filas);
 }
 
-void destruir_fila(void* args){
+void destruir_segmento(void* args){
+    segmento_t* segmento = (segmento_t*) args;
+    sem_destroy(&(segmento->semaforo));
+    free(segmento);
+}
+
+void liberar_segmento(void* args){
     segmento_t* segmento = (segmento_t*) args;
     
+    // Liberamos el segmento
     sem_wait(&reservar_liberar_memoria_mutex);
-    // Liberamos el espacio en el mapa de memoria disponible
-    liberar_memoria_segmentacion(segmento->inicio, segmento->tamanio);
-    free(segmento);
+    liberar_memoria_segmentacion(segmento);
     sem_post(&reservar_liberar_memoria_mutex);
 }
 
@@ -294,20 +276,20 @@ segmento_t* crear_fila(tabla_segmentos_t* tabla, int tamanio){
     sem_wait(&reservar_liberar_memoria_mutex);
 
     // Buscamos un espacio de memoria por algoritmo
-    int inicio = algoritmo_de_ubicacion(tamanio);
+    segmento_t* segmento = algoritmo_de_ubicacion(tamanio);
 
     // Si no se encontro espacio
-    if(inicio < 0){
+    if(segmento == NULL){
         // Ejecutamos la compactacion
         sem_post(&reservar_liberar_memoria_mutex);
         compactacion();
         sem_wait(&reservar_liberar_memoria_mutex);
 
         // Probamos una segunda vez 
-        inicio = algoritmo_de_ubicacion(tamanio);
+        segmento = algoritmo_de_ubicacion(tamanio);
         
         // Si tampoco se encontro espacio
-        if(inicio < 0){
+        if(segmento == NULL){
             log_error(logger,"ERROR: crear_fila. No hay espacio en memoria disponible.");
             sem_post(&reservar_liberar_memoria_mutex);
             return NULL;
@@ -316,33 +298,56 @@ segmento_t* crear_fila(tabla_segmentos_t* tabla, int tamanio){
 
     // Si se encontro espacio
     // Reservamos el espacio en el mapa de memoria disponible
-    reservar_memoria_segmentacion(inicio, tamanio);   
+    reservar_memoria_segmentacion(segmento, tamanio);
 
     sem_post(&reservar_liberar_memoria_mutex);
 
-    // Creamos el segmento
-    segmento_t* segmento = malloc(sizeof(segmento_t));
-    segmento->inicio = inicio;
-    segmento->tamanio = tamanio;
-    segmento->PID = tabla->PID;
-    sem_init(&(segmento->semaforo), 0, 1);
-
     // Agregamos el segmento a la tabla
     list_add(tabla->filas,segmento);
+    segmento->PID = tabla->PID;
     segmento->numero_segmento = generar_nuevo_numero_segmento(tabla);
     return segmento;
 }
 
-void reservar_memoria_segmentacion(uint32_t inicio, uint32_t tamanio){
-    for(int pos = inicio;pos < inicio + tamanio;pos++){
-        bitarray_set_bit(mapa_memoria_disponible, pos);
-    }
+void reservar_memoria_segmentacion(segmento_t* segmento, uint32_t tamanio_pedido){
+    // Calculamos el espacio que sobraria
+    uint32_t espacio_sobrante = segmento->tamanio - tamanio_pedido;
+
+    // Actualizamos el segmento:
+    segmento->estado = SEGMENTO_OCUPADO;
+    segmento->tamanio = tamanio_pedido;
+
+    // Si sobro espacio, creamos a continuacion un nuevo segmento libre
+    uint32_t inicio_nuevo_segmento = segmento->inicio + segmento->tamanio;
+    crear_segmento_libre(inicio_nuevo_segmento, espacio_sobrante);
 }
 
-void liberar_memoria_segmentacion(uint32_t inicio, uint32_t tamanio){
-    for(int pos = inicio;pos < inicio + tamanio;pos++){
-        bitarray_clean_bit(mapa_memoria_disponible, pos);
-    }
+void crear_segmento_libre(uint32_t inicio, uint32_t tamanio){
+    
+    // Si el tamanio es mayor a 0, creamos a partir de inicio un nuevo segmento libre
+    if(tamanio > 0){
+        // Creamos el segmento
+        segmento_t* nuevo_segmento = malloc(sizeof(segmento_t));
+        nuevo_segmento->inicio = inicio;
+        nuevo_segmento->tamanio = tamanio;
+        nuevo_segmento->estado = SEGMENTO_LIBRE;
+        sem_init(&(nuevo_segmento->semaforo), 0, 1);
+
+        // Agregamos el segmento a la lista global de segmentos, 
+        // ordenada por su direccion fisica inicial
+
+        bool segmento_inicia_antes(void* arg1, void* arg2){
+            segmento_t* segmento_menor = (segmento_t*) arg1;
+            segmento_t* segmento_mayor = (segmento_t*) arg2;
+            return segmento_menor->inicio < segmento_mayor->inicio;
+        }
+
+        list_add_sorted(lista_segmentos, nuevo_segmento, segmento_inicia_antes);
+    }    
+}
+
+void liberar_memoria_segmentacion(segmento_t* segmento){
+    segmento->estado = SEGMENTO_LIBRE;
 }
 
 int generar_nuevo_numero_segmento(tabla_segmentos_t* tabla){
@@ -373,7 +378,7 @@ uint32_t numero_de_segmento(uint32_t direccion_logica){
 
 void eliminar_tripulante_segmentacion(void* tabla, uint32_t direccion_logica_TCB){
     // Quitamos la fila de la tabla de segmentos (tambien se encarga de liberar la memoria)
-    quitar_y_destruir_fila(tabla, numero_de_segmento(direccion_logica_TCB));
+    quitar_y_liberar_segmento(tabla, numero_de_segmento(direccion_logica_TCB));
 
     // Si no quedan tripulantes en la patota, destruimos su tabla y liberamos sus recursos
     if(cantidad_filas(tabla) <= 2){
@@ -384,8 +389,7 @@ void eliminar_tripulante_segmentacion(void* tabla, uint32_t direccion_logica_TCB
 // DUMP MEMORIA
 
 void dump_memoria_segmentacion(){
-    // crear_archivo_dump(tablas_de_patotas, dump_patota_segmentacion);
-    crear_archivo_dump(lista_segmentos_en_memoria(), dump_segmento);
+    crear_archivo_dump(lista_segmentos, dump_segmento);
     // Para pruebas
     /*
     log_info(logger,"Dump: %s",temporal_get_string_time("%d/%m/%y %H:%M:%S"));
@@ -393,33 +397,19 @@ void dump_memoria_segmentacion(){
     */
 }
 
-/*
-void dump_patota_segmentacion(void* args, FILE* archivo_dump){
-    tabla_segmentos_t* tabla_patota = (tabla_segmentos_t*) args;
-
-    // Obtenemos el PID
-    uint32_t PID;
-    leer_memoria_principal(tabla_patota, DIR_LOG_PCB, DESPL_PID, &PID, sizeof(uint32_t));
-
-    // Por cada segmento, hacemos un dump de su informacion
-    t_list_iterator* iterador = list_iterator_create(tabla_patota->filas);    // Creamos el iterador
-    segmento_t* segmento;
-
-    while(list_iterator_has_next(iterador)){
-        segmento = list_iterator_next(iterador);
-        dump_segmento(segmento, PID, archivo_dump);
-    }
-
-    list_iterator_destroy(iterador);    // Liberamos el iterador
-}*/
-
 void dump_segmento(void* args, FILE* archivo_dump){
     segmento_t* segmento = (segmento_t*) args;
+    char* info_segmento;
 
     // Proceso: 1	Segmento: 1	Inicio: 0x0000	Tam: 20b
-    char* info_segmento = string_from_format("\nProceso: %3d Segmento: %3d Inicio: %8d Tam: %db", 
+    if(segmento->estado == SEGMENTO_OCUPADO){
+        info_segmento = string_from_format("\nEstado: OCUPADO Proceso: %3d Segmento: %3d Inicio: %8d Tam: %db", 
                         segmento->PID, segmento->numero_segmento, segmento->inicio, segmento->tamanio);
-    
+    }
+    else{
+        info_segmento = string_from_format("\nEstado: LIBRE   Proceso:  -  Segmento:  -  Inicio: %8d Tam: %db", 
+                        segmento->inicio, segmento->tamanio);
+    }
     // Escribimos la info en el archivo
     fwrite(info_segmento, sizeof(char), strlen(info_segmento), archivo_dump);   
     
@@ -489,22 +479,40 @@ void compactacion(){
     sem_wait(&reservar_liberar_memoria_mutex);
     log_info(logger,"INICIANDO COMPACTACION");
     
-    // Generamos la lista de segmentos ordenada
-    t_list* lista_segmentos_memoria = lista_segmentos_en_memoria();
-    // Compactamos los segmentos por orden
-    list_iterate(lista_segmentos_memoria, compactar_segmento);
-    // Destruimos la lista (sin destruir los segmentos)    
-    list_destroy(lista_segmentos_memoria);
+    int espacio_disponible = espacio_disponible_segmentacion();
+
+    // Elimino todos los segmentos libres de la lista global de segmentos:
+    bool es_segmento_libre(void* args){
+        segmento_t* segmento = (segmento_t*) args;
+        return segmento->estado == SEGMENTO_LIBRE;
+    }
+
+    while( list_any_satisfy(lista_segmentos, es_segmento_libre) )
+        list_remove_and_destroy_by_condition(lista_segmentos, es_segmento_libre, destruir_segmento);
+        
+    // Compacto todos los segmentos ocupados por orden
+
+    // Por cada segmento, lo movemos al primer lugar de la memoria disponible
+    t_list_iterator* iterador = list_iterator_create(lista_segmentos);    // Creamos el iterador
+    uint32_t inicio_proximo_espacio_disponible = 0;
+    segmento_t* segmento;
+
+    while(list_iterator_has_next(iterador)){
+        segmento = list_iterator_next(iterador);
+        compactar_segmento(segmento, inicio_proximo_espacio_disponible);
+        inicio_proximo_espacio_disponible += segmento->tamanio;
+    }
+
+    list_iterator_destroy(iterador);    // Liberamos el iterador
+
+    // Si sobra espacio, creo un segmento libre al final de la memoria principal:
+    crear_segmento_libre(tamanio_memoria - espacio_disponible, espacio_disponible);
 
     log_info(logger,"COMPACTACION COMPLETADA");
     sem_post(&reservar_liberar_memoria_mutex);
-
-    // PARA PRUEBAS
-    // ejecutar_rutina(dump_memoria);
 }
 
-void compactar_segmento(void* args){
-    segmento_t* segmento = (segmento_t*) args;
+void compactar_segmento(segmento_t* segmento, uint32_t inicio){
 
     sem_wait(&(segmento->semaforo));
 
@@ -512,20 +520,8 @@ void compactar_segmento(void* args){
     void* buffer = malloc(segmento->tamanio);
     memcpy(buffer, memoria_principal + segmento->inicio, segmento->tamanio);
 
-    // Liberar memoria en el mapa
-    liberar_memoria_segmentacion(segmento->inicio, segmento->tamanio);
-    
-    // Buscar el primer espacio disponible en RAM para ocupar (usar criterio first fit)
-    int ini = first_fit(segmento->tamanio);
-    if(ini < 0){
-        log_error(logger,"ERROR: compactar_segmento. Error de compactacion. Programame bien prro");
-    }
-
     // Actualizo informacion segmento
-    segmento->inicio = ini;
-
-    // Reservar el espacio de memoria encontrado en el mapa 
-    reservar_memoria_segmentacion(segmento->inicio, segmento->tamanio);
+    segmento->inicio = inicio;
 
     // Guardar la informacion del buffer en la RAM
     memcpy(memoria_principal + segmento->inicio, buffer, segmento->tamanio);
@@ -533,41 +529,21 @@ void compactar_segmento(void* args){
 
     sem_post(&(segmento->semaforo));
 }
-    
-
-t_list* lista_segmentos_en_memoria(){
-    t_list* lista_segmentos_memoria = list_create();
-
-    bool segmento_inicia_antes(void* arg1, void* arg2){
-        segmento_t* segmento_menor = (segmento_t*) arg1;
-        segmento_t* segmento_mayor = (segmento_t*) arg2;
-        return segmento_menor->inicio < segmento_mayor->inicio;
-    }
-
-    // Agrega al segmento a la lista, ordenandolos por su direccion fisica inicial
-    void agregar_segmento(void* args){
-        segmento_t* segmento = (segmento_t*) args;
-        list_add_sorted(lista_segmentos_memoria, segmento, segmento_inicia_antes);
-    }
-
-    // Agregamos cada segmento de la tabla a la lista de segmentos
-    void agregar_segmentos_de_tabla(void* args){
-        tabla_segmentos_t* tabla_patota = (tabla_segmentos_t*) args;
-        list_iterate(tabla_patota->filas, agregar_segmento);
-    }
-
-    // Por cada tabla de patota, agregamos sus segmentos a la lista de segmentos
-    list_iterate(tablas_de_patotas, agregar_segmentos_de_tabla);
-
-    return lista_segmentos_memoria;
-}
 
 uint32_t espacio_disponible_segmentacion(){
+
     uint32_t espacio_disponible = 0;
-    for(int i = 0;i < tamanio_memoria;i++){
-        // Si el byte esta disponible
-        if(!bitarray_test_bit(mapa_memoria_disponible, i))
-            espacio_disponible++;
+
+    // Por cada segmento, nos fijamos si esta libre o no
+    t_list_iterator* iterador = list_iterator_create(lista_segmentos);    // Creamos el iterador
+    segmento_t* segmento;
+
+    while(list_iterator_has_next(iterador)){
+        segmento = list_iterator_next(iterador);
+        if(segmento->estado == SEGMENTO_LIBRE)
+            espacio_disponible += segmento->tamanio;
     }
+
+    list_iterator_destroy(iterador);    // Liberamos el iterador
     return espacio_disponible;
 }
