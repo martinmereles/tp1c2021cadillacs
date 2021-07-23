@@ -1,10 +1,10 @@
 #include "i_mongostore.h"
 
 int server_fd;
-numero_sabotaje = 0;
 
 void handler(int num){
-	printf("le envio la señal al discord\n");
+	//printf("le envio la señal al discord\n");
+	log_debug(logger,"Se detecto señal SIGUSR1, avisando a discordiador..");
 	if(posiciones_sabotaje[num_sabotaje]!=NULL){
 		char * payload = posiciones_sabotaje[num_sabotaje];
 		num_sabotaje++;
@@ -22,7 +22,7 @@ int main(int argc, char *argv[])
 		printf("FALTA NOMBRE DEL CONFIG.\n");
 		return EXIT_FAILURE;
 	}
-
+	num_sabotaje = 0;
 	char* path_config = string_new();
 	string_append(&path_config, "./cfg/tests/");
 	string_append(&path_config, argv[1]);
@@ -57,9 +57,9 @@ int main(int argc, char *argv[])
 	log_info(logger, "I-MongoStore listo para recibir al Discordiador");
 
 	i_mongo_store(server_fd);
-
-	log_info(logger, "Cerrando socket servidor");
 	liberar_recursos();
+	log_info(logger, "Cerrando socket servidor");
+	
 	
 	return EXIT_SUCCESS;
 }
@@ -67,13 +67,11 @@ int main(int argc, char *argv[])
 void liberar_recursos(){
 	munmap(superbloquemap, superbloque_stat.st_size);
 	munmap(blocksmap, blocks_stat.st_size);
-	bitarray_destroy(&bitmap);
 	free(super_bloque.bitarray);
-	//config_destroy(config);
-	//config_destroy(config_superbloque);
+	//bitarray_destroy(&bitmap);
 	config_destroy(config_test);
 	config_destroy(config_general);
-	log_destroy(logger);
+	//log_destroy(logger);
 	close(server_fd);
 	close(sbfile);
 	close(bfile);
@@ -105,7 +103,7 @@ int i_mongo_store(int servidor_fd) {
 	// Declaramos variables
 	status_servidor = RUNNING;
 	pthread_t *hilo_atender_cliente;
-	int sfd;
+	//int sfd;
 
 	// Inicializamos pollfd
 	struct pollfd pfds[3];
@@ -237,13 +235,13 @@ bool leer_mensaje_cliente_y_procesar(int cliente_fd){
 			free(payload);
 			break;
 		case COD_OBTENER_BITACORA:
-			log_info(logger,"procesando solicitud de bitacora..");
+			log_debug(logger,"Procesando solicitud de bitacora..");
 			payload = recibir_payload(cliente_fd);
 			char* bitacora = leer_bitacora(payload);
 			enviar_operacion(cliente_fd,COD_OBTENER_BITACORA,bitacora,strlen(bitacora)+1);
 			free(bitacora);
 			free(payload);
-			log_info(logger,"bitacora enviada");
+			log_debug(logger,"Bitacora enviada");
 			break;
 		case COD_EJECUTAR_TAREA:
 			recibir_payload_y_ejecutar(cliente_fd, recibir_tarea);
@@ -256,8 +254,9 @@ bool leer_mensaje_cliente_y_procesar(int cliente_fd){
 			break;
 		case COD_MANEJAR_SABOTAJE:;
 			char * payload = recibir_payload(cliente_fd);
-			printf("el trip %s intentara resolver el sabotaje\n",payload);
+			//printf("el trip %s intentara resolver el sabotaje\n",payload);
 			fsck();
+			free(payload);
 			break;
 		case -1:
 			log_error(logger, "El cliente se desconecto.");
