@@ -39,9 +39,6 @@ int main(int argc, char *argv[])
 	//sem_init(&sem_sabotaje_tripulante,0,0);
 	//sem_init(&sem_tripulante_disponible,0,0);
 
-	// Creo estructuras del planificador
-	crear_estructuras_planificador();
-
 	int i_mongo_store_fd;
 	int mi_ram_hq_fd;
 
@@ -56,6 +53,9 @@ int main(int argc, char *argv[])
 	duracion_sabotaje = atoi(config_get_string_value(config_test, "DURACION_SABOTAJE"));
 	retardo_ciclo_cpu = atoi(config_get_string_value(config_test, "RETARDO_CICLO_CPU"));
 	path_tareas = config_get_string_value(config_general, "PATH_TAREAS");
+
+	// Creo estructuras del planificador
+	crear_estructuras_planificador();
 
 	if(inicializar_algoritmo_planificacion(config_test) == EXIT_FAILURE)
 		return EXIT_FAILURE;

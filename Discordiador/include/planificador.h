@@ -90,6 +90,8 @@ void desbloquear_tripulantes_tras_sabotaje(void);
 int bloquear_tripulantes_por_sabotaje(void);
 t_tripulante *desencolar_tripulante_por_tid(t_queue *cola_src, int tid_buscado);
 
+void postear_sem_evento_planificable();
+
 // VARIABLES GLOBALES
 t_tripulante * tripulante_sabotaje;
 t_tripulante * tripulante_elegido;
@@ -107,6 +109,7 @@ sem_t sem_sabotaje_tripulante;
 sem_t sem_tripulante_disponible;
 
 int grado_multiproc;
+int retardo_ciclo_cpu; // tiempo de espera por c/ciclo CPU
 int quantum;
 
 // en ESTADO NEW: genera las estructuras administrativas , una vez generado todo --> pasa a READY.
@@ -123,5 +126,5 @@ int sabotaje_activo;
 
 
 pthread_t hilo_dispatcher;
-
+pthread_t hilo_posteador;
 #endif

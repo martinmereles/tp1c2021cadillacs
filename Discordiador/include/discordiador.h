@@ -77,7 +77,6 @@ char* path_tareas;
 
 //grado_multitarea = grado multiprocesamiento
 int duracion_sabotaje; // expresado como cantidad en ciclos CPU
-int retardo_ciclo_cpu; // tiempo de espera por c/ciclo CPU
 
 int generadorPID;
 int generadorTID;

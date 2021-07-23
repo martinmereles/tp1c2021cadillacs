@@ -35,27 +35,24 @@ int dispatcher(void *algor_planif){
         sem_wait(&sem_mutex_ejecutar_dispatcher);
         
         do{
-
             // Se admiten en el sistema cada uno de los tripulantes creados
             sem_wait(&sem_mutex_ingreso_tripulantes_new);
-            if( existen_tripulantes_en_cola(NEW) ){
+            while( existen_tripulantes_en_cola(NEW) ){
                 //log_debug(logger, "Atendiendo COLA NEW");
                 tripulante = desencolar(NEW); 
                 transicion(tripulante, NEW, READY);
                 sem_post(&sem_mutex_ingreso_tripulantes_new);
-                break;
             }
             sem_post(&sem_mutex_ingreso_tripulantes_new);
             
-            if( hay_espacio_disponible(grado_multiproc) && existen_tripulantes_en_cola(READY) ){
+            while( hay_espacio_disponible(grado_multiproc) && existen_tripulantes_en_cola(READY) ){
                 //log_debug(logger, "Atendiendo COLA READY");
                 tripulante = desencolar(READY);
                 transicion(tripulante, READY, EXEC);
-                break;
             }
 
             // Consulto si hay que atender Bloqueos IO
-            if(existen_tripulantes_en_cola(BLOCKED_IO_TO_READY)){
+            while(existen_tripulantes_en_cola(BLOCKED_IO_TO_READY)){
                 //log_debug(logger, "Atendiendo COLA BLOCKED IO TO READY");
                 get_buffer_peticiones_and_swap(BLOCKED_IO_TO_READY);
 
@@ -63,10 +60,9 @@ int dispatcher(void *algor_planif){
                 primer_tripulante = ojear_cola(BLOCKED_IO);
                 if(primer_tripulante != NULL)
                     sem_post(primer_tripulante->sem_puede_usar_dispositivo_io);
-                break;
             }
 
-            if(existen_tripulantes_en_cola(EXEC_TO_BLOCKED_IO)){
+            while(existen_tripulantes_en_cola(EXEC_TO_BLOCKED_IO)){
                 //log_debug(logger, "Atendiendo COLA EXEC TO BLOCKED IO");
 
                 int cant_tripulantes = cantidad_tripulantes_en_cola(BLOCKED_IO);
@@ -79,11 +75,10 @@ int dispatcher(void *algor_planif){
                     if(primer_tripulante != NULL)
                         sem_post(primer_tripulante->sem_puede_usar_dispositivo_io);  
                 }
-                break;
             }
 
             // Consulto si hay sabotaje
-            if( hay_sabotaje() ){
+            while( hay_sabotaje() ){
                 //Atendiendo sabotaje
                 log_debug(logger, "Atendiendo COLA BLOCKED_EMERGENCY");
                 if (bloquear_tripulantes_por_sabotaje() != EXIT_SUCCESS)
@@ -92,19 +87,16 @@ int dispatcher(void *algor_planif){
                 //TODO: pasar TRIPULANTE que atendio SABOTAJE de EXEC a BLOCKED_IO
                 log_debug(logger, "Termino sabotaje"); 
                 desbloquear_tripulantes_tras_sabotaje();
-                break;
             }
 
             // Si hay tripulantes que se quedaron sin quantum (transicion EXEC_TO_READY)
-            if( existen_tripulantes_en_cola(EXEC_TO_READY) ){
+            while( existen_tripulantes_en_cola(EXEC_TO_READY) ){
                 get_buffer_peticiones_and_swap(EXEC_TO_READY);
-                break;
             }
                 
             // Si hay tripulantes en EXIT
-            if( existen_tripulantes_en_cola(EXIT) ){
+            while( existen_tripulantes_en_cola(EXIT) ){
                 gestionar_tripulantes_en_exit();
-                break;
             }
 
         }while(false);
@@ -133,6 +125,15 @@ void crear_estructuras_planificador(){
 
     // Creando hilo del dispatcher
     pthread_create(&hilo_dispatcher, NULL, (void*) dispatcher, NULL);
+    pthread_create(&hilo_posteador, NULL, (void*) postear_sem_evento_planificable,NULL);
+    pthread_detach(hilo_posteador);
+}
+
+void postear_sem_evento_planificable(){
+    while(true){
+        sleep(retardo_ciclo_cpu);
+        sem_post(&sem_hay_evento_planificable);
+    }
 }
 
 
