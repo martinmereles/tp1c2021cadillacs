@@ -36,8 +36,8 @@ int main(int argc, char *argv[])
 	sem_init(&sem_struct_iniciar_tripulante, 0, 0);
 	//semaforos sabotaje
 	sem_init(&sem_sabotaje_finalizado,0,0);
-	sem_init(&sem_sabotaje_tripulante,0,0);
-	sem_init(&sem_tripulante_disponible,0,0);
+	//sem_init(&sem_sabotaje_tripulante,0,0);
+	//sem_init(&sem_tripulante_disponible,0,0);
 
 	// Creo estructuras del planificador
 	crear_estructuras_planificador();
@@ -208,11 +208,11 @@ void recibir_y_procesar_mensaje_i_mongo_store(int i_mongo_store_fd){
 			sem_post(tripulante_sabotaje->sem_planificacion_fue_reanudada);
 			queue_destroy_and_destroy_elements(temporal,free);
 
-			sem_wait(&sem_sabotaje_tripulante);
+			sem_wait(&sem_sabotaje_finalizado);
 			desencolar_tripulante_por_tid(cola[EXEC], tripulante_sabotaje->TID);
 			transicion(tripulante_sabotaje, EXEC, BLOCKED_EMERGENCY);
 			desbloquear_tripulantes_tras_sabotaje();
-			sem_post(&sem_sabotaje_finalizado);
+			
 
             log_debug(logger, "Termino sabotaje"); 
 			break;
@@ -720,6 +720,7 @@ int submodulo_tripulante(void* args) {
 					ciclo = crear_ciclo_cpu();
 					if(primer_ciclo){
 						printf("soy trip %d y entre a resolver el sabotaje\n",tripulante->TID);
+						
 						llego_a_el_sabotaje=false;
 						ciclos_ejecutando_sabotaje=0;
 						primer_ciclo = false;
@@ -752,7 +753,8 @@ int submodulo_tripulante(void* args) {
 						if(ciclos_ejecutando_sabotaje == tarea_sabotaje.duracion){
 							printf("termine la resolver el sabotaje\n");
 							//destruir_tarea(tarea_sabotaje);
-							sabotaje_activo = 0;
+							sem_post(&sem_sabotaje_finalizado);
+							sabotaje_activo = 0; 
 							free(indice_tripulante);
 						}	
 					}
