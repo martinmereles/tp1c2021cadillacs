@@ -20,9 +20,9 @@ void eliminar_patota(tabla_paginas_t* tabla_a_eliminar){
     }
 
     // QUITAMOS LA PATOTA DE LA LISTA DE PATOTAS Y LA DESTRUIMOS
+    sem_wait(&mutex_tablas_patotas);
     list_remove_and_destroy_by_condition(tablas_de_patotas, tiene_PID, destruir_tabla_paginas);
-
-    log_debug(logger, "LA CANTIDAD DE PATOTAS EN EL SISTEMA ES %d",list_size(tablas_de_patotas));
+    sem_post(&mutex_tablas_patotas);
 }
 
 // DESTRUYE LA TABLA DE PAGINAS Y LIBERA LOS MARCOS (Los marcos no se destruyen)
@@ -37,7 +37,11 @@ void destruir_tabla_paginas(void* args){
 
 void liberar_marco(void* args){
     marco_t* marco = (marco_t*) args;
+    sem_wait(marco->semaforo);
     marco->estado = MARCO_LIBRE;
+    if(marco->bit_presencia == true)
+        log_debug(logger, "Marco %2d: Liberado", marco->numero_marco);
+    sem_post(marco->semaforo);
 }
 
 int crear_patota_paginacion(uint32_t PID, uint32_t longitud_tareas, char* tareas){
@@ -76,7 +80,9 @@ int crear_patota_paginacion(uint32_t PID, uint32_t longitud_tareas, char* tareas
     tabla_patota->tamanio_tareas = longitud_tareas;
 
     // Agregar la tabla a la lista de tablas
+    sem_wait(&mutex_tablas_patotas);
     list_add(tablas_de_patotas, tabla_patota);
+    sem_post(&mutex_tablas_patotas);
 
     // Guardo el PID y la direccion logica de las tareas en el PCB
     escribir_memoria_principal(tabla_patota, direccion_logica_PCB, DESPL_PID, &PID, sizeof(uint32_t));
@@ -264,11 +270,12 @@ int escribir_memoria_principal_paginacion(void* args, uint32_t inicio_logico, ui
     // Escribo el dato en memoria principal
     memcpy(memoria_principal + direccion_fisica_dato, dato, tamanio_escritura_pagina_actual);
    
-    sem_post(&mutex_proceso_swap);
     // Actualizo informacion de la pagina
     actualizar_timestamp(pagina);   // LRU
     pagina->bit_uso = true;         // Clock
   
+    sem_post(&mutex_proceso_swap);
+
     // Calculo el tamanio de lo que me falto escribir
     tamanio_total -= tamanio_escritura_pagina_actual;
     
@@ -325,11 +332,11 @@ int leer_memoria_principal_paginacion(void* args, uint32_t inicio_logico, uint32
     // Leo el dato de memoria principal
     memcpy(dato, memoria_principal + direccion_fisica_dato, tamanio_lectura_pagina_actual);
 
-    sem_post(&mutex_proceso_swap);
-
     // Actualizo informacion de la pagina
     actualizar_timestamp(pagina);   // LRU
     pagina->bit_uso = true;         // Clock
+
+    sem_post(&mutex_proceso_swap);
 
     // Calculo el tamanio de lo que me falto leer
     tamanio_total -= tamanio_lectura_pagina_actual;
@@ -351,14 +358,6 @@ int leer_memoria_principal_paginacion(void* args, uint32_t inicio_logico, uint32
 // TABLAS DE PAGINACION
 
 tabla_paginas_t* obtener_tabla_patota_paginacion(int PID_buscado){
-    /*
-    bool tiene_PID(void* args){
-        tabla_paginas_t* tabla = (tabla_paginas_t*) args;
-        uint32_t PID_tabla;
-        leer_memoria_principal(tabla, DIR_LOG_PCB, DESPL_PID, &PID_tabla, sizeof(uint32_t));
-        log_info(logger,"EL PID ENCONTRADO ES: %d",PID_tabla);
-        return PID_tabla == PID_buscado;
-    }*/
 
     bool tiene_PID(void* args){
         tabla_paginas_t* tabla = (tabla_paginas_t*) args;        
@@ -366,7 +365,11 @@ tabla_paginas_t* obtener_tabla_patota_paginacion(int PID_buscado){
         return tabla->PID == PID_buscado;
     }
 
-    return list_find(tablas_de_patotas, tiene_PID);
+    sem_wait(&mutex_tablas_patotas);
+    tabla_paginas_t* tabla_buscada = list_find(tablas_de_patotas, tiene_PID);
+    sem_post(&mutex_tablas_patotas);
+
+    return tabla_buscada;
 }
 
 marco_t* ultima_pagina(tabla_paginas_t* tabla_patota){
@@ -472,6 +475,7 @@ void dump_memoria_paginacion(){
     t_list* paginas_presentes = list_filter(lista_de_marcos, es_pagina_presente);
     crear_archivo_dump(paginas_presentes, dump_marco);
     sem_post(&mutex_proceso_swap);
+    list_destroy(paginas_presentes);
 }
 
 void dump_marco(void* args, FILE* archivo_dump){
@@ -481,10 +485,10 @@ void dump_marco(void* args, FILE* archivo_dump){
     char* info_marco;                                    
     if(marco->estado == MARCO_OCUPADO)
         info_marco = string_from_format("\nMarco: %3d Estado: Ocupado Proceso: %3d Pagina: %3d",
-                                         marco->numero_marco,marco->PID,marco->numero_pagina,marco->timestamp,marco->bit_presencia);
+                                         marco->numero_marco,marco->PID,marco->numero_pagina);
     else
         info_marco = string_from_format("\nMarco: %3d Estado: Libre   Proceso:  -  Pagina:  - ",
-                                         marco->numero_marco, marco->bit_presencia);       
+                                         marco->numero_marco);       
     
     fwrite(info_marco, sizeof(char), strlen(info_marco), archivo_dump);
 
@@ -497,7 +501,7 @@ void dump_marco(void* args, FILE* archivo_dump){
 void actualizar_timestamp(marco_t* pagina){
     sem_wait(&mutex_temporal);
     free(pagina->timestamp);
-    pagina->timestamp = temporal_get_string_time("%y%m%d%H%M%S");
+    pagina->timestamp = temporal_get_string_time("%y%m%d%H%M%S%MS");
     sem_post(&mutex_temporal);
 }
 
@@ -530,7 +534,7 @@ marco_t* algoritmo_lru(){
         char* timestamp_2 = pagina_2->timestamp;
         int i = 0;
 
-        for(;i < 11 && atoi(timestamp_1 + i) == atoi(timestamp_2 + i);i++);
+        for(;i < 13 && atoi(timestamp_1 + i) == atoi(timestamp_2 + i);i++);
         if(atoi(timestamp_1 + i) < atoi(timestamp_2 + i))
             retorno = (void*) pagina_1;
         else
@@ -607,7 +611,7 @@ int proceso_swap(marco_t* pagina_necesitada){
 
     // Bloquear con semaforos las paginas
     sem_wait(pagina_necesitada->semaforo);
-    log_debug(logger, "MARCO NECESITADO: %d", pagina_necesitada->numero_marco);
+    // log_debug(logger, "MARCO NECESITADO: %d", pagina_necesitada->numero_marco);
     // log_info(logger, "BLOQUEO MARCO NUMERO %d", pagina_necesitada->numero_marco);
 
     // Copiamos en un buffer el contenido de la pagina necesitada
@@ -629,7 +633,7 @@ int proceso_swap(marco_t* pagina_necesitada){
 
     
         sem_wait(pagina_victima->semaforo);
-        log_debug(logger,"MARCO VICTIMA POR ALGORITMO ES: %d",pagina_victima->numero_marco);
+        // log_debug(logger,"MARCO VICTIMA POR ALGORITMO ES: %d",pagina_victima->numero_marco);
         // log_info(logger, "BLOQUEO MARCO NUMERO %d", pagina_victima->numero_marco);
         // Movemos la informacion de la pagina victima a donde estaba la pagina necesitada en memoria virtual 
         char* buffer_victima = leer_marco(pagina_victima);
@@ -681,8 +685,16 @@ int proceso_swap(marco_t* pagina_necesitada){
     list_sort(lista_de_marcos, tiene_menor_numero_marco);    
   
     //log_info(logger, "FINALIZANDO SWAP");
-    //  log_info(logger, "DESBLOQUEO MARCOs NUMERO %d %d", pagina_necesitada->numero_marco, pagina_victima->numero_marco);
- 
+    if(pagina_victima->estado == MARCO_OCUPADO)
+        log_debug(logger, "SWAP: Pat.%2d Pag.%2d => Marco %d => Pat.%2d Pag.%2d", 
+            pagina_necesitada->PID, pagina_necesitada->numero_pagina,
+            pagina_necesitada->numero_marco,
+            pagina_victima->PID, pagina_victima->numero_pagina);
+    else
+        log_debug(logger, "SWAP: Pat.%2d Pag.%2d => Marco %d", 
+            pagina_necesitada->PID, pagina_necesitada->numero_pagina,
+            pagina_necesitada->numero_marco);
+
     // Liberar los semaforos de las paginas
     sem_post(pagina_necesitada->semaforo);
     sem_post(pagina_victima->semaforo);

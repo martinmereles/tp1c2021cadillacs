@@ -153,6 +153,7 @@ int comunicacion_cliente(int cliente_fd) {
 	void* tabla_patota = NULL;
 	uint32_t dir_log = -1;
 	bool cliente_conectado = true;
+	uint32_t TID;
 
 	struct pollfd pfds[1];
 	pfds[0].fd = cliente_fd;	
@@ -167,7 +168,7 @@ int comunicacion_cliente(int cliente_fd) {
 		if(num_events != 0){
 			// Si hay un mensaje del cliente
 			if(pfds[0].revents & POLLIN)
-				cliente_conectado = leer_mensaje_cliente_y_procesar(cliente_fd, &tabla_patota, &dir_log);
+				cliente_conectado = leer_mensaje_cliente_y_procesar(cliente_fd, &tabla_patota, &dir_log, &TID);
 			else{
 				log_error(logger, "Evento inesperado en file descriptor del cliente: %s", strerror(pfds[0].revents));
 				status_servidor = END;
@@ -178,7 +179,7 @@ int comunicacion_cliente(int cliente_fd) {
 }
 
 // Cada tripulante sabe a que segmento pertenece y a que proceso pertenece
-bool leer_mensaje_cliente_y_procesar(int cliente_fd, void** tabla_patota, uint32_t* dir_log){
+bool leer_mensaje_cliente_y_procesar(int cliente_fd, void** tabla_patota, uint32_t* dir_log, uint32_t* TID){
 	bool cliente_conectado = true;
 	// Leo codigo de operacion
 	int cod_op = recibir_operacion(cliente_fd);
@@ -195,7 +196,7 @@ bool leer_mensaje_cliente_y_procesar(int cliente_fd, void** tabla_patota, uint32
 			break;
 		case COD_INICIAR_TRIPULANTE:
 			payload = recibir_payload(cliente_fd);
-			resultado_op = iniciar_tripulante(payload, tabla_patota, dir_log);
+			resultado_op = iniciar_tripulante(payload, tabla_patota, dir_log, TID);
 			free(payload);
         	enviar_operacion(cliente_fd, resultado_op, NULL, 0); 
 			break;
@@ -208,23 +209,23 @@ bool leer_mensaje_cliente_y_procesar(int cliente_fd, void** tabla_patota, uint32
 		// Nuevos mensajes
 		case COD_ENVIAR_UBICACION_TRIPULANTE:
 			payload = recibir_payload(cliente_fd);
-			enviar_ubicacion_tripulante(cliente_fd, payload, tabla_patota, dir_log);
+			enviar_ubicacion_tripulante(cliente_fd, payload, tabla_patota, dir_log, TID);
 			free(payload);
 			break;
 		case COD_RECIBIR_ESTADO_TRIPULANTE:
 			payload = recibir_payload(cliente_fd);
-			recibir_estado_tripulante(payload, tabla_patota, dir_log);
+			recibir_estado_tripulante(payload, tabla_patota, dir_log, TID);
 			free(payload);
 			break;
 		case COD_ENVIAR_ESTADO_TRIPULANTE:
 			payload = recibir_payload(cliente_fd);
-			enviar_estado_tripulante(cliente_fd, payload, tabla_patota, dir_log);
+			enviar_estado_tripulante(cliente_fd, payload, tabla_patota, dir_log, TID);
 			free(payload);
 			break;
 
 		case COD_ENVIAR_PROXIMA_TAREA:
 			payload = recibir_payload(cliente_fd);
-			enviar_proxima_tarea(cliente_fd, payload, tabla_patota, dir_log);
+			enviar_proxima_tarea(cliente_fd, payload, tabla_patota, dir_log, TID);
 			free(payload);
 			break;
 		case COD_EXPULSAR_TRIPULANTE:
