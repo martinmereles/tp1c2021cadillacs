@@ -44,7 +44,7 @@ int main(int argc, char *argv[])
 	logger = log_create("./cfg/i-mongostore.log", "I-MongoStore", 1, LOG_LEVEL_DEBUG);
 	
 	// Leo IP y PUERTO del config y datos base de SUPERBLOQUE
-	char* ip = config_get_string_value(config_general, "IP");
+	char* ip = "127.0.0.1";
 	leer_config();
 	//Levanto/Creo el Filesystem
 	iniciar_filesystem();

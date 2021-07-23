@@ -32,8 +32,8 @@ int main(int argc, char *argv[])
 
 
 	// Leo IP y PUERTO del config
-	char* puerto_escucha = config_get_string_value(config_general, "PUERTO");			
-	char* ip = config_get_string_value(config_general, "IP");
+	char* puerto_escucha = config_get_string_value(config_general, "PUERTO");
+	char* ip = "127.0.0.1";
 
 	// Inicializar las estructuras para administrar la memoria
 	if(inicializar_estructuras_memoria(config_general, config_test)==EXIT_FAILURE)
