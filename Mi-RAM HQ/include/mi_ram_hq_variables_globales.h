@@ -36,8 +36,10 @@ void* memoria_principal;
 int tamanio_memoria;
 
 // Mapa de posiciones de memoria libres
-t_bitarray*	mapa_memoria_disponible;
-char* bitarray_mapa_memoria_disponible;
+// SEGMENTACION
+t_list* lista_segmentos;
+// t_bitarray*	mapa_memoria_disponible;
+// char* bitarray_mapa_memoria_disponible;
 
 // ESTRUCTURAS PARA ADMINISTRAR LA MEMORIA PRINCIPAL
 

@@ -56,7 +56,7 @@ void reanudar_planificacion();
 t_tarea* leer_proxima_tarea_mi_ram_hq(int mi_ram_hq_fd_tripulante);
 char leer_estado_mi_ram_hq(int mi_ram_hq_fd_tripulante);
 void leer_estado_tripulante_mi_ram_hq(int mi_ram_hq_fd_tripulante, t_tripulante* tripulante);
-
+t_tarea* obtener_proxima_tarea(int mi_ram_hq_fd_tripulante, t_tripulante* tripulante, int *ciclos_ejecutando_tarea);
 
 // Funciones para crear/destruir una tarea
 t_tarea* crear_tarea(char* string);
