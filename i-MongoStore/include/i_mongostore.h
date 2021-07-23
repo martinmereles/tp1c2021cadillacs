@@ -57,6 +57,8 @@ superbloque_config sb_config;
 t_bitarray bitmap;
 void* superbloquemap;
 char * blocksmap;
+char * blocksmapdisco;
+
 int sbfile;
 int bfile;
 char ** posiciones_sabotaje;

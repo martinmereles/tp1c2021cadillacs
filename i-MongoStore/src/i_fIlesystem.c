@@ -17,7 +17,8 @@ void * bajada_a_disco(void * arg){
 	while(1){
 		sleep(fs_config.tiempo_sincro);
 		log_warning(logger,"Bajando datos a disco...");
-		msync(blocksmap, blocks_stat.st_size, MS_SYNC);
+		memcpy(blocksmapdisco,blocksmap,blocks_stat.st_size);
+		msync(blocksmapdisco, blocks_stat.st_size, MS_SYNC);
 	}
 	return NULL;
 }
@@ -58,7 +59,9 @@ void mapear_blocks(){
 	}
 	//printf("el tamaño del archivo es de %d\n", (int)blocks_stat.st_size);
 	sem_wait(&sem_mutex_blocks);
-	blocksmap = mmap (NULL, blocks_stat.st_size, PROT_READ | PROT_WRITE ,MAP_SHARED, bfile, 0 );
+	blocksmap = calloc(1,blocks_stat.st_size);
+	blocksmapdisco = mmap (NULL, blocks_stat.st_size, PROT_READ | PROT_WRITE ,MAP_SHARED, bfile, 0 );
+	memcpy(blocksmap,blocksmapdisco,blocks_stat.st_size);
 	sem_post(&sem_mutex_blocks);
 	//test de grabado en mapeo
 	/*char * test = "se inicializo el tripulante 10";
