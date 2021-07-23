@@ -606,6 +606,8 @@ int submodulo_tripulante(void* args) {
 	int ciclos_ejecutando_sabotaje=0;
 	
 	char * indice_tripulante = string_itoa(tripulante->TID);
+
+	enviar_op_recibir_estado_tripulante(mi_ram_hq_fd_tripulante, 'N');
 		
 	while(!tripulante_finalizado){
 			
@@ -621,7 +623,6 @@ int submodulo_tripulante(void* args) {
 		switch(tripulante->estado){
 
 			case NEW:	// El tripulante espera hasta que el planificador lo saque de la cola de new
-				enviar_op_recibir_estado_tripulante(mi_ram_hq_fd_tripulante, 'N');
 				sem_post(&sem_hay_evento_planificable);
 				sem_wait(tripulante->sem_tripulante_dejo[NEW]);
 				break;

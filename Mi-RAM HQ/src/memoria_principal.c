@@ -11,8 +11,12 @@ int inicializar_estructuras_memoria(t_config* config_general, t_config* config_t
     if(inicializar_esquema_memoria(config_general, config_test) == EXIT_FAILURE)
         return EXIT_FAILURE;
     
+    sem_init(&mutex_tablas_patotas, 0, 1);
+
     // Inicializo la lista de tablas de patotas
+    sem_wait(&mutex_tablas_patotas);
     tablas_de_patotas = list_create();
+    sem_post(&mutex_tablas_patotas);
 
     // Inicializo semaforos
     sem_init(&reservar_liberar_memoria_mutex, 0, 1);
@@ -196,6 +200,7 @@ void liberar_estructuras_memoria(t_config* config){
         fclose(memoria_virtual);
         remove(path_swap);
     } 
+    sem_destroy(&mutex_tablas_patotas);
 
     free(memoria_principal);
     finalizar_mapa();   // Finalizo mapa
@@ -210,14 +215,14 @@ void leer_tarea_memoria_principal(void* tabla, char** tarea, uint32_t id_prox_ta
     uint32_t dir_log_tareas;
     leer_memoria_principal(tabla, DIR_LOG_PCB, DESPL_TAREAS, &dir_log_tareas, sizeof(uint32_t));
     
-    log_info(logger,"La direccion logica de las tareas es: %x", dir_log_tareas);
+    // log_info(logger,"La direccion logica de las tareas es: %x", dir_log_tareas);
 
     // Leemos la lista de tareas completa
     char* tareas = malloc(tamanio + 1);
     leer_memoria_principal(tabla, dir_log_tareas, 0, tareas, tamanio);
     tareas[tamanio] = '\0';
-    log_info(logger,"La lista de tareas es:\n %s",tareas);
-    log_info(logger,"El ID de la proxima tarea es: %d",id_prox_tarea);
+    // log_info(logger,"La lista de tareas es:\n %s",tareas);
+    // log_info(logger,"El ID de la proxima tarea es: %d",id_prox_tarea);
 
     // Obtenemos el array de tareas
     char** array_tareas = (char**) string_split(tareas, "\n");
@@ -244,8 +249,7 @@ void leer_tarea_memoria_principal(void* tabla, char** tarea, uint32_t id_prox_ta
 }
 
 void signal_handler(int senial){
-    log_info(logger,"Signal atendida por el hilo %d",syscall(__NR_gettid));
-
+    // log_info(logger,"Signal atendida por el hilo %d",syscall(__NR_gettid));
 	switch(senial){
 		case SIGUSR1:
             ejecutar_rutina(dump_memoria);

@@ -38,8 +38,6 @@ int tamanio_memoria;
 // Mapa de posiciones de memoria libres
 // SEGMENTACION
 t_list* lista_segmentos;
-// t_bitarray*	mapa_memoria_disponible;
-// char* bitarray_mapa_memoria_disponible;
 
 // ESTRUCTURAS PARA ADMINISTRAR LA MEMORIA PRINCIPAL
 
@@ -50,6 +48,7 @@ t_list* tablas_de_patotas;
 sem_t reservar_liberar_memoria_mutex;
 sem_t mutex_proceso_swap;
 sem_t mutex_temporal;
+sem_t mutex_tablas_patotas;
 
 // PUNTEROS A FUNCIONES GLOBALES
 // Sirven para apuntar a las funciones que implementan segmentacion o paginacion, segun la configuracion
