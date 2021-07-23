@@ -205,14 +205,14 @@ int existe_filesystem(){
 		bitmap = *bitarray_create_with_mode(super_bloque.bitarray,super_bloque.blocks/8,LSB_FIRST);
 		sem_post(&sem_mutex_bitmap);
 		//test sobre el bitarray
-		/*int sizeBitarray = bitarray_get_max_bit(&bitmap);
+		int sizeBitarray = bitarray_get_max_bit(&bitmap);
 		printf("size of bitarray = %d\n", sizeBitarray);
 		printf("test de bitarray:");
 		for(int i = 0; i<super_bloque.blocks; i++){
 			int test = bitarray_test_bit(&bitmap, i);
 			printf("%d",test);
 		}
-		printf("\n");
+		printf("\n");/*
 		int num = 0;
 		int prueba = bitarray_test_bit(&bitmap, num);
 		printf("test bit 1: %d\n", prueba);
@@ -238,6 +238,7 @@ int existe_filesystem(){
 		if(existe_archivo(block_path)){
 			log_info(logger, "Se encontro un archivo Blocks.ims existente");
 			free(block_path);
+			free(sb_path);
 			return 1;
 		}else{
 			blocks_create = fopen (block_path, "w");
@@ -246,6 +247,7 @@ int existe_filesystem(){
 			fclose(blocks_create);
 			log_info(logger, "No se encontro un archivo Blocks.ims existente y se creo uno en base a SuperBloque.ims");
 			free(block_path);
+			free(sb_path);
 			return 1;
 		}
 	}else{

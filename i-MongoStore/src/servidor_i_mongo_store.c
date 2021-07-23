@@ -13,7 +13,7 @@ __thread t_config_tarea tarea_config;
 __thread t_config * bitacora_config_file;
 __thread t_config_bitacora bitacora_config;
 __thread t_trip tripulante;
-__thread char* path_bitacora;
+//__thread char* path_bitacora;
 
 void liberar_recursos_thread(){
     config_destroy(bitacora_config_file);
@@ -56,13 +56,13 @@ void iniciar_tripulante(char* payload){
     //string_append(&mensaje, "\n");
     tripulante.TID = TID;
     tripulante.PID = PID;
-    char * path_relativo= string_new();
+    /*char * path_relativo= string_new();
     string_append(&path_relativo, "/Files/Bitacoras/Tripulante");
     char * tidstr = string_itoa(TID);
     string_append(&path_relativo, tidstr);
     string_append(&path_relativo, ".ims");
     path_bitacora= crear_path_absoluto(path_relativo);
-    free(tidstr);
+    free(tidstr);*/
     //free(path_relativo);
     //escribir_bitacora(mensaje);
 }
@@ -71,6 +71,8 @@ void iniciar_tripulante(char* payload){
 
 void escribir_bitacora(char* mensaje){
     printf("\nBIT: trip:%d\nBIT: largo de mensaje: %d\nmensaje:%s\n",tripulante.TID, strlen(mensaje),mensaje);
+    char * path_relativo = string_from_format("/Files/Bitacoras/Tripulante%d.ims",tripulante.TID);
+    char * path_bitacora = crear_path_absoluto(path_relativo);
     char ** bloques_usables;
     int cantidad_de_bloques;
     int offset_bitacora=0;
@@ -128,6 +130,8 @@ void escribir_bitacora(char* mensaje){
         free(blockcountstr);
         config_destroy(bitacora_config_file);
         free(bloques_config);
+        free(path_relativo);
+        free(path_bitacora);
         liberar_char_array(bloques_usables);
     }else{
         printf("existe bitacora\n");
@@ -226,6 +230,8 @@ void escribir_bitacora(char* mensaje){
         liberar_char_array(lista_bloques);
         free(bloques_config_final);
         free(bloques_config);
+        free(path_relativo);
+        free(path_bitacora);
     }
     
 }
@@ -329,7 +335,7 @@ int recibir_tarea(char* payload){
                 //printf("hice post soy trip%d\n",tripulante.TID);
                 sem_post(&sem_mutex_oxigeno);
                 log_info(logger, "se genero %s unidades de oxigeno",nombre_parametros[1]);
-                //free(path);
+                free(path);
                 break;
             }
             case CONSUMIR_OXIGENO:{
@@ -337,7 +343,7 @@ int recibir_tarea(char* payload){
                 sem_wait(&sem_mutex_oxigeno);
                 consumir_recurso(path,"Oxigeno",nombre_parametros[1]);
                 sem_post(&sem_mutex_oxigeno);
-                //free(path);
+                free(path);
                 break;
             }
             case GENERAR_COMIDA:{
@@ -347,7 +353,7 @@ int recibir_tarea(char* payload){
                 generar_recurso(path, caracter_llenado, nombre_parametros[1]);
                 sem_post(&sem_mutex_comida);
                 log_info(logger, "se genero %s unidades de comida",nombre_parametros[1]);
-                //free(path);
+                free(path);
                 break;
             }
             case CONSUMIR_COMIDA:{
@@ -355,7 +361,7 @@ int recibir_tarea(char* payload){
                 sem_wait(&sem_mutex_comida);
                 consumir_recurso(path,"Comida",nombre_parametros[1]);
                 sem_post(&sem_mutex_comida);
-                //free(path);
+                free(path);
                 break;
             }
             case GENERAR_BASURA:{
@@ -365,7 +371,7 @@ int recibir_tarea(char* payload){
                 generar_recurso(path, caracter_llenado, nombre_parametros[1]);
                 sem_post(&sem_mutex_basura);
                 log_info(logger, "se genero %s unidades de basura",nombre_parametros[1]);
-                //free(path);
+                free(path);
                 break;
             }
             case DESCARTAR_BASURA:{
@@ -748,7 +754,7 @@ void generar_recurso(char* path, char caracter_llenado,char* parametro){
                     free(fill);
                 }
             }    
-            free(bloques_usables);
+            liberar_char_array(bloques_usables);
         }else{
             bloques_config = string_new();
             string_append(&bloques_config, tarea_config.blocks);
@@ -789,10 +795,13 @@ void generar_recurso(char* path, char caracter_llenado,char* parametro){
         printf("el md5 es: %s \n",md5);
         config_save(tarea_config_file);
         config_destroy(tarea_config_file);
+        free(buffer_temporal);
+        free(md5_str);
         free(md5);
         free(sizestr);
         free(blockcountstr);
         liberar_char_array(lista_bloques);
+        liberar_char_array(lista_bloques_temp);
         free(bloques_config);
     }
 }
@@ -890,6 +899,7 @@ void consumir_recurso(char* path, char* nombre_recurso ,char* parametro){
             printf("el md5 es: %s \n",md5);
             config_save(tarea_config_file);
             config_destroy(tarea_config_file);
+            free(md5_str);
             free(md5);
             free(sizestr);
             free(blockcountstr);
@@ -943,6 +953,8 @@ void consumir_recurso(char* path, char* nombre_recurso ,char* parametro){
             printf("el md5 es: %s \n",md5);
             config_save(tarea_config_file);
             config_destroy(tarea_config_file);
+            free(md5_str);
+            free(md5);
             free(cerostr);
             free(bloques_config);
             liberar_char_array(lista_bloques);

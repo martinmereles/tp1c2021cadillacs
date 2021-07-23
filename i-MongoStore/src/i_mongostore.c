@@ -57,9 +57,9 @@ int main(int argc, char *argv[])
 	log_info(logger, "I-MongoStore listo para recibir al Discordiador");
 
 	i_mongo_store(server_fd);
-
-	log_info(logger, "Cerrando socket servidor");
 	liberar_recursos();
+	log_info(logger, "Cerrando socket servidor");
+	
 	
 	return EXIT_SUCCESS;
 }
@@ -67,13 +67,11 @@ int main(int argc, char *argv[])
 void liberar_recursos(){
 	munmap(superbloquemap, superbloque_stat.st_size);
 	munmap(blocksmap, blocks_stat.st_size);
-	bitarray_destroy(&bitmap);
 	free(super_bloque.bitarray);
-	//config_destroy(config);
-	//config_destroy(config_superbloque);
+	//bitarray_destroy(&bitmap);
 	config_destroy(config_test);
 	config_destroy(config_general);
-	log_destroy(logger);
+	//log_destroy(logger);
 	close(server_fd);
 	close(sbfile);
 	close(bfile);
