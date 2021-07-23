@@ -252,8 +252,6 @@ int escribir_memoria_principal_paginacion(void* args, uint32_t inicio_logico, ui
         return EXIT_FAILURE;
     }   
     
-    //log_info(logger,"DIRECCION FISICA A ESCRIBIR: %d (DL: %x)", direccion_fisica_dato, direccion_logica);
-
     int desplazamiento = get_desplazamiento(direccion_logica);
 
     /* Voy a empezar a escribir el dato en la pagina actual:
@@ -270,6 +268,8 @@ int escribir_memoria_principal_paginacion(void* args, uint32_t inicio_logico, ui
     // Escribo el dato en memoria principal
     memcpy(memoria_principal + direccion_fisica_dato, dato, tamanio_escritura_pagina_actual);
    
+    log_trace(logger,"Acceso a memoria: Pat. %d: Pag. %d", pagina->PID, pagina->numero_pagina);
+
     // Actualizo informacion de la pagina
     actualizar_timestamp(pagina);   // LRU
     pagina->bit_uso = true;         // Clock
@@ -331,6 +331,8 @@ int leer_memoria_principal_paginacion(void* args, uint32_t inicio_logico, uint32
 
     // Leo el dato de memoria principal
     memcpy(dato, memoria_principal + direccion_fisica_dato, tamanio_lectura_pagina_actual);
+
+   log_trace(logger,"Acceso a memoria: Pat. %d: Pag. %d", pagina->PID, pagina->numero_pagina);
 
     // Actualizo informacion de la pagina
     actualizar_timestamp(pagina);   // LRU
@@ -410,6 +412,10 @@ int crear_pagina(tabla_paginas_t* tabla_patota){
     list_add(tabla_patota->paginas,pagina);
     sem_post(tabla_patota->semaforo);
 
+
+    if(pagina->bit_presencia == true)
+        log_debug(logger, "Marco %2d: Reservado", pagina->numero_marco);
+    
     sem_post(pagina->semaforo);
 
     return EXIT_SUCCESS;
