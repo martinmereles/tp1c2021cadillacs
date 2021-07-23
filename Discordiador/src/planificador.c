@@ -38,7 +38,7 @@ int dispatcher(void *algor_planif){
             // Se admiten en el sistema cada uno de los tripulantes creados
             sem_wait(&sem_mutex_ingreso_tripulantes_new);
             if( existen_tripulantes_en_cola(NEW) ){
-                //log_debug(logger, "Atendiendo COLA NEW");
+                log_debug(logger, "Atendiendo COLA NEW");
                 tripulante = desencolar(NEW); 
                 transicion(tripulante, NEW, READY);
                 sem_post(&sem_mutex_ingreso_tripulantes_new);
@@ -47,7 +47,7 @@ int dispatcher(void *algor_planif){
             sem_post(&sem_mutex_ingreso_tripulantes_new);
             
             if( hay_espacio_disponible(grado_multiproc) && existen_tripulantes_en_cola(READY) ){
-                //log_debug(logger, "Atendiendo COLA READY");
+                log_debug(logger, "Atendiendo COLA READY");
                 tripulante = desencolar(READY);
                 transicion(tripulante, READY, EXEC);
                 break;
@@ -55,7 +55,7 @@ int dispatcher(void *algor_planif){
 
             // Consulto si hay que atender Bloqueos IO
             if(existen_tripulantes_en_cola(BLOCKED_IO_TO_READY)){
-                //log_debug(logger, "Atendiendo COLA BLOCKED IO TO READY");
+                log_debug(logger, "Atendiendo COLA BLOCKED IO TO READY");
                 get_buffer_peticiones_and_swap(BLOCKED_IO_TO_READY);
 
                 // Si quedo algun tripulante en la cola, al primero le dejo usar el dispositivo de E/S
@@ -66,7 +66,7 @@ int dispatcher(void *algor_planif){
             }
 
             if(existen_tripulantes_en_cola(EXEC_TO_BLOCKED_IO)){
-                //log_debug(logger, "Atendiendo COLA EXEC TO BLOCKED IO");
+                log_debug(logger, "Atendiendo COLA EXEC TO BLOCKED IO");
 
                 int cant_tripulantes = cantidad_tripulantes_en_cola(BLOCKED_IO);
 
@@ -542,7 +542,6 @@ t_tripulante* iniciador_tripulante(int tid, int pid, int pos_x, int pos_y){
 
     // Lo agrego a la lista global de tripulantes ordenado por TID
     list_add_sorted(lista_tripulantes, nuevo, tripulante_tid_es_menor_que);
-    encolar(NEW, nuevo);
     return nuevo;
 }
 
