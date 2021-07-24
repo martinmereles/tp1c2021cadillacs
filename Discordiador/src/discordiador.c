@@ -34,6 +34,7 @@ int main(int argc, char *argv[])
 	sem_init(&sem_generador_PID, 0, 1);
 	sem_init(&sem_generador_TID, 0, 1);
 	sem_init(&sem_struct_iniciar_tripulante, 0, 0);
+    sem_init(&sem_postear_evento_planificable, 0, 0);
 	//semaforos sabotaje
 	sem_init(&sem_sabotaje_finalizado,0,0);
 	//sem_init(&sem_sabotaje_tripulante,0,0);
@@ -336,8 +337,8 @@ void leer_consola_y_procesar(int i_mongo_store_fd, int mi_ram_hq_fd) {
 	
 			if (estado_planificador == PLANIFICADOR_RUNNING){
 				dispatcher_pausar();
-				log_debug(logger, "Fue pausado exitosamente");
-			}else 
+			}
+			else 
 				log_debug(logger, "Ya esta pausado");
 			
 			break;
@@ -608,7 +609,8 @@ int submodulo_tripulante(void* args) {
 	char * indice_tripulante = string_itoa(tripulante->TID);
 
 	enviar_op_recibir_estado_tripulante(mi_ram_hq_fd_tripulante, 'N');
-		
+	encolar(NEW, tripulante);
+
 	while(!tripulante_finalizado){
 			
 		// Si la planificacion fue pausada, se bloquea el tripulante
@@ -623,7 +625,6 @@ int submodulo_tripulante(void* args) {
 		switch(tripulante->estado){
 
 			case NEW:	// El tripulante espera hasta que el planificador lo saque de la cola de new
-				encolar(NEW, tripulante);
 				sem_post(&sem_hay_evento_planificable);
 				sem_wait(tripulante->sem_tripulante_dejo[NEW]);
 				break;
@@ -690,7 +691,7 @@ int submodulo_tripulante(void* args) {
 				if(ciclos_en_estado_actual == tarea->duracion){
 
 					// TODO: Avisa que finalizo la tarea
-					log_error(logger,"T%2d: Ciclo Tarea I/O: Tarea completada", tripulante->TID);
+					log_warning(logger,"T%2d: Ciclo Tarea I/O: Tarea completada", tripulante->TID);
 					enviar_operacion(i_mongo_store_fd_tripulante, COD_TERMINAR_TAREA, tarea->string, strlen(tarea->string)+1);
 					destruir_tarea(tarea);
 
@@ -710,7 +711,7 @@ int submodulo_tripulante(void* args) {
 
 				// Se crea un hilo aparte que termina despues de un ciclo
 				ciclo = crear_ciclo_cpu();	
-				log_error(logger,"T%2d: Ciclo Tarea I/O: Quedan %d", tripulante->TID, tarea->duracion - ciclos_en_estado_actual);			
+				log_warning(logger,"T%2d: Ciclo Tarea I/O: Quedan %d", tripulante->TID, tarea->duracion - ciclos_en_estado_actual);			
 
 				ciclos_en_estado_actual++;
 				

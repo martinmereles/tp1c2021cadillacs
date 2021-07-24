@@ -98,6 +98,7 @@ t_tripulante * tripulante_elegido;
 t_sabotaje posicion_sabotaje;
 sem_t sem_mutex_ingreso_tripulantes_new;
 sem_t sem_mutex_ejecutar_dispatcher;
+sem_t sem_postear_evento_planificable;
 
 
 // Revisar semaforos
