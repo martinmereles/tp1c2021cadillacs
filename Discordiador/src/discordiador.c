@@ -623,6 +623,7 @@ int submodulo_tripulante(void* args) {
 		switch(tripulante->estado){
 
 			case NEW:	// El tripulante espera hasta que el planificador lo saque de la cola de new
+				encolar(NEW, tripulante);
 				sem_post(&sem_hay_evento_planificable);
 				sem_wait(tripulante->sem_tripulante_dejo[NEW]);
 				break;
@@ -636,7 +637,6 @@ int submodulo_tripulante(void* args) {
 				}
 				enviar_op_recibir_estado_tripulante(mi_ram_hq_fd_tripulante, 'R');	
 				if(tarea == NULL){
-					// PEDIR TAREA A LA RAM
 					tarea = obtener_proxima_tarea(mi_ram_hq_fd_tripulante, tripulante, &ciclos_ejecutando_tarea);
 				}
 				sem_post(&sem_hay_evento_planificable);
@@ -721,6 +721,10 @@ int submodulo_tripulante(void* args) {
 			case EXEC:
 				// printf("imprimo tid\n");
 				// printf("soy trip %d y entre en exec\n",tripulante->TID);
+				if(tarea == NULL){
+					tarea = obtener_proxima_tarea(mi_ram_hq_fd_tripulante, tripulante, &ciclos_ejecutando_tarea);
+				}
+
 				if(sabotaje_activo){
 					ciclo = crear_ciclo_cpu();
 					if(primer_ciclo){
