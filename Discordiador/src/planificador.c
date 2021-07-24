@@ -82,7 +82,7 @@ int dispatcher(void *algor_planif){
             }
 
             // Consulto si hay sabotaje
-            if( hay_sabotaje() ){
+            /*if( hay_sabotaje() ){
                 //Atendiendo sabotaje
                 log_debug(logger, "Atendiendo COLA BLOCKED_EMERGENCY");
                 if (bloquear_tripulantes_por_sabotaje() != EXIT_SUCCESS)
@@ -92,7 +92,7 @@ int dispatcher(void *algor_planif){
                 log_debug(logger, "Termino sabotaje"); 
                 desbloquear_tripulantes_tras_sabotaje();
                 break;
-            }
+            }*/
 
             // Si hay tripulantes que se quedaron sin quantum (transicion EXEC_TO_READY)
             if( existen_tripulantes_en_cola(EXEC_TO_READY) ){
@@ -382,10 +382,10 @@ int bloquear_tripulantes_por_sabotaje(void){
     sabotaje_activo=1;
     // Si no hay nadie para atender el sabotaje, falla, y no continua el sabotaje
     if (!existen_tripulantes_en_cola(BLOCKED_EMERGENCY)){
-        printf("no existen tripulantes disponibles\n");
+        //printf("no existen tripulantes disponibles\n");
         int valor_semaforo;
         sem_getvalue(&sem_tripulante_disponible, &valor_semaforo);
-        printf("valor semaforo:%d \n",valor_semaforo);
+        //printf("valor semaforo:%d \n",valor_semaforo);
         sem_wait(&sem_tripulante_disponible);
     }
 
@@ -407,7 +407,7 @@ int bloquear_tripulantes_por_sabotaje(void){
 
 
 void desbloquear_tripulantes_tras_sabotaje(void){
-    printf("desbloqueando tripulantes\n");
+    //printf("desbloqueando tripulantes\n");
     // Paso los tripulantes de las colas temporales a las comunes. Si estaban pausados, los reanudo
     queue_clean(cola[EXEC]);
     queue_clean(cola[READY]);

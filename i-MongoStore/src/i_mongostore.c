@@ -9,9 +9,10 @@ void handler(int num){
 		char * payload = posiciones_sabotaje[num_sabotaje];
 		num_sabotaje++;
 		enviar_operacion(discordiador_fd,COD_MANEJAR_SABOTAJE,payload,strlen(payload)+1);
+		log_debug(logger,"Posicion de sabotaje informada al discordiador");
+		free(payload);
 	}else{
-		char * payload = "";
-		enviar_operacion(discordiador_fd,COD_MANEJAR_SABOTAJE_INEXISTENTE,payload,strlen(payload)+1);
+		log_error(logger,"No hay posiciones de sabotaje restantes.");
 	}
 	
 }
