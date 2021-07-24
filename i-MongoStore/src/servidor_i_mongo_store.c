@@ -387,6 +387,9 @@ int recibir_tarea(char* payload){
                         liberar_bit(&bitmap,atoi(lista_bloques[i]));
                         sem_post(&sem_mutex_bitmap);
                     }
+                    char * bloques_liberados = string_from_format("Bloques %s liberados",tarea_config.blocks);
+                    log_debug(logger,bloques_liberados);
+                    free(bloques_liberados);
                     remove(path);
                     liberar_char_array(lista_bloques);
                     config_destroy(tarea_config_file);
@@ -856,6 +859,9 @@ void consumir_recurso(char* path, char* nombre_recurso ,char* parametro){
                 sem_post(&sem_mutex_blocks);
                //printf("entro BITMAP\n");
                 sem_wait(&sem_mutex_bitmap);
+                char * bloques_liberados = string_from_format("Bloque %s liberado por consumir %s",lista_bloques[i],nombre_recurso);
+                log_debug(logger,bloques_liberados);
+                free(bloques_liberados);
                 liberar_bit(&bitmap,atoi(lista_bloques[i]));
                 sem_post(&sem_mutex_bitmap);
                 free(fill);
@@ -919,6 +925,10 @@ void consumir_recurso(char* path, char* nombre_recurso ,char* parametro){
                 sem_post(&sem_mutex_bitmap);
                 free(fill);
             }
+            char * bloques_liberados = string_from_format("Bloques %s liberados",tarea_config.blocks);
+            log_debug(logger,bloques_liberados);
+            free(bloques_liberados);
+
             //printf("sali del for \n");
             char * bloques_config = array_block_to_string(lista_bloques,0);
 
