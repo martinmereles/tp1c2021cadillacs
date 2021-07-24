@@ -1074,8 +1074,6 @@ void leer_ubicacion_tripulante_mi_ram_hq(int mi_ram_hq_fd_tripulante, int* posic
 	}
 }
 
-	
-
 enum comando_discordiador string_to_comando_discordiador(char* string){
 	if(strcmp(string,"INICIAR_PATOTA")==0)
 		return INICIAR_PATOTA;
